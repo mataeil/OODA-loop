@@ -1,6 +1,6 @@
-# CONCEPTS — ooda-harness Glossary & Architecture
+# CONCEPTS — OODA-loop Glossary & Architecture
 
-This document defines the key terms and architectural patterns used in ooda-harness.
+This document defines the key terms and architectural patterns used in OODA-loop.
 It is intended for solo indie hackers and side project developers who want to understand
 how the OODA-based autonomous AI agent engine works before configuring or extending it.
 
@@ -9,7 +9,7 @@ how the OODA-based autonomous AI agent engine works before configuring or extend
 ## The OODA Loop
 
 Boyd's OODA loop (Observe → Orient → Decide → Act) is the engine behind every autonomous cycle.
-In ooda-harness, each `/evolve` run executes one complete loop:
+In OODA-loop, each `/evolve` run executes one complete loop:
 
 - **Observe** — Collect signals from all configured domains: service health, test results,
   backlog size, GitHub PR status, and any other data sources your config defines.
@@ -95,7 +95,7 @@ User runs /evolve
 ## File Structure
 
 ```
-ooda-harness/
+OODA-loop/
 ├── agent/
 │   ├── skills/             # Skill definitions, organized by phase
 │   │   ├── observe/        # Data collection skills

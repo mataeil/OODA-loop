@@ -1,4 +1,4 @@
-# ooda-harness
+# OODA-loop
 
 **An autonomous brain for your codebase — powered by Boyd's OODA loop and Claude Code**
 
@@ -10,27 +10,27 @@
 
 ## What is this?
 
-ooda-harness is an open-source autonomous agent framework that gives your codebase a self-managing loop. It uses Boyd's OODA cycle — Observe, Orient, Decide, Act — to continuously monitor your project, learn from past outcomes, choose the highest-priority action, and execute it by running skills and creating pull requests. Unlike scheduled scripts or simple automation, ooda-harness builds and maintains a world model: it knows what changed, what worked, what failed, and why.
+OODA-loop is an open-source autonomous agent framework that gives your codebase a self-managing loop. It uses Boyd's OODA cycle — Observe, Orient, Decide, Act — to continuously monitor your project, learn from past outcomes, choose the highest-priority action, and execute it by running skills and creating pull requests. Unlike scheduled scripts or simple automation, OODA-loop builds and maintains a world model: it knows what changed, what worked, what failed, and why.
 
 The framework has been battle-tested on a production service (a URL shortening platform) running 14 autonomous cycles successfully. It is designed specifically for Claude Code and runs entirely within your repository.
 
 ---
 
-## Why ooda-harness?
+## Why OODA-loop?
 
 - **vs. cron scripts**: Cron runs on schedule. OODA runs on need.
 - **vs. simple automation**: Automation follows rules. OODA builds a world model and learns.
 - **vs. manual ops**: You set the domains and safety levels. The harness does the rest.
-- **vs. AI copilots**: Copilots answer questions. ooda-harness acts autonomously and tracks consequences.
-- **vs. one-shot agents**: One-shot agents forget. ooda-harness accumulates memory across cycles.
+- **vs. AI copilots**: Copilots answer questions. OODA-loop acts autonomously and tracks consequences.
+- **vs. one-shot agents**: One-shot agents forget. OODA-loop accumulates memory across cycles.
 
 ---
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/ooda-harness/ooda-harness.git
-cd ooda-harness
+git clone https://github.com/mataeil/OODA-loop.git
+cd OODA-loop
 cp config.example.json config.json
 # Edit config.json with your project details
 ```
@@ -49,7 +49,7 @@ Your first `/evolve` run will observe all configured domains and write initial s
 
 ## Progressive Complexity
 
-ooda-harness is designed to earn your trust. Start at Level 0 and move up only when the observations look right.
+OODA-loop is designed to earn your trust. Start at Level 0 and move up only when the observations look right.
 
 | Level | Name | What happens |
 |-------|------|-------------|
@@ -111,7 +111,7 @@ See [config.example.json](config.example.json) for the full annotated schema.
 
 ## Safety
 
-ooda-harness is designed to be safe by default. Level 0 cannot create PRs. Level 3 requires deliberate opt-in.
+OODA-loop is designed to be safe by default. Level 0 cannot create PRs. Level 3 requires deliberate opt-in.
 
 - **HALT file** — `agent/safety/HALT` stops everything instantly. Create the file to pause the harness. Delete it to resume. No code needed.
 - **Protected paths** — `agent/safety/*`, `agent/skills/meta/*`, and `agent/contracts/*` cannot be modified by the harness. The agent cannot rewrite its own safety rules.
@@ -127,7 +127,7 @@ See [SECURITY.md](SECURITY.md) for the full threat model, protected path policy,
 
 ## Built-in Skills
 
-ooda-harness ships with five operational skills organized by OODA phase, plus three wizard commands:
+OODA-loop ships with five operational skills organized by OODA phase, plus three wizard commands:
 
 | Skill | Phase | Description |
 |-------|-------|-------------|
@@ -158,7 +158,7 @@ The skill interface specification is defined in `agent/contracts/schema.md`. All
 
 ## Contributing
 
-ooda-harness is open source and welcomes contributions: new domain skills, scoring formula improvements, integrations (GitHub Actions, Slack, PagerDuty), and documentation. Before submitting a PR, please read [CONTRIBUTING.md](CONTRIBUTING.md) for the skill authoring guide, domain registration steps, and the code style rules. All skill PRs must include a contract-compliant example output.
+OODA-loop is open source and welcomes contributions: new domain skills, scoring formula improvements, integrations (GitHub Actions, Slack, PagerDuty), and documentation. Before submitting a PR, please read [CONTRIBUTING.md](CONTRIBUTING.md) for the skill authoring guide, domain registration steps, and the code style rules. All skill PRs must include a contract-compliant example output.
 
 ---
 

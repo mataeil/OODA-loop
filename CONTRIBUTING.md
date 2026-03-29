@@ -1,4 +1,4 @@
-# Contributing to ooda-harness
+# Contributing to OODA-loop
 
 Thank you for your interest in contributing. All contributions are valued — whether you are
 fixing a typo, improving a skill prompt, or proposing a change to the core engine. This guide
@@ -14,7 +14,7 @@ your familiarity with the project.
 ### Tier 1: Skills (recommended entry point)
 
 Skills are self-contained slash commands in `agent/skills/`. They are the easiest way to extend
-ooda-harness without touching the core engine.
+OODA-loop without touching the core engine.
 
 What you can do:
 - Write new domain skills (observe, detect, strategize, execute, support)
@@ -61,8 +61,8 @@ for autonomous operation safety and self-modification protection — they need t
 ## Development Setup
 
 ```bash
-git clone https://github.com/ooda-harness/ooda-harness.git
-cd ooda-harness
+git clone https://github.com/mataeil/OODA-loop.git
+cd OODA-loop
 cp config.example.json config.json
 # Edit config.json for your test project
 # Never commit config.json — it is in .gitignore

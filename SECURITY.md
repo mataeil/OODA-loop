@@ -1,12 +1,12 @@
-# Security Policy — ooda-harness
+# Security Policy — OODA-loop
 
 ## Reporting Vulnerabilities
 
 **Do not open public GitHub issues for security bugs.**
 
-Security vulnerabilities in ooda-harness should be reported privately to:
+Security vulnerabilities in OODA-loop should be reported privately to:
 
-    security@ooda-harness.dev
+    security@OODA-loop.dev
 
 Include a description of the issue, steps to reproduce, and the potential impact.
 We practice responsible disclosure: reporters will receive acknowledgment within
@@ -17,7 +17,7 @@ public disclosure until a fix is available.
 
 ## Threat Model
 
-ooda-harness is an autonomous AI agent that can read your codebase, open pull
+OODA-loop is an autonomous AI agent that can read your codebase, open pull
 requests, run deployment workflows, and at Level 3 merge PRs without human
 approval. This capability creates a threat surface that differs from ordinary
 software. The threats and mitigations below reflect deliberate design decisions.
@@ -249,6 +249,6 @@ your budget; setting it to `0` disables the hard stop (not recommended).
 
 ## Supported Versions
 
-Only the **latest release** of ooda-harness receives security patches. If you
+Only the **latest release** of OODA-loop receives security patches. If you
 are running an older version, upgrade before reporting a vulnerability or
 applying a fix.

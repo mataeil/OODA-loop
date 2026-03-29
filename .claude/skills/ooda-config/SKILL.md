@@ -1,6 +1,6 @@
 ---
 name: ooda-config
-description: Configuration management for ooda-harness. View, modify, and validate config.json settings via slash commands.
+description: Configuration management for OODA-loop. View, modify, and validate config.json settings via slash commands.
 version: "1.0.0"
 input:
   files: [config.json]

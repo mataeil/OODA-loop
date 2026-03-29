@@ -1,6 +1,6 @@
 # Skill Contract Schema
 
-Every skill in ooda-harness declares a contract. The engine reads these
+Every skill in OODA-loop declares a contract. The engine reads these
 contracts to route OODA cycles, validate safety rules, and wire up chain
 triggers between skills. If a skill has no contract, evolve will refuse to
 call it.

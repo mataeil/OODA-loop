@@ -1,11 +1,11 @@
 ---
 name: ooda-status
-description: Display ooda-harness status dashboard. Shows cycle count, domain states, confidence scores, action queue, and alerts in a single view.
+description: Display OODA-loop status dashboard. Shows cycle count, domain states, confidence scores, action queue, and alerts in a single view.
 ---
 
 # /ooda-status — Status Dashboard
 
-Display the current state of the ooda-harness at a glance.
+Display the current state of the OODA-loop at a glance.
 
 ## Step 0: Safety Check
 
@@ -89,7 +89,7 @@ Replace `{placeholders}` with the computed values from Step 2.
 
 ```
 ╔══════════════════════════════════════════╗
-║  ooda-harness status                     ║
+║  OODA-loop status                     ║
 ╠══════════════════════════════════════════╣
 ║ Cycle: #{N}  Last: {ago}  Level: {N}     ║
 ╠══════════════════════════════════════════╣

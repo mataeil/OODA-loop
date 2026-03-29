@@ -5,7 +5,7 @@ description: 3-step project setup wizard. Auto-detects language, test framework,
 
 # ooda-setup — Project Setup Wizard
 
-Entry point for new users. Run `/ooda-setup` after cloning ooda-harness.
+Entry point for new users. Run `/ooda-setup` after cloning OODA-loop.
 Runs a 3-step interactive wizard: scan → confirm domains → write config.json.
 
 ---

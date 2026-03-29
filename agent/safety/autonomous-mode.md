@@ -1,6 +1,6 @@
 # Autonomous Mode — Safety Policy
 
-This document is the runtime safety contract for ooda-harness. Every skill and
+This document is the runtime safety contract for OODA-loop. Every skill and
 the evolve engine MUST read and obey these rules. Violations are bugs.
 
 All thresholds and limits are read from `config.json` at runtime. This document

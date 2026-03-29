@@ -1,4 +1,4 @@
-# CLAUDE.md — ooda-harness
+# CLAUDE.md — OODA-loop
 
 Boyd의 OODA 루프 기반 자율운영 AI 에이전트 하네스.
 
@@ -13,4 +13,4 @@ Boyd의 OODA 루프 기반 자율운영 AI 에이전트 하네스.
 
 이전 세션의 설계 결정, 7-Agent 리뷰 결과, 구현 계획:
 - `.claude/context.md`
-- `.claude/plans/ooda-harness-plan.md`
+- `.claude/plans/OODA-loop-plan.md`

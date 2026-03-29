@@ -5,7 +5,7 @@ description: OODA Meta-Orchestrator. Observes all domain states, orients by lear
 
 # evolve: OODA Meta-Orchestrator -- Autonomous Decision Engine
 
-evolve is the brain of ooda-harness. It sits above every domain skill and runs
+evolve is the brain of OODA-loop. It sits above every domain skill and runs
 one full OODA loop per cycle: Observe the world, Orient by analyzing patterns
 and updating beliefs, Decide which domain needs attention most, then Act by
 invoking the winning skill.
@@ -585,7 +585,7 @@ Re-sort pending by effective_rice descending.
 
 ```
 for each provider in config.notifications where enabled:
-  Build message: "ooda-harness cycle #{N}: {domain} -> {result}"
+  Build message: "OODA-loop cycle #{N}: {domain} -> {result}"
   Send via provider API (resolve $ENV_VAR references from environment).
   On failure: increment failure counter.
     3 consecutive failures -> auto-disable provider at runtime

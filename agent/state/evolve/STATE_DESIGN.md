@@ -1,4 +1,4 @@
-# State File Design — ooda-harness evolve engine
+# State File Design — OODA-loop evolve engine
 
 This document specifies every state file under `agent/state/evolve/`, including full
 schemas, retention policies, cascade rules, and the rationale behind each design decision.
