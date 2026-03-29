@@ -1,0 +1,147 @@
+{
+  "schema_version": "1.0.0",
+  "project": {
+    "name": "my-app",
+    "locale": "en",
+    "timezone": "UTC"
+  },
+  "domains": {
+    "service_health": {
+      "weight": 2.0,
+      "state_file": "agent/state/service_health.json",
+      "primary_skill": "/scan-health",
+      "chain": [],
+      "fallback": true,
+      "enabled": true
+    },
+    "test_coverage": {
+      "weight": 0.5,
+      "state_file": "agent/state/test_coverage.json",
+      "primary_skill": "/check-tests",
+      "chain": [],
+      "fallback": true,
+      "enabled": true
+    },
+    "backlog": {
+      "weight": 0.3,
+      "state_file": "agent/state/backlog.json",
+      "primary_skill": "/plan-backlog",
+      "chain": [],
+      "fallback": false,
+      "enabled": true
+    },
+    "business_strategy": {
+      "weight": 1.0,
+      "state_file": "agent/state/business_strategy.json",
+      "primary_skill": "/scan-market",
+      "chain": [],
+      "fallback": true,
+      "enabled": true
+    },
+    "ux_evolution": {
+      "weight": 1.0,
+      "state_file": "agent/state/ux_evolution.json",
+      "primary_skill": "/scan-ux",
+      "chain": [],
+      "fallback": true,
+      "enabled": true
+    },
+    "competitors": {
+      "weight": 0.3,
+      "state_file": "agent/state/competitors.json",
+      "primary_skill": "/scan-competitors",
+      "chain": [],
+      "fallback": false,
+      "enabled": true
+    }
+  },
+  "implementation": {
+    "enabled": false,
+    "weight": 1.5,
+    "primary_skill": "/dev-cycle",
+    "observe_loop_escape_bonus": 5.0
+  },
+  "scoring": {
+    "goal_weight": 0.3,
+    "confidence_weight": 0.2,
+    "hours_if_never_run": 168,
+    "implementation_formula": {
+      "pending_multiplier": 2.0,
+      "age_multiplier": 0.1,
+      "rice_multiplier": 0.01,
+      "open_pr_penalty": -3.0
+    }
+  },
+  "confidence": {
+    "initial": 0.5,
+    "merge_boost": 0.1,
+    "reject_penalty": 0.2,
+    "min": 0.1,
+    "max": 1.0
+  },
+  "safety": {
+    "halt_file": "agent/safety/HALT",
+    "confidence_threshold": 0.6,
+    "min_cycle_interval_minutes": 30,
+    "max_prs_per_cycle": 1,
+    "first_cycle_observe_only": true,
+    "max_files_per_pr": 20,
+    "max_lines_per_pr": 500,
+    "protected_paths": [
+      "agent/safety/*",
+      "agent/skills/meta/*",
+      "agent/contracts/*"
+    ],
+    "skill_allowlist": ["/scan-health", "/check-tests", "/plan-backlog", "/run-deploy", "/dev-cycle"]
+  },
+  "progressive_complexity": {
+    "current_level": 0,
+    "levels": {
+      "0": {
+        "name": "Just watching",
+        "domains": 1,
+        "implementation": false,
+        "auto_merge": false
+      },
+      "1": {
+        "name": "Watching + testing",
+        "domains": 2,
+        "implementation": false,
+        "auto_merge": false
+      },
+      "2": {
+        "name": "Full observation",
+        "domains": "all",
+        "implementation": false,
+        "auto_merge": false
+      },
+      "3": {
+        "name": "Autonomous",
+        "domains": "all",
+        "implementation": true,
+        "auto_merge": true
+      }
+    }
+  },
+  "memory": {
+    "working_memory_size": 20,
+    "episode_retention_weeks": 52,
+    "contrarian_check_interval": 10,
+    "action_queue_decay_days": 14,
+    "action_queue_decay_amount": 0.05
+  },
+  "test_command": "npm test",
+  "health_endpoints": [],
+  "deploy_workflow": null,
+  "notifications": {
+    "telegram": {
+      "enabled": false,
+      "bot_token": "$OODA_TELEGRAM_BOT_TOKEN",
+      "chat_id": "$OODA_TELEGRAM_CHAT_ID"
+    }
+  },
+  "cost": {
+    "daily_limit_usd": 10.0,
+    "warning_threshold_pct": 80
+  }
+}
