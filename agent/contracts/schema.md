@@ -258,7 +258,7 @@ description: >
 input:
   files:
     - agent/state/backlog.json
-    - agent/state/evolve/action-queue.json
+    - agent/state/evolve/action_queue.json
     - agent/state/evolve/goals.json
   apis:
     - "GitHub Issues API"
@@ -267,7 +267,7 @@ input:
 output:
   files:
     - agent/state/backlog.json
-    - agent/state/evolve/action-queue.json
+    - agent/state/evolve/action_queue.json
   prs: none
 
 chain_triggers:
@@ -335,7 +335,7 @@ description: >
 
 input:
   files:
-    - agent/state/evolve/action-queue.json
+    - agent/state/evolve/action_queue.json
     - agent/state/evolve/confidence.json
     - agent/state/test_coverage.json
   config_keys:
@@ -343,7 +343,7 @@ input:
 
 output:
   files:
-    - agent/state/evolve/action-queue.json
+    - agent/state/evolve/action_queue.json
   prs: "Draft PR"
 
 chain_triggers:
@@ -380,7 +380,7 @@ input:
     - agent/state/evolve/state.json
     - agent/state/evolve/confidence.json
     - agent/state/evolve/goals.json
-    - agent/state/evolve/action-queue.json
+    - agent/state/evolve/action_queue.json
     - agent/state/evolve/memos.json
 
 output:

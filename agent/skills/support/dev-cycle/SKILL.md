@@ -5,7 +5,7 @@ ooda_phase: support
 version: "1.0.0"
 input:
   files:
-    - agent/state/evolve/action-queue.json
+    - agent/state/evolve/action_queue.json
     - agent/state/evolve/state.json
     - config.json
     - CLAUDE.md
@@ -16,7 +16,7 @@ input:
     - safety.protected_paths
     - test_command
 output:
-  files: [agent/state/evolve/action-queue.json]
+  files: [agent/state/evolve/action_queue.json]
 safety:
   halt_check: true
   read_only: false
@@ -86,7 +86,7 @@ schedule). When in doubt, treat as manual invocation and allow execution.
 
 ## Step 1: Select Action from Queue
 
-Read `agent/state/evolve/action-queue.json`.
+Read `agent/state/evolve/action_queue.json`.
 
 Find the top pending item by highest `effective_rice` (after decay adjustment):
 
@@ -106,7 +106,7 @@ Selected action: {selected.title}
   Related     : {selected.related_files}
 ```
 
-Update the action's status to `"in_progress"` in `action-queue.json` and write
+Update the action's status to `"in_progress"` in `action_queue.json` and write
 the file before proceeding. If the file write fails, abort and print the error.
 
 ---
@@ -164,7 +164,7 @@ if lines_changed + estimated_lines_for_this_file > config.safety.max_lines_per_p
   GOTO Step 4
 ```
 
-When partial: note unfinished scope in `action-queue.json` under the action's
+When partial: note unfinished scope in `action_queue.json` under the action's
 `memos` field so the next dev-cycle cycle picks up where this one stopped.
 
 ---
@@ -203,7 +203,7 @@ while attempt <= max_attempts:
 if test_status != "passed" after 3 attempts:
   Print "[BLOCKED] Tests failed after 3 attempts. Action marked as blocked."
   Print "Review test output above and fix manually."
-  Update action status to "blocked" in action-queue.json
+  Update action status to "blocked" in action_queue.json
   git stash  (preserve work without committing)
   EXIT with non-zero status.
 ```
@@ -265,7 +265,7 @@ Print "  gh pr create --draft --title \"{selected.title}\""
 pr_number = null
 ```
 
-Update `action-queue.json`:
+Update `action_queue.json`:
 ```json
 {
   "status": "proposed",
@@ -305,7 +305,7 @@ PR      : not created — push branch and create manually
 |---|---|
 | HALT file present | Print reason, exit immediately |
 | Level < 3, not manual | Print level message, exit cleanly |
-| action-queue.json missing | Print "Action queue not found at agent/state/evolve/action-queue.json", exit cleanly |
+| action_queue.json missing | Print "Action queue not found at agent/state/evolve/action_queue.json", exit cleanly |
 | No pending actions | Print "No pending actions", exit cleanly |
 | Branch already exists | Append suffix (`-2`, `-3`), continue |
 | PR size limit hit | Create partial PR, note remaining scope in action memos |

@@ -71,9 +71,9 @@ OODA-loop/
 │       │   ├── state.json                 # {schema_version, cycle_count, ...}
 │       │   ├── confidence.json
 │       │   ├── goals.json
-│       │   ├── skill-gaps.json
+│       │   ├── skill_gaps.json
 │       │   ├── memos.json
-│       │   ├── action-queue.json
+│       │   ├── action_queue.json
 │       │   ├── CHANGELOG.md
 │       │   └── metrics.json               # Long-term counters (NEW)
 │       └── external/                      # External signal drop zone (NEW)

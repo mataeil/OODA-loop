@@ -6,9 +6,9 @@ agent/state/*.json
 agent/state/evolve/state.json
 agent/state/evolve/confidence.json
 agent/state/evolve/goals.json
-agent/state/evolve/skill-gaps.json
+agent/state/evolve/skill_gaps.json
 agent/state/evolve/memos.json
-agent/state/evolve/action-queue.json
+agent/state/evolve/action_queue.json
 agent/state/evolve/metrics.json
 agent/state/evolve/cycle_in_progress.json
 agent/state/evolve/domain-suggestions.json

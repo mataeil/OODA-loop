@@ -37,9 +37,9 @@ cat agent/state/evolve/state.json 2>/dev/null || echo "MISSING"
 cat agent/state/evolve/confidence.json 2>/dev/null || echo "MISSING"
 ```
 
-**agent/state/evolve/action-queue.json** — pending and proposed action counts, top action
+**agent/state/evolve/action_queue.json** — pending and proposed action counts, top action
 ```bash
-cat agent/state/evolve/action-queue.json 2>/dev/null || echo "MISSING"
+cat agent/state/evolve/action_queue.json 2>/dev/null || echo "MISSING"
 ```
 
 **agent/state/evolve/metrics.json** — cost_today, cost_limit
@@ -74,7 +74,7 @@ cat agent/state/evolve/metrics.json 2>/dev/null || echo "MISSING"
 
 **Confidence** — value from confidence.json for this domain (e.g. `0.9`). Show `—` if unavailable.
 
-**Actions** — count items in action-queue.json by status field: pending vs proposed.
+**Actions** — count items in action_queue.json by status field: pending vs proposed.
 Top action: first item sorted by RICE score descending.
 
 **Alerts** — collect all alerts arrays from domain state files. Count total.
@@ -115,6 +115,6 @@ If HALT is active, write `HALT: ACTIVE` (all caps, no color codes needed — emp
 | config.json missing | Print: `Not configured. Run /ooda-setup first.` — stop. |
 | state files missing (all) | Show dashboard with `Cycle: #0  Last: —  Level: 0` and domain rows as `?`. Add note: `No cycles run yet. Run /evolve to start.` |
 | Individual domain state file missing | Show `?` for score, conf, last, status for that domain only. |
-| action-queue.json missing | Show `Actions: — pending, — proposed` and `Next: —`. |
+| action_queue.json missing | Show `Actions: — pending, — proposed` and `Next: —`. |
 | metrics.json missing | Show `Cost: —/— today`. |
 | HALT active | Show full dashboard. Mark `HALT: ACTIVE`. Do not suppress any data. |

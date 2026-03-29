@@ -12,9 +12,9 @@ schemas, retention policies, cascade rules, and the rationale behind each design
 | state.json | Cycle tracking + decision log (working memory) | 20 entries | episodes.json |
 | confidence.json | Per-domain confidence scores | Permanent (overwritten) | principles.json |
 | goals.json | User-defined project goals | Permanent (user-managed) | episodes.json |
-| skill-gaps.json | Detected missing capabilities | Unlimited (user prunes) | principles.json |
+| skill_gaps.json | Detected missing capabilities | Unlimited (user prunes) | principles.json |
 | memos.json | Cross-cycle notes + score adjustments | 10 entries | episodes.json |
-| action-queue.json | Implementation task queue | 20 pending, 30 completed | metrics.json |
+| action_queue.json | Implementation task queue | 20 pending, 30 completed | metrics.json |
 | metrics.json | Long-term counters | Permanent (append-only counters) | None (terminal) |
 | episodes.json | Weekly episode summaries (Tier 2) | 52 weeks | principles.json |
 | principles.json | Permanent learned rules (Tier 3) | Permanent | None (terminal) |
@@ -260,7 +260,7 @@ Goal progress snapshots are included in weekly episode summaries.
 
 ---
 
-## 4. skill-gaps.json — Detected Missing Capabilities
+## 4. skill_gaps.json — Detected Missing Capabilities
 
 ### What it tracks
 
@@ -399,7 +399,7 @@ The engine should write score adjustments when:
 
 ---
 
-## 6. action-queue.json — Implementation Task Queue
+## 6. action_queue.json — Implementation Task Queue
 
 ### What it tracks
 
@@ -880,7 +880,7 @@ is still recorded (for audit and pattern detection).
 Tier 1: Working Memory
   ├── decision_log (state.json) — 20 entries, raw cycle data
   ├── memos.json — 10 entries, cross-cycle notes
-  └── action-queue.json — 20 pending items
+  └── action_queue.json — 20 pending items
 
         ↓ (weekly trigger)
 

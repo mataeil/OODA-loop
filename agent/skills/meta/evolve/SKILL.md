@@ -42,9 +42,9 @@ agent/state/evolve/
   state.json          -- cycle_count, last_cycle, decision_log (max 20)
   confidence.json     -- per-domain confidence scores (0.1-1.0)
   goals.json          -- user-defined goals with progress tracking
-  skill-gaps.json     -- detected missing capabilities with frequency
+  skill_gaps.json     -- detected missing capabilities with frequency
   memos.json          -- cross-cycle notes and score_adjustments
-  action-queue.json   -- RICE-scored pending/in_progress/completed actions
+  action_queue.json   -- RICE-scored pending/in_progress/completed actions
   metrics.json        -- permanent counters (cycles, PRs, costs)
   episodes.json       -- weekly summaries (tier 2 memory)
   principles.json     -- permanent learnings (tier 3 memory)
@@ -136,9 +136,9 @@ for each domain_name, domain_config in config.domains:
 ```
 
 Also read evolve self-state: state.json, confidence.json, memos.json,
-goals.json, action-queue.json, skill-gaps.json.
+goals.json, action_queue.json, skill_gaps.json.
 
-If `config.implementation.enabled`: read action-queue.json for pending_count,
+If `config.implementation.enabled`: read action_queue.json for pending_count,
 oldest_pending_hours, highest_rice.
 
 ### 1-B: GitHub Status
@@ -394,8 +394,8 @@ Re-check HALT file. If appeared: EXIT immediately.
 1. **confidence >= threshold**: execute primary skill, then chain[] sequentially (max 3). Re-check HALT before each chain skill.
 2. **confidence < threshold**: primary skill only, skip chain.
 3. **HALT during execution**: stop immediately, log partial execution.
-4. **Error during execution**: log to skill-gaps.json, continue to Reflect.
-5. **Chain failure tracking**: if chain skill failed 3+ times (skill-gaps.json), mark action as "blocked".
+4. **Error during execution**: log to skill_gaps.json, continue to Reflect.
+5. **Chain failure tracking**: if chain skill failed 3+ times (skill_gaps.json), mark action as "blocked".
 6. **Chain depth cap**: max 3 skills. Truncate with warning if more.
 
 Execute by calling the slash command:
@@ -461,7 +461,7 @@ connection), data insufficient (missing collection), no skill matched domain.
 
 ```
 for each detected gap:
-  if gap_name exists in skill-gaps.json: increment frequency, update last_seen
+  if gap_name exists in skill_gaps.json: increment frequency, update last_seen
   else: add with frequency=1, first_seen=now
 Print "[Reflect] Gaps: {count}. Top: {highest_freq_gap}" or "No new gaps."
 ```
@@ -469,7 +469,7 @@ Print "[Reflect] Gaps: {count}. Top: {highest_freq_gap}" or "No new gaps."
 ### 5-B: Auto Skill Proposal
 
 ```
-for each gap in skill-gaps.json where frequency >= 3:
+for each gap in skill_gaps.json where frequency >= 3:
   if agent/state/evolve/proposed-skills/{gap_name}.md does not exist:
     Generate proposal: background, gap, proposed OODA phase, estimated I/O.
     Print "[Reflect] Skill proposal: {gap_name} (freq: {n})"
@@ -494,7 +494,7 @@ If executed skill was NOT implementation's primary_skill:
 - Parse output for actionable items. Assign RICE scores:
   `RICE = (Reach * Impact * Confidence) / Effort`
 - Dedup: skip if title keyword overlap > 80% with existing queue items.
-- Add to action-queue.json pending. Cap at 20 (remove lowest RICE as "superseded").
+- Add to action_queue.json pending. Cap at 20 (remove lowest RICE as "superseded").
 
 If implementation skill was executed: skip (it manages its own queue).
 
@@ -531,7 +531,7 @@ Persist updated confidence scores from Step 2-B.
 
 Persist score_adjustments (2-D cleared consumed ones) and history (cap 10).
 
-### 6-C2: action-queue.json
+### 6-C2: action_queue.json
 
 Persist queue: pending sorted by RICE desc (cap 20), in_progress, completed (keep last 20).
 
@@ -599,9 +599,9 @@ for each provider in config.notifications where enabled:
 git add agent/state/evolve/state.json
 git add agent/state/evolve/confidence.json
 git add agent/state/evolve/memos.json
-git add agent/state/evolve/action-queue.json
+git add agent/state/evolve/action_queue.json
 git add agent/state/evolve/metrics.json
-git add agent/state/evolve/skill-gaps.json
+git add agent/state/evolve/skill_gaps.json
 git add agent/state/evolve/goals.json
 git add agent/state/evolve/CHANGELOG.md
 git add agent/state/evolve/episodes.json    # if updated
@@ -639,8 +639,8 @@ input:
     - agent/state/evolve/confidence.json
     - agent/state/evolve/goals.json
     - agent/state/evolve/memos.json
-    - agent/state/evolve/action-queue.json
-    - agent/state/evolve/skill-gaps.json
+    - agent/state/evolve/action_queue.json
+    - agent/state/evolve/skill_gaps.json
     - agent/state/evolve/metrics.json
     - agent/state/evolve/episodes.json
     - agent/state/evolve/principles.json
@@ -670,9 +670,9 @@ output:
     - agent/state/evolve/state.json
     - agent/state/evolve/confidence.json
     - agent/state/evolve/memos.json
-    - agent/state/evolve/action-queue.json
+    - agent/state/evolve/action_queue.json
     - agent/state/evolve/metrics.json
-    - agent/state/evolve/skill-gaps.json
+    - agent/state/evolve/skill_gaps.json
     - agent/state/evolve/goals.json
     - agent/state/evolve/CHANGELOG.md
     - agent/state/evolve/episodes.json (weekly)
