@@ -11,6 +11,7 @@
       "state_file": "agent/state/service_health.json",
       "primary_skill": "/scan-health",
       "chain": [],
+      "branch_prefix": "auto/scan-health/",
       "fallback": true,
       "enabled": true
     },
@@ -19,6 +20,7 @@
       "state_file": "agent/state/test_coverage.json",
       "primary_skill": "/check-tests",
       "chain": [],
+      "branch_prefix": "auto/check-tests/",
       "fallback": true,
       "enabled": true
     },
@@ -27,6 +29,7 @@
       "state_file": "agent/state/backlog.json",
       "primary_skill": "/plan-backlog",
       "chain": [],
+      "branch_prefix": "auto/plan-backlog/",
       "fallback": false,
       "enabled": true
     },
@@ -35,6 +38,7 @@
       "state_file": "agent/state/business_strategy.json",
       "primary_skill": "/scan-market",
       "chain": [],
+      "branch_prefix": "auto/scan-market/",
       "fallback": true,
       "enabled": true
     },
@@ -43,6 +47,7 @@
       "state_file": "agent/state/ux_evolution.json",
       "primary_skill": "/scan-ux",
       "chain": [],
+      "branch_prefix": "auto/scan-ux/",
       "fallback": true,
       "enabled": true
     },
@@ -51,6 +56,7 @@
       "state_file": "agent/state/competitors.json",
       "primary_skill": "/scan-competitors",
       "chain": [],
+      "branch_prefix": "auto/scan-competitors/",
       "fallback": false,
       "enabled": true
     }
@@ -92,7 +98,7 @@
       "agent/skills/meta/*",
       "agent/contracts/*"
     ],
-    "skill_allowlist": ["/scan-health", "/check-tests", "/plan-backlog", "/run-deploy", "/dev-cycle"]
+    "skill_allowlist": ["/scan-health", "/check-tests", "/plan-backlog", "/run-deploy", "/dev-cycle", "/scan-market", "/scan-ux", "/scan-competitors"]
   },
   "progressive_complexity": {
     "current_level": 0,
@@ -122,6 +128,15 @@
         "auto_merge": true
       }
     }
+  },
+  "signals": {
+    "health_alert_bonus": 5.0,
+    "stale_after_change_hours": 24,
+    "stale_after_change_bonus": 2.0,
+    "queue_pressure_threshold": 5,
+    "queue_pressure_bonus": 3.0,
+    "queue_age_hours": 48,
+    "queue_age_bonus": 2.0
   },
   "memory": {
     "working_memory_size": 20,

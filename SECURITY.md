@@ -29,9 +29,9 @@ software. The threats and mitigations below reflect deliberate design decisions.
 guardrails that govern its own behavior.
 
 **Mitigation.** Those paths are declared as `protected_paths` in config. Any PR
-that touches protected paths is automatically escalated to Level 3 and requires
-explicit human review before it can be merged. The agent cannot auto-merge
-changes to its own policy files.
+that touches protected paths requires explicit human review and cannot be
+auto-merged, regardless of the current complexity level. The agent cannot
+modify its own policy files without human approval.
 
 ---
 
@@ -172,8 +172,8 @@ current complexity level:
 | `agent/skills/meta/*` | Core evolve engine                      |
 | `agent/contracts/*`   | Skill interface contracts               |
 
-Any PR touching these paths is escalated to Level 3 automatically. The agent
-cannot self-approve such PRs.
+Any PR touching these paths requires explicit human review and cannot be
+auto-merged, regardless of the current complexity level.
 
 ---
 
