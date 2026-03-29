@@ -277,7 +277,7 @@ chain_triggers:
 safety:
   halt_check: true
   read_only: true
-  cost_limit_usd: 0.03
+  cost_limit_usd: 0.01
 
 domains:
   - backlog
@@ -304,7 +304,7 @@ input:
 
 output:
   files:
-    - agent/state/service_health.json
+    - agent/state/deploy.json
   prs: none
 
 chain_triggers:
@@ -353,7 +353,7 @@ chain_triggers:
 safety:
   halt_check: true
   read_only: false
-  branch_prefix: "auto/dev/"
+  branch_prefix: "auto/dev-cycle/"
   cost_limit_usd: 0.50
   max_files: 20
   max_lines: 500
