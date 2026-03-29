@@ -20,7 +20,7 @@ safety:
   branch_prefix: "auto/deploy/"
   cost_limit_usd: 0.05
 domains:
-  - deployment
+  - service_health
 chain_triggers:
   - target: scan-health
     condition: "post_deploy_health_check == 'failed'"
@@ -75,7 +75,7 @@ All five conditions must pass. On first failure, print the reason and skip deplo
 | 1 | No critical health alerts | `agent/state/service_health.json` | `alerts` has no item with `severity == "critical"` |
 | 2 | Tests passing | `agent/state/test_coverage.json` | `status == "passing"` |
 | 3 | No HALT file | `config.safety.halt_file` | File does not exist (re-confirmed) |
-| 4 | Complexity level | `agent/state/evolve/cycle.json` | `progressive_complexity >= 3` OR invoked directly by user |
+| 4 | Complexity level | `config.json` | `progressive_complexity.current_level >= 3` OR invoked directly by user |
 | 5 | Clean working tree | `git status --porcelain` | Output is empty (no uncommitted changes) |
 
 On any failure:

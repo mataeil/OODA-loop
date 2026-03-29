@@ -1,6 +1,21 @@
 ---
 name: check-tests
 description: Run test suite, track coverage trends, and detect regressions. Detect phase skill — uses config.test_command to execute tests and records results.
+ooda_phase: detect
+version: "1.0.0"
+input:
+  files: [agent/state/test_coverage.json]
+  config_keys: [test_command]
+output:
+  files: [agent/state/test_coverage.json]
+safety:
+  halt_check: true
+  read_only: true
+  cost_limit_usd: 0.05
+domains: [test_coverage]
+chain_triggers:
+  - target: dev-cycle
+    condition: "new_failures >= 1 OR coverage_drop > 5"
 ---
 
 # check-tests: Test Suite Runner & Coverage Tracker

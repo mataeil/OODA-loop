@@ -16,7 +16,7 @@ domains:
   - backlog
 chain_triggers:
   - target: dev-cycle
-    condition: "top_rice_score > 50"
+    condition: "actionable_items >= 1 AND top_rice_score >= 50"
 ---
 
 # plan-backlog: GitHub Issues RICE Scorer

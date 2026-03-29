@@ -31,7 +31,7 @@ output:
 safety:
   halt_check: true
   read_only: true
-  branch_prefix: "auto/your-skill/"
+  branch_prefix: "auto/your-skill/"  # Only required when read_only: false
   cost_limit_usd: 0.05
 
 domains: [your_domain]

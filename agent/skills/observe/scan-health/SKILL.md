@@ -135,7 +135,7 @@ Overall status: healthy | degraded | critical
 | https://example.com/api  |  503   |     —         |     120       | endpoint_down  |
 ```
 
-If alerts exist: `Alerts: N warning, N critical. Consider running /dev-debug for investigation.`
+If alerts exist: `Alerts: N warning, N critical. Consider running /dev-cycle for investigation.`
 If `consecutive_failures >= 3`, note that the `dev-cycle` chain trigger condition is met.
 
 ---
