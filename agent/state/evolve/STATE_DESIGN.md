@@ -937,7 +937,7 @@ change for weeks. Separate files mean:
 - Selective reads: the Orient phase can read only what it needs (confidence + memos + principles) without loading the full action queue.
 - Schema evolution: each file can evolve its schema independently.
 
-The fwd.page reference used 8 files and it worked well for 15 cycles. Adding
+The reference implementation used 8 files and proved stable over 15 cycles. Adding
 episodes.json, principles.json, and metrics.json brings us to 10, but each one
 has a clear single responsibility.
 

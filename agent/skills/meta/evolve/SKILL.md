@@ -27,7 +27,7 @@ routing tables are hardcoded.
 These rules are absolute. Violating any is a bug.
 
 1. **HALT File** -- Before ANY work, check `config.safety.halt_file`. If it exists, print reason and stop immediately.
-2. **Protected Paths** -- PRs touching `config.safety.protected_paths` MUST be Level 3 (human review). No auto-merge ever.
+2. **Protected Paths** -- PRs touching `config.safety.protected_paths` MUST be Risk Tier 3 (human review). No auto-merge ever.
 3. **PR Limit** -- Max `config.safety.max_prs_per_cycle` PRs per cycle (default 1).
 4. **State-Only Direct Write** -- evolve writes only to `agent/state/evolve/*`. All other changes require branch + PR.
 5. **Skill Allowlist** -- Only invoke skills in `config.safety.skill_allowlist`. Unlisted skill = safety violation, skip to Reflect.
@@ -66,7 +66,22 @@ if file exists at config.safety.halt_file:
   EXIT immediately.
 ```
 
-### 0-B: Crash Recovery
+### 0-B: Concurrent Execution Lock
+
+```
+lock_file = agent/state/evolve/.lock
+if lock_file exists:
+  Print "[SKIP] Another evolve cycle is running (lock file exists)."
+  Print "If stale, remove manually: rm {lock_file}"
+  EXIT.
+Create lock_file with content: {"pid": current, "started_at": "ISO 8601"}
+```
+
+The lock file is deleted at the end of Step 6. If evolve crashes, the lock
+persists — the next invocation detects it and exits. To recover from a stale
+lock, the operator deletes the file manually.
+
+### 0-C: Crash Recovery
 
 ```
 if state.json.cycle_in_progress == true:
@@ -75,7 +90,7 @@ if state.json.cycle_in_progress == true:
   Continue with fresh cycle (do NOT resume old one).
 ```
 
-### 0-C: Min Cycle Interval
+### 0-D: Min Cycle Interval
 
 ```
 elapsed = (now - state.json.last_cycle) in minutes.
@@ -89,7 +104,7 @@ if elapsed < config.safety.min_cycle_interval_minutes:
 if last_cycle is null: first cycle, proceed.
 ```
 
-### 0-D: First Cycle Observe-Only
+### 0-E: First Cycle Observe-Only
 
 ```
 if state.json.cycle_count === 0 AND config.safety.first_cycle_observe_only:
@@ -297,7 +312,7 @@ default goal_contribution = 0.5
 for each domain:
   find active goals related to this domain (via goal.related_domains or keyword)
   if found: goal_contribution = 0.5 * (1.0 - min(matching_goal.progress))
-  override: if config.domains[name].goal_contributions is defined, use directly
+  (optional) if user adds goal_contributions to a domain in config.json, use those values directly
 ```
 
 ### 3-D: Score Table Output
@@ -403,9 +418,9 @@ if chain AND confidence >= threshold:
 After execution, check if a new PR was created (new open PR matching domain
 branch_prefix or skill output indicating PR creation).
 
-If PR created, determine risk level:
+If PR created, determine risk tier (distinct from progressive complexity levels):
 
-**Level 1 -- Auto-merge** (ALL must be true):
+**Risk Tier 1 -- Auto-merge** (ALL must be true):
 - progressive_complexity >= 3
 - no protected paths touched
 - files <= config.safety.max_files_per_pr
@@ -416,12 +431,12 @@ for deploy. If config.health_endpoints configured, run health check. If health
 fails: `git revert --no-edit HEAD && git push origin HEAD`, create HALT file,
 notify.
 
-**Level 2 -- Merge, manual deploy** (progressive_complexity >= 3, no protected
-paths, but exceeds size limits):
+**Risk Tier 2 -- Merge, manual deploy** (progressive_complexity >= 3, no
+protected paths, but exceeds size limits):
 Action: `gh pr merge {n} --merge`. Print: "Deploy manually with /run-deploy."
 
-**Level 3 -- Human review** (ANY: protected paths touched, level < 3,
-implementation PR):
+**Risk Tier 3 -- Human review** (ANY: protected paths touched, complexity
+level < 3, implementation PR):
 Keep as draft. Print: "PR #{n} requires human review."
 
 ### 4-D: Execution Output
@@ -431,7 +446,7 @@ Keep as draft. Print: "PR #{n} requires human review."
   ... (skill output) ...
 [Act] /check-tests completed. (elapsed: 1m 42s)
 [Act] PR #42 created on branch auto/check-tests/2025-01-15-fix
-[Act] Risk: Level 1 (auto-merge eligible)
+[Act] Risk Tier 1 (auto-merge eligible)
 [Act] PR #42 auto-merged.
 ```
 
@@ -559,8 +574,10 @@ Set first_cycle_at if null. Set last_updated = now.
 
 ```
 for each pending item older than config.memory.action_queue_decay_days:
-  item.decay_penalty += config.memory.action_queue_decay_amount
-  item.effective_rice = item.rice_score - item.decay_penalty
+  periods_overdue = floor((age_days - decay_days) / decay_days) + 1
+  cumulative_decay = periods_overdue * config.memory.action_queue_decay_amount
+  item.effective_rice = item.rice_score - (cumulative_decay * item.rice_score)
+  if item.effective_rice <= 0: move to completed as "superseded"
 Re-sort pending by effective_rice descending.
 ```
 
@@ -594,6 +611,8 @@ git add agent/state/evolve/principles.json  # if updated
 git commit -m "evolve: cycle #{N} -- {domain} ({result})"
 git push origin HEAD
 ```
+
+Delete the lock file: `rm agent/state/evolve/.lock`
 
 Print cycle completion:
 
