@@ -50,6 +50,27 @@ Check `config.health_endpoints`. If missing or empty:
 
 ---
 
+## Step 0.5: Lens Load (Adaptive Context)
+
+Read `agent/state/service_health/lens.json`. If missing or unparseable, proceed
+with base behavior only — this step is purely additive.
+
+If lens exists:
+- **focus_items** (confidence >= 0.6): Prioritize these endpoints/metrics first.
+  Allocate extra time and retries to high-priority items.
+- **learned_thresholds** (confidence >= 0.6): Override default thresholds. For
+  example, if the lens says endpoint X has a learned threshold of 800ms instead
+  of the default 3000ms, use 800ms for anomaly detection on that endpoint.
+- **discovered_signals** (actionable=true): Include these as additional diagnostic
+  checks beyond the base behavior. For example, if the lens says "deploy failures
+  correlate with health degradation", check recent deploy status first.
+
+If lens is corrupt (invalid JSON, missing schema_version):
+  Log: "[WARN] Lens file corrupt, using base behavior."
+  Continue normally. Do NOT crash.
+
+---
+
 ## Step 1: Baseline Load
 
 Read `agent/state/service_health.json`. If missing, create with initial structure:
@@ -120,6 +141,10 @@ Write to `agent/state/service_health.json`:
 
 Status: `healthy` = all 200 + no alerts. `degraded` = warning alerts only. `critical` = any critical alert.
 Update `avg_response_ms` as a rolling average (weight new reading at 0.2).
+
+**Note:** This skill does NOT write to `agent/state/service_health/lens.json`.
+Lens updates (learning thresholds, promoting signals, adjusting focus) happen
+exclusively in evolve's Reflect phase (Step 5-E).
 
 ---
 
