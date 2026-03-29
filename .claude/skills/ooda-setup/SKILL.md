@@ -122,3 +122,20 @@ Print:
     /ooda-status      — Check current state
     /ooda-config      — Modify configuration
 ```
+
+After printing the "Setup complete!" block, read the domains from the written config.json. For any domain where `status: "available"` (i.e., not enabled and not explicitly disabled), append:
+
+```
+  3 optional skills are available but not yet configured:
+    /scan-market      — market research and strategic analysis
+    /scan-ux          — UX audit and UI analysis
+    /scan-competitors — competitor monitoring
+
+  Create any of these when you're ready:
+    /ooda-skill create <name>
+
+  Or disable ones you don't need:
+    /ooda-skill disable <name>
+```
+
+Only list domains whose `status` field equals `"available"` in the generated config. If no domains have `status: "available"`, omit this block entirely.

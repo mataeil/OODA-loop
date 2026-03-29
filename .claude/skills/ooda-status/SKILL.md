@@ -22,10 +22,12 @@ Do not abort — status must always be readable regardless of HALT state.
 
 Read each file below. If a file is missing, note it and use a safe default value.
 
-**config.json** — project name, current level, cost limit, domain list
+**config.json** — project name, current level, cost limit, domain list, domain status fields
 ```bash
 cat config.json 2>/dev/null || echo "MISSING"
 ```
+
+Read each domain's `status` field from config.json to identify which domains are `"available"` (not yet configured) vs `"active"` vs `"disabled"`.
 
 **agent/state/evolve/state.json** — cycle_count, last_cycle timestamp
 ```bash
@@ -107,6 +109,28 @@ Replace `{placeholders}` with the computed values from Step 2.
 
 One row per enabled domain. Pad domain names and numbers so columns align.
 If HALT is active, write `HALT: ACTIVE` (all caps, no color codes needed — emphasis via caps).
+
+## Step 4: Suggestions
+
+After rendering the dashboard, check whether a suggestion should be shown:
+
+1. Read `cycle_count` from state.json. If `cycle_count >= 3`, proceed.
+2. Collect all domains from config.json where `status: "available"`.
+3. If any `"available"` domains exist, show **exactly one** suggestion per status check:
+
+```
+  Suggestion: You've run {N} cycles. Consider adding
+  /scan-market for strategic insights.
+  Run: /ooda-skill create scan-market
+```
+
+   Replace the domain name and description with the actual available domain being suggested.
+
+4. Rotate through available domains across successive status checks (use cycle_count mod available-domain-count to pick which one to show).
+5. Once all domains are either `"active"` or `"disabled"` (none remain `"available"`), omit the Suggestions block entirely.
+6. Never show more than 1 suggestion per status check.
+
+---
 
 ## Graceful Degradation
 

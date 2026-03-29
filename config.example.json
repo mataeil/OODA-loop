@@ -13,7 +13,8 @@
       "chain": [],
       "branch_prefix": "auto/scan-health/",
       "fallback": true,
-      "enabled": true
+      "enabled": true,
+      "status": "active"
     },
     "test_coverage": {
       "weight": 0.5,
@@ -22,7 +23,8 @@
       "chain": [],
       "branch_prefix": "auto/check-tests/",
       "fallback": true,
-      "enabled": true
+      "enabled": true,
+      "status": "active"
     },
     "backlog": {
       "weight": 0.3,
@@ -31,7 +33,8 @@
       "chain": [],
       "branch_prefix": "auto/plan-backlog/",
       "fallback": false,
-      "enabled": true
+      "enabled": true,
+      "status": "active"
     },
     "business_strategy": {
       "weight": 1.0,
@@ -40,7 +43,9 @@
       "chain": [],
       "branch_prefix": "auto/scan-market/",
       "fallback": true,
-      "enabled": true
+      "enabled": true,
+      "status": "available",
+      "description": "Market research and strategic analysis. Run /ooda-skill create scan-market to configure."
     },
     "ux_evolution": {
       "weight": 1.0,
@@ -49,7 +54,9 @@
       "chain": [],
       "branch_prefix": "auto/scan-ux/",
       "fallback": true,
-      "enabled": true
+      "enabled": true,
+      "status": "available",
+      "description": "UX audit and UI analysis. Run /ooda-skill create scan-ux to configure."
     },
     "competitors": {
       "weight": 0.3,
@@ -58,7 +65,9 @@
       "chain": [],
       "branch_prefix": "auto/scan-competitors/",
       "fallback": false,
-      "enabled": true
+      "enabled": true,
+      "status": "available",
+      "description": "Competitor monitoring and intelligence. Run /ooda-skill create scan-competitors to configure."
     }
   },
   "implementation": {

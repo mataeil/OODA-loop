@@ -126,6 +126,13 @@ Record `cycle_start_time = now`.
 
 ```
 for each domain_name, domain_config in config.domains:
+  if domain_config.status == "disabled": skip entirely, do not score
+  if domain_config.status == "available":
+    log "[{domain}] Not yet configured. Skipping."
+    skip, do not score
+  if domain_config.status == "active": proceed normally
+  # Legacy: if no status field, treat as "active" (backward compat)
+
   if not domain_config.enabled: skip
   file = domain_config.state_file
   if file missing:
@@ -133,6 +140,14 @@ for each domain_name, domain_config in config.domains:
   else:
     read JSON. Calculate hours_since_last from data.last_run to now.
     Extract: status, run_count, alerts.
+
+  Also read lens file: agent/state/{domain_name}/lens.json
+  If lens exists and is valid JSON:
+    Extract focus_items where confidence >= 0.6
+    Extract learned_thresholds where confidence >= 0.6
+    Extract discovered_signals
+    Store as domain_config.lens for use in Step 4 skill invocation
+  If lens missing or corrupt: proceed without lens (base behavior)
 ```
 
 Also read evolve self-state: state.json, confidence.json, memos.json,
@@ -248,12 +263,17 @@ Print: `[Orient] {orient_summary}`
 ```
 level = config.progressive_complexity.current_level
 level_config = config.progressive_complexity.levels[level]
-Sort config.domains by weight descending.
 
-Level 0: keep first level_config.domains domains only.
-Level 1: keep first level_config.domains domains only.
-Level 2: all domains. No implementation.
-Level 3: all domains + implementation (if config.implementation.enabled).
+First, exclude non-active domains:
+  Remove any domain where status == "disabled" or status == "available"
+  Only status == "active" domains count toward the level-based domain limit
+
+Sort remaining (active) domains by weight descending.
+
+Level 0: keep first level_config.domains active domains only.
+Level 1: keep first level_config.domains active domains only.
+Level 2: all active domains. No implementation.
+Level 3: all active domains + implementation (if config.implementation.enabled).
 ```
 
 Filter domains BEFORE scoring.
@@ -500,6 +520,36 @@ If implementation skill was executed: skip (it manages its own queue).
 
 Print: `[Reflect] Extracted {N} actions. Queue: {pending_count} pending.`
 
+### 5-E: Adaptive Lens Update
+
+```
+for each observe-phase skill that ran this cycle:
+  Read the skill's observation output (domain state file)
+  Read current lens: agent/state/{domain}/lens.json
+  Read last 3-5 observations from decision_log
+
+  Analyze for patterns:
+  - Endpoints/metrics with high variance -> propose focus_item (confidence 0.3)
+  - Thresholds that missed real problems -> propose learned_threshold (confidence 0.3)
+  - Thresholds that fired on false positives -> decrease existing threshold confidence by 0.2
+  - Cross-domain correlations -> propose discovered_signal (confidence 0.3)
+
+  Confidence updates for EXISTING lens items:
+  - Confirming observation:    confidence += 0.1  (cap at 1.0)
+  - Disconfirming observation: confidence -= 0.2  (asymmetric: bad learning dies 2x faster)
+  - Item drops below 0.1: move to deprecated_items
+  - Cap: max 50 items per lens; prune lowest-confidence items if exceeded
+
+  Write updated lens to agent/state/{domain}/lens.json
+  Append changes to agent/state/{domain}/lens_changelog.json
+
+if cycle_count % config.memory.contrarian_check_interval == 0:
+  Compare current observation quality against baseline (first 3 cycles)
+  If quality degraded: flag lens for human review in memos
+```
+
+Print: `[Reflect] Lens updated for {N} domains.` or "Lens unchanged."
+
 ### 5-D: Goal Update
 
 Update goal.last_activity for relevant goals. Update progress if measurable.
@@ -606,6 +656,8 @@ git add agent/state/evolve/goals.json
 git add agent/state/evolve/CHANGELOG.md
 git add agent/state/evolve/episodes.json    # if updated
 git add agent/state/evolve/principles.json  # if updated
+git add agent/state/*/lens.json             # if updated
+git add agent/state/*/lens_changelog.json   # if updated
 # NEVER use git add -A or git add .
 
 git commit -m "evolve: cycle #{N} -- {domain} ({result})"
