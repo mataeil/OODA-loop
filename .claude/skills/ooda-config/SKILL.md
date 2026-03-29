@@ -113,6 +113,33 @@ On any failure append: `Run /ooda-config show to review your settings.`
 
 ---
 
+## Lens Management
+
+### Step H — lens review {domain}
+
+Show the lens snapshot for the named domain.
+
+1. Look up the domain in `config.domains`. Not found → `Domain not found: <name>` and exit.
+2. Derive the lens path: `agent/state/<name>/lens.json` (or `lens_file` field if present in config).
+3. If lens.json does not exist → `No lens data for <name>. Run a cycle first.` and exit.
+4. Print the full contents of lens.json as a labeled key-value block, including all evidence trail entries (timestamps, sources, confidence deltas).
+
+---
+
+### Step I — lens reset {domain}
+
+Wipe the lens snapshot for the named domain, forcing a fresh start on the next cycle.
+
+1. Look up the domain in `config.domains`. Not found → `Domain not found: <name>` and exit.
+2. Derive the lens path the same way as Step H.
+3. If lens.json does not exist → `No lens file found for <name>. Nothing to reset.` and exit.
+4. Ask for confirmation: `Reset lens for <name>? This clears all accumulated evidence. (yes/no)`
+   Any answer other than "yes" → `Cancelled.` and exit.
+5. Overwrite lens.json with: `{ "schema_version": "1.0.0", "domain": "<name>", "reset_at": "<ISO timestamp>", "evidence": [] }`
+6. Print: `Lens reset: <name>  (evidence cleared, next cycle starts fresh)`
+
+---
+
 ## Usage
 
 ```
@@ -123,4 +150,6 @@ On any failure append: `Run /ooda-config show to review your settings.`
 /ooda-config domain list           List all domains with status
 /ooda-config safety                Show full safety settings
 /ooda-config validate              Validate config.json structure and values
+/ooda-config lens review {domain}  Show lens.json for a domain with evidence trails
+/ooda-config lens reset {domain}   Wipe lens.json for a domain (start fresh)
 ```
