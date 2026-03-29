@@ -4,8 +4,6 @@ Thank you for your interest in contributing. All contributions are valued — wh
 fixing a typo, improving a skill prompt, or proposing a change to the core engine. This guide
 explains how to contribute effectively.
 
-Please review our Code of Conduct before participating. By contributing you agree to abide by it.
-
 ---
 
 ## Three Contribution Tiers
