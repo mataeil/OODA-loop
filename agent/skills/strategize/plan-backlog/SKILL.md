@@ -41,6 +41,17 @@ Exit cleanly (not an error).
 
 ## Step 1: Load Issues
 
+**Remote check** — before fetching issues, verify a GitHub remote exists:
+
+```bash
+git remote -v 2>/dev/null | grep -q origin
+```
+
+If no remote is found:
+- Print `[plan-backlog] No GitHub remote configured. Backlog scoring requires a GitHub repository with issues. Skipping.`
+- Write state file with `"status": "no_remote"` (preserve `run_count` if state already exists)
+- Exit 0 — do NOT crash or show raw git errors
+
 ```bash
 gh issue list --state open --json number,title,labels,body,createdAt,assignees --limit 100
 ```
@@ -122,6 +133,7 @@ List all issues if fewer than 5. If none: `No open issues to score. Backlog is c
 |---|---|
 | HALT file present | Print reason, exit immediately |
 | `gh` not installed | Print install hint, exit 0 |
+| No GitHub remote configured | Write `status: "no_remote"`, print message, exit 0 |
 | Not a GitHub repo | Print message, exit 0 |
 | No open issues | Write `status: "no_issues"`, exit 0 |
 | Issue has no labels or body | Apply all defaults; still scored |

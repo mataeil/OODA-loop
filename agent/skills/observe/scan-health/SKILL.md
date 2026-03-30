@@ -116,6 +116,16 @@ If both unavailable, record `status_code: 0`, `error: "no_http_client"`.
 | response_time_ms > 3000 | `slow_response` | warning |
 | response_time_ms > 2x baseline avg | `response_degradation` | warning |
 
+**Baseline comparison on failure** — when an endpoint is DOWN (HTTP 000, connection refused, or timeout with no response), include baseline context in the alert detail so the user understands what changed:
+
+```
+Previous baseline: {avg_response_ms}ms / 200 OK (from {samples} samples)
+Current: CONNECTION REFUSED
+Change: endpoint_down (was healthy)
+```
+
+If no baseline exists for the endpoint (first run), omit the "Previous baseline" line and note `Change: endpoint_down (no prior baseline)`.
+
 Alert shape: `{ "severity": "warning", "type": "...", "endpoint": "...", "detail": "..." }`
 
 Increment `consecutive_failures` per endpoint on non-200; reset to 0 on success.
