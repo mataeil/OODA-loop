@@ -88,7 +88,7 @@
     }
   },
   "confidence": {
-    "initial": 0.5,
+    "initial": 0.7,
     "merge_boost": 0.1,
     "reject_penalty": 0.2,
     "min": 0.1,

@@ -123,7 +123,42 @@ Print:
     /ooda-config      — Modify configuration
 ```
 
-After printing the "Setup complete!" block, read the domains from the written config.json. For any domain where `status: "available"` (i.e., not enabled and not explicitly disabled), append:
+### Step 4/4: First Look (Verification Mini-Cycle)
+
+After printing the "Setup complete!" block, run a quick verification pass against
+the just-written config.json. This gives the user real data from their project
+within 60 seconds of setup, before they ever run `/evolve`.
+
+Print: `[4/4] Taking a first look at your project...`
+
+For each enabled domain, run a lightweight check (15-second overall timeout):
+
+1. **test_coverage**: If `config.test_command` is non-empty, run it with a 10-second
+   timeout. Parse the output for pass/fail counts and coverage percentage.
+   Print: `  test_coverage    {passed}/{total} passing ({coverage}% coverage)`
+   If test_command is empty: print `  test_coverage    [Skip] No test_command configured`
+   If command fails or times out: print `  test_coverage    [Error] Test command failed`
+
+2. **service_health**: If `config.health_endpoints` is non-empty, curl each endpoint
+   with `--max-time 5`. Print status code and response time.
+   Print: `  service_health   {url} → {status} ({time}ms)`
+   If array is empty: print `  service_health   [Skip] No health endpoints configured`
+   If curl fails: print `  service_health   {url} → unreachable`
+
+3. **backlog**: Run `gh issue list --state open --limit 100 --json number 2>/dev/null`.
+   Count results.
+   Print: `  backlog          {count} open issues`
+   If `gh` is not installed or fails: print `  backlog          [Skip] gh CLI not available`
+   If no issues: print `  backlog          0 open issues`
+
+Print: `Ready. Run /evolve for your first full cycle.`
+
+This step is informational only — it does not write state files or modify config.json.
+If the entire step fails or times out, print `[4/4] Verification skipped.` and continue.
+
+---
+
+After the verification mini-cycle, read the domains from the written config.json. For any domain where `status: "available"` (i.e., not enabled and not explicitly disabled), append:
 
 ```
   3 optional skills are available but not yet configured:

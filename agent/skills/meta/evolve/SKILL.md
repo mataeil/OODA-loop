@@ -250,6 +250,11 @@ They apply exactly once.
 
 ### 2-E: Orient Summary
 
+Read the previous cycle's orient_summary from `state.json.decision_log[-1].orient_summary`
+(if decision_log is non-empty). Use it as prior context: what changed since that assessment?
+What predictions held? What was surprising? This creates a cumulative world model that
+evolves across cycles rather than being rebuilt from scratch each time.
+
 Write 2-3 sentence world model: what changed, what's urgent, what to focus on.
 Store as orient_summary in the decision_log entry being built.
 Print: `[Orient] {orient_summary}`
@@ -277,6 +282,28 @@ Level 3: all active domains + implementation (if config.implementation.enabled).
 ```
 
 Filter domains BEFORE scoring.
+
+### 3-A0: Implicit Guidance Check (Boyd Shortcut)
+
+Before formal scoring, check if Orient produced a clear, high-confidence directive:
+
+1. **Critical alert override.** If any domain state file contains `alerts` with
+   `severity: "critical"`, skip scoring entirely. Select that domain as the winner.
+   If multiple domains have critical alerts, pick the one with the highest weight.
+   Print: `[Decide] Implicit guidance: critical alert in {domain}. Bypassing scoring.`
+   Jump directly to Step 3-I.
+
+2. **Stable pattern shortcut.** If the same domain won scoring for 3+ consecutive
+   cycles (check decision_log last 3 entries) AND its confidence >= 0.8 AND no
+   urgent signals exist for other domains: skip full scoring, continue with that
+   domain. Print: `[Decide] Implicit guidance: stable pattern, continuing {domain}.`
+   Jump to Step 3-I.
+
+3. Otherwise, proceed to normal scoring (3-A).
+
+This implements Boyd's key insight: Orient can bypass Decide and feed directly
+into Act. An experienced operator does not score every option when the building
+is on fire.
 
 ### 3-A: Standard Scoring Formula
 
@@ -390,6 +417,26 @@ if invoked with --dry-run:
 [Decide] Chain: {config.domains[winner].chain or "none"}
 [Decide] Confidence: {confidence} (threshold: {threshold})
 ```
+
+### 3-J: Score Verification
+
+After selecting the winner, re-derive its score from raw components as a sanity check:
+
+```
+verify = (hours_since_last * weight) + urgent + (goal * goal_weight) + (conf * conf_weight) + memo
+```
+
+For implementation domain, use the implementation formula instead (3-A2 components).
+
+If `abs(verify - reported_score) > 0.01`:
+  Print: `[WARN] Score mismatch for {winner}: computed {verify}, reported {score}. Using recomputed.`
+  Replace the score with the verified value.
+  Re-sort all domains and re-select winner if rank changed.
+
+Cross-check: verify winner confidence >= config.safety.confidence_threshold (redundant
+check against 3-F to catch any gate bypass).
+
+Record `"score_verified": true` (or `false` if mismatch was found) in the decision_log entry.
 
 ---
 
