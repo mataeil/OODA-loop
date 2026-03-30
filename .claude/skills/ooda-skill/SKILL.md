@@ -140,8 +140,10 @@ Before writing any file, verify the generated SKILL.md contains:
 | Check | Rule |
 |---|---|
 | YAML frontmatter | `---` block at top with name, ooda_phase, version, description |
+| `contract_version` field | Present and set to `"1.0"` |
 | `name` field | Equals `{skill-name}` |
-| `ooda_phase` field | One of: observe, detect, strategize, execute, support |
+| `ooda_phase` field | One of: meta, observe, detect, strategize, execute, support |
+| `status` field | Present — `active` or `deprecated` (default: `active`) |
 | `safety.halt_check` | `true` |
 | `safety.read_only` | Present |
 | `input.files` | Non-empty list |

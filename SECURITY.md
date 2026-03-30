@@ -112,6 +112,23 @@ In production, set `skill_allowlist` to an explicit list of skill names.
 
 ---
 
+### Threat 7: Adaptive Lens Poisoning
+
+**Risk.** The Adaptive Lens learns incorrect thresholds or focus items from
+anomalous data, causing the agent to miss real problems or chase false positives
+persistently.
+
+**Mitigation.**
+- Bad learning decays 2x faster than good learning grows (asymmetric
+  confidence: disconfirming observation applies `-0.2`, confirming applies `+0.1`).
+- Items that drop below confidence `0.1` are moved to `deprecated_items`.
+- Maximum 50 items per lens; lowest-confidence items are pruned first.
+- Lens files (`agent/state/*/lens.json`) are gitignored, so corruption does not
+  propagate to the repository. If a lens is deleted, the skill falls back to
+  its base (lens-free) behavior.
+
+---
+
 ## Safety Mechanisms
 
 ### HALT File
@@ -199,16 +216,39 @@ judgment is unreliable. Scores recover gradually as PRs are merged.
 
 ---
 
+### Cycle Lock Timeout
+
+A cycle lock prevents concurrent evolve runs. If a cycle crashes or hangs, the
+lock expires after `safety.lock_timeout_minutes` (default `30`). This prevents
+a stale lock from permanently blocking all future cycles.
+
+---
+
+### Contrarian Check
+
+Every `memory.contrarian_check_interval` cycles (default `10`), the engine
+generates a counter-argument to its dominant strategy and stores it as a memo
+with type `"contrarian"`. This is a deliberate cognitive safeguard: it forces
+the agent to question its own priorities periodically, reducing the risk of
+tunnel vision or runaway focus on a single domain.
+
+---
+
 ### Cost Controls
 
 | Setting                     | Default | Config Key                       |
 |-----------------------------|---------|----------------------------------|
 | Daily limit                 | $10 USD | `cost.daily_limit_usd`           |
 | Warning threshold           | 80%     | `cost.warning_threshold_pct`     |
+| Per-skill cost cap          | varies  | `safety.cost_limit_usd` per contract |
 
 At 80% of the daily limit a warning is logged. When the limit is reached the
 cycle is halted for the remainder of the day. Adjust the limit in config to match
 your budget; setting it to `0` disables the hard stop (not recommended).
+
+Individual skills can also declare a `safety.cost_limit_usd` in their contract
+(e.g., `scan-health` defaults to `$0.02`, `dev-cycle` to `$0.10`). This provides
+a per-invocation cap in addition to the global daily limit.
 
 ---
 
@@ -244,6 +284,11 @@ your budget; setting it to `0` disables the hard stop (not recommended).
 8. **Never store secrets in `config.json`.** Use `$ENV_VAR` references and pass
    values through environment variables. Treat `config.json` as you would a
    `.env` file: never commit it.
+
+9. **Spot-check Adaptive Lens files periodically.** Review
+   `agent/state/*/lens.json` after the first 10-20 cycles to verify that learned
+   thresholds and focus items match your expectations. Delete a lens file to
+   reset a domain to base behavior.
 
 ---
 

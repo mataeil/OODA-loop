@@ -37,7 +37,7 @@ In OODA-loop, each `/evolve` run executes one complete loop:
 | **Skill** | A Claude Code slash command that performs a specific task (e.g., `/scan-health`, `/run-tests`). Skills are registered to domains in `config.json` and can be chained together. |
 | **Weight** | A multiplier applied to a domain's staleness score during Decide. Higher weight means the domain gets attention sooner. Example: `service_health` uses `2.0` (critical path), `competitors` uses `0.3` (low frequency). |
 | **Confidence** | A per-domain score from `0.1` to `1.0` that tracks how well past actions in that domain have been received. Increases on PR merge (`+0.1`), decreases on PR rejection (`-0.2`). Used in the scoring formula. |
-| **Scoring Formula** | `score = (hours_since_last × weight) + urgent_signal + (goal_contribution × 0.3) + (confidence × 0.2) + memo_adjustment`. The domain with the highest score wins the cycle. |
+| **Scoring Formula** | `score = (hours_since_last × weight) + urgent_signal + (goal_contribution × goal_weight) + (confidence × confidence_weight) + memo_adjustment`. Floor clamp: if the computed score is negative it is clamped to `0` (the raw value is still recorded in `decision_log` for diagnostics). The domain with the highest score wins the cycle. |
 
 > **Scoring Dynamics.** The staleness term `(hours_since_last × weight)` intentionally dominates the formula. A domain idle for 24 hours at weight 2.0 contributes 48.0 to its score, while goal and confidence terms together contribute less than 1.0 under typical values. This ensures every domain receives regular attention regardless of confidence, preventing the engine from permanently ignoring low-confidence domains. As your project accumulates cycle history, use `memo_adjustments` and `goal_contributions` to shift priority where needed. Formula rebalancing is planned for v0.2.
 | **Implementation Domain** | A special domain that converts queued observations into code changes (PRs). Uses a scoring formula based on action queue pressure rather than staleness. Disabled by default — enabled only at Level 3. |
@@ -51,7 +51,10 @@ In OODA-loop, each `/evolve` run executes one complete loop:
 | **Dry Run** | `/evolve --dry-run` executes Observe → Orient → Decide but skips Act entirely. Prints the full score table and identifies which domain would have won. Safe to run at any time. |
 | **First Cycle Observe-Only** | When `first_cycle_observe_only: true` is set in `config.json`, the very first `/evolve` run only observes all domains without executing any action. Builds initial state files safely before autonomous operation begins. |
 | **3-Tier Memory** | Working memory (last 20 `decision_log` entries) → Episodes (52 weeks of summaries) → Principles (permanent learnings). Information cascades from short-term to long-term as cycles accumulate. |
-| **Contrarian Check** | Every 10 cycles, the engine must generate one counter-argument to its currently dominant strategy. Prevents tunnel vision and over-indexing on a single domain. |
+| **Contrarian Check** | Every `memory.contrarian_check_interval` cycles (default 10), the engine must generate one counter-argument to its currently dominant strategy. The result is stored as a memo with type `"contrarian"`. Prevents tunnel vision and over-indexing on a single domain. |
+| **Implicit Guidance** | Boyd's "Orient feeds directly into Act" shortcut. Before formal scoring, the Decide phase checks for (1) critical alerts that bypass scoring entirely, and (2) stable patterns where the same domain won 3+ consecutive cycles with confidence >= 0.8. Implemented in the evolve engine as Step 3-A0. |
+| **Adaptive Lens** | A per-domain learning file (`agent/state/{domain}/lens.json`) that evolves each cycle. Observe skills load their lens to focus on high-variance metrics, learned thresholds, and cross-domain correlations. Bad learning decays 2x faster than good learning grows (asymmetric confidence: +0.1 confirm, -0.2 disconfirm). Max 50 items per lens; items below confidence 0.1 are deprecated. |
+| **Domain Status** | A lifecycle field on each domain in `config.json`. Values: `"active"` (fully operational), `"available"` (configured but skill not yet generated -- run `/ooda-skill create`), `"disabled"` (manually paused). Only `active` domains participate in scoring. |
 | **Graceful Degradation** | If GitHub, CI, or test infrastructure are unavailable, the engine disables dependent features instead of failing hard. The cycle continues with reduced scope. |
 
 ---
@@ -75,7 +78,8 @@ User runs /evolve
               └─ Apply memo adjustments
 
   → Step 3: Decide
-              └─ Score all domains using scoring formula
+              └─ Implicit Guidance check (critical alerts / stable patterns)
+              └─ Score all domains using scoring formula (floor clamp to 0)
               └─ Apply safety level filters (disabled domains)
               └─ Select winning domain and skill
 
@@ -87,6 +91,7 @@ User runs /evolve
   → Step 5: Reflect
               └─ Write decision_log entry
               └─ Update domain state file (last_run timestamp)
+              └─ Update Adaptive Lens for observed domains
               └─ Cascade memory (working → episodes → principles)
 
   → Commit state changes to git

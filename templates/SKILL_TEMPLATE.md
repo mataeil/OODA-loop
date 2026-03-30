@@ -11,9 +11,11 @@ phase it serves, and what output it produces.
 ## Contract
 
 ```yaml
+contract_version: "1.0"
 name: your-skill-name
-ooda_phase: observe|detect|strategize|execute|support
+ooda_phase: meta|observe|detect|strategize|execute|support
 version: "1.0.0"
+status: active
 description: Same as frontmatter description.
 
 input:
@@ -108,3 +110,4 @@ After creating your skill:
 2. Add a domain entry in `config.json` with `primary_skill` pointing to your skill
 3. Add your skill name to `config.safety.skill_allowlist`
 4. Create a symlink: `ln -sf ../../agent/skills/{phase}/{skill-name} .claude/skills/{skill-name}`
+5. To deprecate later, set `status: deprecated` in the contract (skill stays callable but is excluded from auto-selection)

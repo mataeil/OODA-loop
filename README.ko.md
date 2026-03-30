@@ -133,9 +133,9 @@ cd OODA-loop
 ```
 Cycle: #1  |  Level: 0 (Just watching)
 Domains scanned: 3
-  service_health    OK       confidence 0.50
-  test_coverage     87.2%    confidence 0.50
-  backlog           12 open  confidence 0.50
+  service_health    OK       confidence 0.70
+  test_coverage     87.2%    confidence 0.70
+  backlog           12 open  confidence 0.70
 Actions: 0 pending  |  PRs: 0
 HALT: inactive
 ```

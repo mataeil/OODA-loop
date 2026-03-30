@@ -170,11 +170,11 @@ You still have the HALT file. You have not needed it.
 
 Every `/evolve` run executes one complete OODA cycle:
 
-1. **Safety** -- Check HALT file. Check cycle interval. Acquire lock.
+1. **Safety** -- Check HALT file. Check cycle interval. Acquire lock (auto-expires after `lock_timeout_minutes`).
 2. **Observe** -- Read all domain states, GitHub PR/issue status, external signals. Load the Adaptive Lens.
 3. **Orient** -- Detect patterns, update confidence scores, sync action queue with PR outcomes, build a world model summary.
-4. **Decide** -- Score every domain. Apply urgent signals and goal contributions. Pick the winner. Gate on confidence threshold.
-5. **Act** -- Execute the winning skill. Run chain if confidence is high enough. Handle PR risk tiers (auto-merge / manual deploy / human review).
+4. **Decide** -- Score every domain. Apply urgent signals and goal contributions. Pick the winner. Gate on confidence threshold. **Implicit Guidance**: critical alerts or stable high-confidence patterns bypass scoring and feed Orient directly into Act (Boyd's Orient-to-Act shortcut).
+5. **Act** -- Execute the winning skill. Run chain if confidence is high enough. Re-check HALT before each chain step. Handle PR risk tiers (auto-merge / manual deploy / human review).
 6. **Reflect** -- Update skill gaps, write memos, extract actions, update the Adaptive Lens, cascade memory.
 
 Domain scoring: `score = (hours_since_last x weight) + urgent + (goals x 0.3) + (confidence x 0.2) + memo_adjustment`
@@ -185,7 +185,7 @@ See [CONCEPTS.md](CONCEPTS.md) for the full glossary, architecture diagram, and 
 
 ## Built-in Skills
 
-Five operational skills, three wizards, and a skill creation command:
+Five domain skills, four wizards, and the orchestrator:
 
 | Command | Phase | What it does |
 |---------|-------|-------------|
@@ -198,6 +198,7 @@ Five operational skills, three wizards, and a skill creation command:
 | `/ooda-config` | Wizard | View and modify settings |
 | `/ooda-status` | Wizard | Status dashboard |
 | `/ooda-skill` | Wizard | Create, disable, enable domain skills |
+| `/evolve` | Meta | Run one full OODA cycle (or `/loop 4h /evolve`) |
 
 **Domain status.** Each domain in config is `active` (runs every cycle), `available`
 (configured but skill not yet created), or `disabled` (opted out). Available skills
@@ -218,8 +219,10 @@ Start at Level 0. Move up when you trust the observations.
 |-------|------|-------------|
 | 0 | Just watching | 1 domain. Observe only. No PRs. |
 | 1 | Watching + testing | 2 domains. Coverage tracking added. |
-| 2 | Full observation | All domains. Reports, scoring, lens learning. |
-| 3 | Autonomous | Implementation enabled. Draft PRs. Auto-merge for low-risk changes. |
+| 2 | Full observation | All domains. Draft PRs (human merges). Reports, scoring, lens learning. |
+| 3 | Autonomous | Implementation enabled. Full PRs. Auto-merge for low-risk changes. |
+
+Skipping levels (e.g. 0 to 3) enforces a 3-cycle observe-only cooldown at the new level before any action.
 
 ```
 /ooda-config level 2
@@ -231,12 +234,14 @@ Start at Level 0. Move up when you trust the observations.
 
 OODA-loop is safe by default. Level 0 cannot create PRs. Level 3 requires deliberate opt-in.
 
-- **HALT file** -- `touch agent/safety/HALT` stops everything instantly. Delete to resume.
+- **HALT file** -- `touch agent/safety/HALT` stops everything instantly. Delete to resume. Re-checked before every destructive action (push, merge, deploy) during a cycle.
 - **Protected paths** -- `agent/safety/*`, `agent/skills/meta/*`, `agent/contracts/*` cannot be modified by the agent. It cannot rewrite its own rules.
 - **Confidence gate** -- Actions below 0.6 confidence are skipped or downgraded.
 - **PR limits** -- Max 20 files, 500 lines per PR. Enforced in config.
 - **First cycle observe-only** -- No action on the first run. Just observation.
 - **Skill allowlist** -- Only registered skills can be invoked.
+- **Lock timeout** -- Concurrent execution lock auto-expires after 30 minutes (configurable via `lock_timeout_minutes`). Stale locks from crashes are cleaned up automatically.
+- **Cost ledger** -- Daily API cost tracked in `cost_ledger.json`. Hard stop at `cost.daily_limit_usd` ($10 default), warning at 80%. Resets daily at 00:00 UTC. Missing ledger = fail-closed.
 - **Adaptive Lens safety** -- Bad learning decays 2x faster than good learning grows. Lens corruption falls back to base behavior.
 
 See [SECURITY.md](SECURITY.md) for the full threat model and safety architecture.
@@ -245,13 +250,27 @@ See [SECURITY.md](SECURITY.md) for the full threat model and safety architecture
 
 ## Configuration
 
-Copy `config.example.json` to `config.json`. Key sections: `project` (name, locale),
-`domains` (what to monitor, weights, skills, status), `safety` (HALT path, PR limits,
-allowlist), `scoring` (formula parameters), `progressive_complexity` (current level),
-`signals` (urgent signal thresholds), `memory` (retention, decay), `notifications`
-(Telegram via `$ENV_VAR`), `cost` (daily limit).
+Copy `config.example.json` to `config.json`. Key sections: `project` (name, locale,
+timezone), `domains` (what to monitor, weights, skills, status), `safety` (HALT path,
+PR limits, allowlist, `lock_timeout_minutes`), `confidence` (initial value, merge boost,
+reject penalty), `scoring` (formula parameters), `progressive_complexity` (current level),
+`signals` (urgent signal thresholds), `memory` (retention, decay, action queue decay),
+`notifications` (Telegram via `$ENV_VAR`), `cost` (daily limit, warning threshold).
 
 See [config.example.json](config.example.json) for the complete annotated schema.
+
+---
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `[SKIP] Another evolve cycle is running` | Stale lock. Remove `agent/state/evolve/.lock` (auto-cleaned after 30 min). |
+| `[SKIP] Too soon` | Wait for `min_cycle_interval_minutes` (default 30) to elapse, or add a critical alert to bypass. |
+| `All scores below 0.5` | No domain needs attention yet. Normal on early cycles. |
+| Confidence stuck at 0.7 | Initial value. Merge or reject a PR to move it. |
+| `/evolve` skips a domain | Check its `status` in config -- `available` means the skill has not been created yet. Run `/ooda-skill create <name>`. |
+| Cost limit hit | Check `agent/state/evolve/cost_ledger.json`. Resets at 00:00 UTC, or raise `cost.daily_limit_usd`. |
 
 ---
 

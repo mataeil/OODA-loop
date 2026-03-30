@@ -19,6 +19,7 @@ schemas, retention policies, cascade rules, and the rationale behind each design
 | episodes.json | Weekly episode summaries (Tier 2) | 52 weeks | principles.json |
 | principles.json | Permanent learned rules (Tier 3) | Permanent | None (terminal) |
 | CHANGELOG.md | Human-readable activity log | 50 entries | None |
+| `agent/state/{domain}/lens.json` | Per-domain Adaptive Lens (focus items, thresholds, signals) | Permanent (overwritten by evolve) | None |
 
 ---
 
@@ -205,6 +206,7 @@ User-defined goals with measurable targets. The scoring formula uses goal contri
       "current": 65,
       "unit": "USD/month",
       "direction": "decrease",
+      "initial_value": 65,
       "progress": 0.0,
       "status": "active",
       "related_domains": ["service_health"],
@@ -226,7 +228,8 @@ User-defined goals with measurable targets. The scoring formula uses goal contri
 | current | number | Current measured value. |
 | unit | string | Measurement unit (for display). |
 | direction | string | `"increase"` or `"decrease"`. Determines how progress is calculated. |
-| progress | float | 0.0-1.0. For "increase": `current/target`. For "decrease": `1 - (current - target) / (initial - target)`. Clamped to [0, 1]. |
+| initial_value | number/null | Snapshot of `current` at goal creation time. Required for "decrease" direction goals so progress can be calculated. Null for "increase" goals. |
+| progress | float | 0.0-1.0. For "increase": `current/target`. For "decrease": `1 - (current - target) / (initial_value - target)`. Clamped to [0, 1]. |
 | status | string | `"active"`, `"achieved"`, `"abandoned"`. |
 | related_domains | array | Domain keys that contribute to this goal. Used in scoring: if a domain is related to an active goal, it gets the goal_weight bonus. |
 | created_at | string | ISO 8601. |
@@ -239,8 +242,8 @@ if direction == "increase":
     progress = min(1.0, current / target)
 
 if direction == "decrease":
-    // initial is captured as "current" at goal creation time
-    progress = min(1.0, max(0.0, 1.0 - (current - target) / (initial - target)))
+    // initial_value is captured as "current" at goal creation time
+    progress = min(1.0, max(0.0, 1.0 - (current - target) / (initial_value - target)))
 ```
 
 When progress reaches 1.0, the engine should set status to "achieved" and log it
@@ -299,7 +302,7 @@ of occurrence so that recurring gaps can be elevated to domain suggestions.
 | description | string | What capability is missing. |
 | detected_at | string | ISO 8601 when first detected. |
 | detected_in_cycle | integer | Cycle number of first detection. |
-| ooda_phase | string | Which phase hit the gap: `"observe"`, `"orient"`, `"decide"`, `"act"`. |
+| ooda_phase | string | Which contract phase hit the gap: `"meta"`, `"observe"`, `"detect"`, `"strategize"`, `"execute"`, `"support"`. |
 | frequency | integer | How many times this gap has been encountered. Incremented each time the same gap is detected again (fuzzy match by description similarity). |
 | last_seen_cycle | integer | Most recent cycle where this gap was detected. |
 | related_domain | string/null | Domain key this gap is most associated with. |
@@ -1042,3 +1045,35 @@ deactivate when the evidence genuinely tilts against the principle.
 action can be in-progress at a time. Using an array (instead of a single object
 or null) keeps the schema consistent with pending/completed and allows future
 extension if the safety limit is relaxed.
+
+---
+
+## 13. Per-Domain Lens Files — `agent/state/{domain}/lens.json`
+
+Adaptive Lens files live outside the `evolve/` directory, one per domain. They
+are written by evolve (Step 5-E) and read by observe-phase skills (Step 0.5).
+See the evolve SKILL.md Adaptive Lens Update section for write rules and the
+individual observe skills for read rules. Lens files are not cascaded -- they
+are overwritten in place each time evolve updates them.
+
+---
+
+## Schema Migration
+
+Every state file carries a `schema_version` field (semver). When the engine or
+a skill bumps a schema version, apply these rules:
+
+1. **PATCH bump** (e.g., 1.0.0 -> 1.0.1): additive field with a default.
+   Reader ignores unknown fields; no migration needed.
+2. **MINOR bump** (e.g., 1.0.0 -> 1.1.0): new required field that the engine
+   can auto-populate from existing data. On load, if `schema_version` is older,
+   the engine writes the missing fields with computed defaults and updates
+   `schema_version` in place.
+3. **MAJOR bump** (e.g., 1.0.0 -> 2.0.0): breaking change (renamed/removed
+   fields, restructured arrays). The engine must refuse to load the file and
+   print: `[ERROR] {file} schema_version {old} is incompatible with engine
+   version {new}. Run /ooda-migrate to upgrade.` A dedicated migration script
+   handles the transform.
+
+The engine should compare `schema_version` against its expected version on
+every file load and log a warning if the minor version is behind.

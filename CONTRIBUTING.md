@@ -23,10 +23,15 @@ What you can do:
 - Create integrations with external tools or APIs
 
 Requirements:
-- All skills must conform to the interface defined in `agent/contracts/schema.md`
+- All skills must conform to the contract schema defined in `agent/contracts/schema.md`
+  (YAML front-matter with `contract_version`, `name`, `ooda_phase`, `version`, `input`, `output`, `safety`)
 - Register new skills in `config.example.json` under an appropriate domain
-- Use `templates/SKILL_TEMPLATE.md` as your starting point (see Quick Guide below)
+- Use `/ooda-skill create <name>` to generate a skill interactively, or copy
+  `templates/SKILL_TEMPLATE.md` manually (see Quick Guide below). Generator
+  templates live in `templates/skill-generators/`.
 - Skills must check for the HALT file at the top of their execution logic
+- Observe-phase skills must include a Step 0.5 (Adaptive Lens) section that reads
+  `agent/state/{domain}/lens.json`
 
 ### Tier 2: Documentation
 
@@ -108,7 +113,17 @@ Use dry-run mode to test the orchestrator without executing actions:
 
 ## Creating a New Skill
 
-A quick three-step process:
+### Option A: Use the skill generator (recommended)
+
+```
+/ooda-skill create <skill-name>
+```
+
+Answer 3-5 questions about your project. The wizard generates a complete SKILL.md with
+the contract front-matter, Adaptive Lens integration, and symlinks already wired.
+Generator templates are in `templates/skill-generators/`.
+
+### Option B: Manual creation (three steps)
 
 **Step 1.** Copy the template to your target location:
 
@@ -118,13 +133,18 @@ cp templates/SKILL_TEMPLATE.md agent/skills/<phase>/<skill-name>/SKILL.md
 
 Valid phases: `observe`, `detect`, `strategize`, `execute`, `support`
 
+Add the required YAML contract front-matter at the top of the file (see
+`agent/contracts/schema.md` for the full field list including `contract_version`,
+`ooda_phase`, `input`, `output`, and `safety`).
+
 **Step 2.** Register the skill in `config.json` under the appropriate domain:
 
 ```json
 "domains": {
   "my_domain": {
     "primary_skill": "/my-skill-name",
-    "weight": 1.0
+    "weight": 1.0,
+    "status": "active"
   }
 }
 ```
