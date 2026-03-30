@@ -2,19 +2,39 @@
 
 **Your side project just got an operations team.**
 
+It watches your project and gets smarter over time. Start at Level 0. Move up when you trust it.
+
 [한국어](README.ko.md) | English
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude-Code-blue)](https://claude.ai/code)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-OODA-loop is an autonomous AI agent framework for Claude Code that watches your
-codebase, learns what matters, and acts on it -- while you sleep. Built on Boyd's
-OODA cycle (Observe, Orient, Decide, Act), it gives a solo developer the operational
-awareness of a team ten times their size. Extracted from a production system that ran
-14 autonomous cycles without human intervention. Ships with progressive autonomy levels,
-confidence thresholds, a single-file kill switch, and protected paths the agent can
-never rewrite.
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/mataeil/OODA-loop.git
+cd OODA-loop
+```
+
+```
+/ooda-setup           # auto-detects your stack, writes config
+/evolve               # runs one OODA cycle (first is observe-only)
+/ooda-status          # check what it found
+```
+
+```
+Cycle: #3  |  Level: 1 (Watching + testing)
+Domains scanned: 2
+  service_health    OK       confidence 0.70
+  backlog           5 scored confidence 0.70
+Actions: 2 pending  |  PRs: 0
+HALT: inactive
+```
+
+Nothing changes until you say so. Level 0 just watches. Level 3 opens PRs.
 
 ---
 
@@ -109,42 +129,23 @@ Claude Code, and earns your trust one cycle at a time.
 
 ## What happens when you run it
 
-**Day 1.** You clone the repo, copy the example config, and run the setup wizard.
-
-```bash
-git clone https://github.com/mataeil/OODA-loop.git
-cd OODA-loop
-```
-
-```
-/ooda-setup
-```
-
-It detects your stack, suggests domains to monitor, and writes your config.
-You run your first cycle:
-
-```
-/evolve
-```
-
-Nothing changes. The first cycle is observe-only by default. OODA-loop scans
-your configured domains and writes what it found. You check the output:
+**Day 1.** You clone the repo and run the setup wizard. It detects your stack,
+suggests domains to monitor, and writes your config. The first `/evolve` is
+observe-only -- it looks, writes down what it found, and moves on.
 
 ```
 /ooda-status
-```
 
-```
 Cycle: #1  |  Level: 0 (Just watching)
 Domains scanned: 3
-  service_health    OK       confidence 0.50
-  test_coverage     87.2%    confidence 0.50
-  backlog           12 open  confidence 0.50
+  service_health    OK       confidence 0.70
+  test_coverage     87.2%    confidence 0.70
+  backlog           12 open  confidence 0.70
 Actions: 0 pending  |  PRs: 0
 HALT: inactive
 ```
 
-That is all. It looked. It wrote down what it saw. You read it and move on.
+That is all. It looked. It learned nothing yet. You read it and move on.
 
 **Day 3.** Three cycles in. Confidence scores are climbing as observations confirm
 each other. You bump the level to 1. The loop now watches two domains and tells
