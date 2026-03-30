@@ -57,6 +57,7 @@ gh issue list --state open --json number,title,labels,body,createdAt,assignees -
 ```
 
 On command error → `Could not fetch issues. Is this a GitHub repository? Skipping.` — exit 0.
+On malformed JSON (parse error) → treat identically to command error: log `Could not parse gh output. Skipping.` — exit 0.
 On empty array → write state with `status: "no_issues"`, print `No open issues to score.` — exit 0.
 
 Also read `agent/state/backlog.json` (if it exists) to carry forward `run_count`.
@@ -64,6 +65,14 @@ Also read `agent/state/backlog.json` (if it exists) to carry forward `run_count`
 ---
 
 ## Step 2: RICE Scoring
+
+**Body cap:** only the first 2000 characters of each issue body are considered for scoring
+(avoids runaway cost on mega-issues with embedded logs).
+
+**Deduplication:** before scoring, group issues whose titles share >=80% similarity
+(case-insensitive Levenshtein ratio). Within each group, keep only the lowest-numbered
+(oldest) issue; mark the rest `"deduplicated": true` in the state `scores` array and set
+their `rice_score` to `0`. The report notes: `N duplicate issues collapsed`.
 
 For each issue estimate four components from title, labels, and body.
 
@@ -74,6 +83,11 @@ For each issue estimate four components from title, labels, and body.
 | **Confidence** | 0.5–1.0 | ≥3 labels + body>200 → 1.0, ≥1 label or body>100 → 0.8, bare issue → 0.5 | **0.8** |
 | **Effort** | 1–10 days | `easy/S` → 1, `L/needs-design` or body>500 → 5, `epic/XL` → 8 | **3** |
 
+**Guard:** Effort MUST be clamped to `[1, 10]` (never zero — prevents division-by-zero).
+When all issues share identical labels (or have no labels at all), every issue receives the
+same defaults; this is expected — relative ordering then falls back to Impact and Reach
+heuristics derived from the title and body text.
+
 ```
 RICE = (Reach × Impact × Confidence) / Effort   [round to 2 decimal places]
 ```
@@ -82,16 +96,18 @@ RICE = (Reach × Impact × Confidence) / Effort   [round to 2 decimal places]
 
 ## Step 3: Priority Table
 
-Sort by RICE descending. Print:
+Sort by RICE descending. **Display the top 25 issues** in the table (print
+`... and N more scored issues (see backlog.json)` if truncated).
 
 ```
-plan-backlog — <ISO timestamp>   Scored: N issues
-| # | Title                                         | RICE  |  R  |  I  |  C  |  E  | Labels      |
-|---|-----------------------------------------------|-------|-----|-----|-----|-----|-------------|
-| 42 | Fix login redirect loop                      | 53.33 | 0.8 | 2.0 | 1.0 |  3  | bug, P0     |
+plan-backlog — <ISO timestamp>   Scored: N issues (showing top 25)
+| #   | Title                                         | RICE  |  R  |  I  |  C  |  E  | Labels          |
+|-----|-----------------------------------------------|-------|-----|-----|-----|-----|-----------------|
+|  42 | Fix login redirect loop                       | 53.33 | 0.8 | 2.0 | 1.0 |   3 | bug, P0         |
 ```
 
-Truncate titles to 45 chars with `…`.
+Truncate titles to 45 chars with `...`. Truncate the Labels column to 20 chars
+with `...` to keep rows aligned when issues carry many labels.
 
 ---
 
@@ -102,12 +118,24 @@ Write to `agent/state/backlog.json` (create `agent/state/` if missing):
 ```json
 { "schema_version": "1.0.0", "last_run": "<ISO 8601>", "run_count": 1,
   "scored_count": 12, "unscored_count": 0, "status": "scored",
+  "actionable_items": 12, "top_rice_score": 53.33,
+  "duplicates_collapsed": 2,
   "scores": [{ "number": 42, "title": "Fix login redirect loop",
     "rice_score": 53.33, "reach": 0.8, "impact": 2.0, "confidence": 1.0,
-    "effort": 3, "labels": ["bug", "P0"], "created_at": "<ISO 8601>" }] }
+    "effort": 3, "labels": ["bug", "P0"], "created_at": "<ISO 8601>",
+    "deduplicated": false }] }
 ```
 
-Every issue is scored (defaults applied when labels/body absent). `status`: `"scored"` or `"no_issues"`.
+Every issue is scored (defaults applied when labels/body absent). `status`: `"scored"`, `"no_issues"`, or `"no_remote"`.
+
+The state MUST also include two top-level summary fields consumed by chain triggers:
+
+```json
+"actionable_items": 12,
+"top_rice_score": 53.33
+```
+
+`actionable_items` = count of scores where `rice_score > 0`. `top_rice_score` = maximum `rice_score` across all scored issues (0.0 when no issues).
 
 ---
 
@@ -135,6 +163,7 @@ List all issues if fewer than 5. If none: `No open issues to score. Backlog is c
 | `gh` not installed | Print install hint, exit 0 |
 | No GitHub remote configured | Write `status: "no_remote"`, print message, exit 0 |
 | Not a GitHub repo | Print message, exit 0 |
+| Malformed gh JSON output | Log parse-error message, exit 0 |
 | No open issues | Write `status: "no_issues"`, exit 0 |
 | Issue has no labels or body | Apply all defaults; still scored |
 | `agent/state/` missing | Create directory, then write |

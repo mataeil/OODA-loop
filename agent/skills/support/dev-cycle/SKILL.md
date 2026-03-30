@@ -71,10 +71,13 @@ if file exists at config.safety.halt_file:
 ### 0-B: Level Gate
 
 ```
-Read agent/state/evolve/state.json → progressive_complexity
-if progressive_complexity < 3 AND not manually invoked by user:
-  Print "Implementation requires Level 3. Current: {progressive_complexity}"
-  Print "Enable with: /ooda-config implementation enable"
+Read config.json → progressive_complexity.current_level  (authoritative source)
+Also check config.json → implementation.enabled
+if implementation.enabled == false AND not manually invoked by user:
+  Print "Implementation domain is disabled. Enable with: /ooda-config implementation enable"
+  EXIT cleanly (not an error).
+if progressive_complexity.current_level < 3 AND not manually invoked by user:
+  Print "Implementation requires Level 3. Current: {current_level}"
   EXIT cleanly (not an error).
 ```
 
@@ -91,11 +94,19 @@ Read `agent/state/evolve/action_queue.json`.
 Find the top pending item by highest `effective_rice` (after decay adjustment):
 
 ```
+if queue is not a list or queue is empty:
+  Print "Action queue is empty or malformed. Nothing to implement."
+  EXIT cleanly.
+
 candidates = [item for item in queue if item.status == "pending"]
 if candidates is empty:
-  Print "No pending actions. Nothing to implement."
+  Print "No pending actions (total items: {len(queue)}, none with status=pending)."
   EXIT cleanly.
 selected = max(candidates, key=lambda x: x.effective_rice)
+
+if selected.effective_rice <= 0:
+  Print "Top candidate RICE score is {selected.effective_rice} (≤ 0). Skipping."
+  EXIT cleanly.
 ```
 
 Print selected action details:
@@ -113,8 +124,12 @@ the file before proceeding. If the file write fails, abort and print the error.
 
 ## Step 2: Create Branch
 
-Generate a URL-safe slug from the action title (lowercase, spaces → hyphens,
-strip special characters, truncate to 40 chars).
+Generate a URL-safe slug from the action title:
+1. Lowercase the title.
+2. Replace spaces and underscores with hyphens.
+3. Strip all characters except `[a-z0-9-]`.
+4. Collapse consecutive hyphens into one and trim leading/trailing hyphens.
+5. Truncate to 40 characters (cut at a hyphen boundary if possible).
 
 Get today's date in `YYYYMMDD` format.
 
@@ -122,7 +137,8 @@ Get today's date in `YYYYMMDD` format.
 git checkout -b auto/dev-cycle/{date}-{action-title-slug}
 ```
 
-If the branch already exists (rare on retry), append `-2`, `-3`, etc.
+If the branch already exists (e.g., retry or duplicate title), append `-2`,
+`-3`, etc., up to `-9`. If all suffixes are taken, abort with an error.
 
 Print:
 ```
@@ -136,7 +152,10 @@ Branch: auto/dev-cycle/{date}-{action-title-slug}
 Read context files before writing any code:
 
 1. If `CLAUDE.md` exists at the project root, read it for project conventions.
-2. Read each file listed in `selected.related_files` to understand the affected code.
+2. For each path in `selected.related_files`:
+   - If the file exists, read it to understand the affected code.
+   - If it does not exist, print `"WARN: related file not found: {path} — skipping"` and continue.
+   - If `related_files` is empty or not set, print `"INFO: No related files listed — proceeding with action title and source report only."`.
 3. Read `selected.source_domain` report (if referenced) to understand the
    motivation behind this action.
 
@@ -145,10 +164,11 @@ implement the changes (write and/or edit files).
 
 **Size limit enforcement:**
 
-Track changes as you write:
+Track changes as you write. After each file edit, run `git diff --stat` on
+the working tree to get authoritative counts (do not estimate):
 ```
 files_changed = 0
-lines_changed = 0  (additions + deletions)
+lines_changed = 0  # counted as (additions + deletions) from git diff --numstat
 ```
 
 Before writing each file:
@@ -197,7 +217,12 @@ while attempt <= max_attempts:
     Print "Tests failed (attempt {attempt}/{max_attempts})."
     if attempt < max_attempts:
       Print "Attempting fix..."
-      analyze test output → make targeted fix to failing tests
+      targeted_fix(test_output):
+        1. Parse test runner output for the first failing test name and assertion message.
+        2. Read the source file containing the failing assertion.
+        3. Apply a single-location edit (≤ 15 lines) that addresses the assertion.
+        4. Do NOT modify test files — only fix production code.
+        5. If the failure is an import/module error, fix the import only.
     attempt += 1
 
 if test_status != "passed" after 3 attempts:
@@ -215,20 +240,33 @@ specific failing assertion or import error. Do not rewrite large sections.
 
 ## Step 5: Create PR
 
-Stage only the files that were explicitly changed in Step 3.
-Never use `git add -A`.
+Stage only the files that were explicitly changed in Step 3 **and** any files
+edited during test-fix retries in Step 4. Maintain a cumulative
+`changed_files` list across both steps.
+
+Never use `git add -A` or `git add .`.
 
 ```bash
-git add {file1} {file2} ...   # one file per add call, explicit list
+# Verify each file exists before staging (skip deleted files with a warning)
+for file in changed_files:
+  if file exists on disk:
+    git add {file}
+  else:
+    Print "WARN: {file} no longer exists — skipping stage"
 git commit -m "{selected.title}"
 git push origin HEAD
 ```
 
-If `git push` fails (no remote, auth error):
+If `git push` fails:
 ```
-Print "ERROR: git push failed — {error}"
-Print "Push manually with: git push origin {branch_name}"
-Record push error in action-queue memos.
+if error contains "conflict" or "rejected" or "non-fast-forward":
+  Print "ERROR: merge conflict detected — {error}"
+  Print "Resolve manually, then: git push origin {branch_name}"
+  Update action status to "blocked" with memo "merge conflict with main"
+else:
+  Print "ERROR: git push failed — {error}"
+  Print "Push manually with: git push origin {branch_name}"
+  Record push error in action-queue memos.
 EXIT with non-zero status.
 ```
 
@@ -237,20 +275,29 @@ Create the PR as Draft (always):
 gh pr create \
   --title "{selected.title}" \
   --body "$(cat <<'EOF'
+<!-- ooda:meta source_domain={selected.source_domain} rice={selected.effective_rice} action_id={selected.id} -->
+
 ## Source
-Domain: {selected.source_domain}
-RICE Score: {selected.effective_rice}
+- **Domain**: {selected.source_domain}
+- **RICE Score**: {selected.effective_rice}
+- **Action ID**: {selected.id}
 
 ## Changes
-{list of changed files with one-line description each}
+| File | Description |
+|------|-------------|
+| `{file1}` | {one-line description} |
 
 ## Test Results
-{test_status}: {test_command output summary or "tests skipped"}
+- **Status**: {test_status}
+- **Command**: `{config.test_command}`
+- **Attempts**: {attempt}/{max_attempts}
+- **Output** (last run): `{last 5 lines of test output or "tests skipped"}`
 
 ## Notes
-{any partial PR notes or size limit warnings}
+{any partial PR notes, size limit warnings, or protected-path flags}
 
-🤖 Generated by OODA-loop dev-cycle
+---
+Generated by OODA-loop dev-cycle v1.0.0
 EOF
 )" \
   --draft
@@ -315,3 +362,6 @@ PR      : not created — push branch and create manually
 | `test_command` not configured | Skip tests, record "skipped", continue to PR |
 | `related_files` missing/empty | Proceed with action title and source report only |
 | Protected path changed | Already in Draft mode — note in PR body as protected-path change |
+| Merge conflict on push | Abort push, mark action `"blocked"` with memo `"merge conflict with main"`, stash changes, exit non-zero |
+| `action_queue.json` malformed | Print parse error, exit cleanly |
+| Branch suffix exhausted (`-9`) | Print error, mark action `"blocked"`, exit non-zero |
