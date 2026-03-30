@@ -46,6 +46,7 @@ agent/state/evolve/
   memos.json          -- cross-cycle notes and score_adjustments
   action_queue.json   -- RICE-scored pending/in_progress/completed actions
   metrics.json        -- permanent counters (cycles, PRs, costs)
+  cost_ledger.json    -- daily API cost tracking (resets at 00:00 UTC)
   episodes.json       -- weekly summaries (tier 2 memory)
   principles.json     -- permanent learnings (tier 3 memory)
   CHANGELOG.md        -- cycle activity log (most recent 50)
@@ -155,6 +156,7 @@ for each domain_name, domain_config in config.domains:
   if domain_config.status == "active": proceed normally
   # Legacy: if no status field, treat as "active" (backward compat)
 
+  # Legacy: "enabled" field is superseded by "status" but still honored as fallback
   if not domain_config.enabled: skip
   file = domain_config.state_file
   if file missing:
@@ -750,6 +752,7 @@ git add agent/state/evolve/confidence.json
 git add agent/state/evolve/memos.json
 git add agent/state/evolve/action_queue.json
 git add agent/state/evolve/metrics.json
+git add agent/state/evolve/cost_ledger.json
 git add agent/state/evolve/skill_gaps.json
 git add agent/state/evolve/goals.json
 git add agent/state/evolve/CHANGELOG.md
@@ -798,6 +801,7 @@ input:
     - agent/state/evolve/action_queue.json
     - agent/state/evolve/skill_gaps.json
     - agent/state/evolve/metrics.json
+    - agent/state/evolve/cost_ledger.json
     - agent/state/evolve/episodes.json
     - agent/state/evolve/principles.json
     - "config.domains.*.state_file (all domain state files)"
@@ -828,6 +832,7 @@ output:
     - agent/state/evolve/memos.json
     - agent/state/evolve/action_queue.json
     - agent/state/evolve/metrics.json
+    - agent/state/evolve/cost_ledger.json
     - agent/state/evolve/skill_gaps.json
     - agent/state/evolve/goals.json
     - agent/state/evolve/CHANGELOG.md
