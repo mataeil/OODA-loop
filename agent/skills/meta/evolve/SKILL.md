@@ -77,16 +77,27 @@ if lock_file exists:
 Create lock_file with content: {"pid": current, "started_at": "ISO 8601"}
 ```
 
-The lock file is deleted at the end of Step 6. If evolve crashes, the lock
-persists — the next invocation detects it and exits. To recover from a stale
-lock, the operator deletes the file manually.
+The lock file is deleted at the end of Step 6. **Every early-exit path (HALT
+during execution, dry-run, min-score skip, confidence gate with no fallback)
+MUST also delete the lock file before exiting.** If evolve crashes unexpectedly,
+the lock persists — the next invocation detects it and exits. To recover from a
+stale lock, the operator deletes the file manually.
+
+Stale lock detection: if `started_at` in the lock file is older than
+`config.safety.lock_timeout_minutes` (default 30), treat the lock as stale,
+log `[WARN] Stale lock detected (age: {minutes}m). Removing.`, delete it,
+and proceed.
 
 ### 0-C: Crash Recovery
 
 ```
 if state.json.cycle_in_progress == true:
-  Print "[WARN] Previous cycle did not complete. Resetting."
+  last = state.json.decision_log[-1] (if exists)
+  Print "[WARN] Previous cycle #{last.cycle} did not complete."
+  Print "  Last domain: {last.domain}, skill: {last.skill}, started: {last.timestamp}"
+  Print "  Resetting cycle_in_progress. Starting fresh cycle."
   Set cycle_in_progress = false, write state.json.
+  Add memo: { type: "crash_recovery", cycle: last.cycle, domain: last.domain }
   Continue with fresh cycle (do NOT resume old one).
 ```
 
@@ -317,6 +328,11 @@ score = (hours_since_last * domain.weight)
       + memo_adjustment                            -- from memos.json, consumed in 2-D
 ```
 
+Floor: if computed score < 0, clamp to 0. Negative scores indicate a domain
+that should be avoided this cycle, but displaying them as 0 prevents confusion
+in the score table. The decision_log still records the raw (pre-clamp) score
+for diagnostics.
+
 Tie-break: prefer domain with fewer total executions (metrics.json.domain_executions).
 
 ### 3-A2: Implementation Scoring
@@ -394,7 +410,11 @@ if winner confidence < config.safety.confidence_threshold:
   Try next-highest domain. Repeat until:
     a) domain with confidence >= threshold found -> use it
     b) all below -> use any fallback=true domain
-    c) no fallback -> skip Act entirely
+    c) no fallback:
+       Print "[Decide] All domains below confidence threshold and no fallback domain."
+       Print "[Decide] Skipping Act. Run will proceed to Reflect."
+       Log decision_log: { action: "skip", reason: "all_below_confidence_no_fallback" }
+       Skip to Step 5.
   When confidence-gated: primary skill ONLY, skip chain[].
   Print "[Decide] Confidence-gated: primary skill only, no chain."
 ```
@@ -404,7 +424,11 @@ if winner confidence < config.safety.confidence_threshold:
 ```
 if invoked with --dry-run:
   Print score table + "Would execute: {skill}". Chain if any.
-  Skip Steps 4-5. Jump to Step 6 (minimal state update).
+  Print "[Dry-run] No changes applied. State files not modified."
+  Skip Steps 4-5. In Step 6: update ONLY metrics.json (increment
+  total_cycles) and CHANGELOG.md (mark result as "dry-run"). Do NOT
+  update confidence.json, memos.json, action_queue.json, or
+  decision_log. Do NOT git commit or push. Delete lock file.
   EXIT.
 ```
 
@@ -559,7 +583,8 @@ Store in memos.json.history (cap at 10). Each entry:
 
 If executed skill was NOT implementation's primary_skill:
 - Parse output for actionable items. Assign RICE scores:
-  `RICE = (Reach * Impact * Confidence) / Effort`
+  `RICE = (Reach * Impact * Confidence) / max(Effort, 0.5)`
+  (Effort is floored at 0.5 to prevent division-by-zero or inflated scores.)
 - Dedup: skip if title keyword overlap > 80% with existing queue items.
 - Add to action_queue.json pending. Cap at 20 (remove lowest RICE as "superseded").
 
@@ -615,7 +640,8 @@ last_cycle = now (ISO 8601)
 cycle_in_progress = false
 Append to decision_log: {
   cycle, timestamp, domain, skill, score, confidence,
-  result, pr_number, orient_summary, elapsed_seconds
+  result, pr_number, orient_summary, elapsed_seconds,
+  score_verified, risk_tier
 }
 Cap decision_log at config.memory.working_memory_size (default 20).
 ```
@@ -642,7 +668,7 @@ Prepend entry:
 - **Result**: {success/error/skip}
 - **Score**: {score} (confidence: {conf})
 - **Orient**: {summary}
-- **PR**: #{n} ({level}) or "none"
+- **PR**: #{n} (Risk Tier {tier}) or "none"
 ```
 
 Cap at 50 entries (remove oldest from bottom).
@@ -672,8 +698,8 @@ Set first_cycle_at if null. Set last_updated = now.
 ```
 for each pending item older than config.memory.action_queue_decay_days:
   periods_overdue = floor((age_days - decay_days) / decay_days) + 1
-  cumulative_decay = periods_overdue * config.memory.action_queue_decay_amount
-  item.effective_rice = item.rice_score - (cumulative_decay * item.rice_score)
+  decay_factor = min(periods_overdue * config.memory.action_queue_decay_amount, 1.0)
+  item.effective_rice = item.rice_score * (1.0 - decay_factor)
   if item.effective_rice <= 0: move to completed as "superseded"
 Re-sort pending by effective_rice descending.
 ```

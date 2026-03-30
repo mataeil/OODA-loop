@@ -5,7 +5,7 @@ ooda_phase: detect
 version: "1.0.0"
 input:
   files: [agent/state/test_coverage.json]
-  config_keys: [test_command]
+  config_keys: [test_command, test_timeout_seconds]
 output:
   files: [agent/state/test_coverage.json]
 safety:
@@ -66,21 +66,28 @@ Note previous `passed`, `failed`, and `coverage_pct` values for Step 3.
 
 ## Step 2: Run Tests
 
-Execute with a 5-minute (300-second) timeout:
+Execute with a configurable timeout (read `config.test_timeout_seconds`; default 300):
 ```bash
 {config.test_command} 2>&1
 ```
 
 Capture exit code, stdout, stderr. Parse:
-- **Counts**: look for `X passed`, `X failed`, `X skipped`, `X tests` (Jest, pytest, Go, Mocha, RSpec)
-- **Coverage**: look for `coverage: X%`, `X% coverage`, `Statements: X%`; if absent record `null`
-- **Status**: exit 0 → `"passing"`, non-zero → `"failing"`, crash/not-found → `"error"`, timeout → `"error"` with note
+- **Counts**: try framework-specific patterns in order:
+    - **Jest**: `Tests:\s+(\d+) failed.*?(\d+) passed.*?(\d+) total` (also `(\d+) skipped`)
+    - **pytest**: `(\d+) passed`, `(\d+) failed`, `(\d+) skipped`, `(\d+) error`
+    - **Go**: count `ok` lines as passed packages, `FAIL` lines as failed packages
+    - **Mocha**: `(\d+) passing`, `(\d+) failing`, `(\d+) pending`
+    - **RSpec**: `(\d+) examples?,\s*(\d+) failures?(?:,\s*(\d+) pending)?`
+    - **Fallback**: generic `(\d+)\s+(?:tests?\s+)?passed`, `(\d+)\s+(?:tests?\s+)?failed`
+    - Compute `total = passed + failed + skipped` when the framework does not emit a total
+- **Coverage**: try patterns in order — `All files.*?\|\s*([\d.]+)%` (Istanbul/nyc), `TOTAL\s+.*?([\d.]+)%` (pytest-cov), `coverage:\s*([\d.]+)%` (Go), `Statements\s*:\s*([\d.]+)%` (Jest), `([\d.]+)%\s*coverage`; use first match; if none match record `null`
+- **Status**: exit 0 → `"passing"`, exit 127 (command not found) or 126 (permission denied) → `"error"` with detail `"test command not found or not executable"`, timeout → `"error"` with detail `"timeout after Ns"`, other non-zero → `"failing"`
 
 ---
 
 ## Step 3: Detect Regressions
 
-Skip on first run (no previous state) — record baseline only. Otherwise compare:
+Skip regression detection when: (a) first run (no previous state), (b) current run status is `"error"`, or (c) previous run status was `"error"`. In these cases record results only, no alerts. Otherwise compare against the last *successful* (`"passing"` or `"failing"`) run:
 
 | Condition | Type | Severity |
 |-----------|------|----------|
@@ -109,20 +116,25 @@ Write to `agent/state/test_coverage.json`:
 }
 ```
 
-History: keep last 20 entries (append current, drop oldest).
+History: append the current run, then truncate to the most recent 50 entries (drop oldest first). If the array already exceeds 50 (e.g., manual edits), truncate to 50 in this write.
 
 ---
 
 ## Step 5: Report
 
 ```
-Tests: {passed}/{total} passed ({coverage}% coverage)
+Tests: {passed}/{total} passed, {skipped} skipped {coverage_section}
 Status: {passing|failing|error}
-vs Previous: +{N} passed, -{N} failed, coverage {+/-N%}
+vs Previous: {delta_section or "first run / no comparison available"}
 Alerts: {alert list or "none"}
 ```
 
-Example: `Tests: 142/145 passed (87.3% coverage) | Status: failing | vs Previous: +3 failed, coverage -1.2% | Alerts: [warning] regression — 3 new failures`
+Where:
+- `{coverage_section}` = `(X.X% coverage)` when available, or `(coverage: n/a)` when `coverage_pct` is `null`.
+- If `total` is 0 and status is not `"error"`, display `Tests: 0 found (check test_command output)`.
+- `{delta_section}` omits coverage delta when either the current or previous `coverage_pct` is `null`.
+
+Example: `Tests: 142/145 passed, 0 skipped (87.3% coverage) | Status: failing | vs Previous: +3 failed, coverage -1.2% | Alerts: [warning] regression — 3 new failures`
 
 ---
 
@@ -131,5 +143,5 @@ Example: `Tests: 142/145 passed (87.3% coverage) | Status: failing | vs Previous
 - No `test_command` → skip with message
 - Test command fails to start → record `"error"` status, write state
 - Coverage parsing fails → record `coverage_pct: null`, continue
-- Timeout (> 300s) → kill process, record `"error"` with timeout note
+- Timeout (exceeds `config.test_timeout_seconds`, default 300) → kill process, record `"error"` with timeout note
 - State file corrupt → treat as first run, re-initialize

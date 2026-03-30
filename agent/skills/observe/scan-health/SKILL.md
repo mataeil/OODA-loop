@@ -5,7 +5,7 @@ ooda_phase: observe
 version: "1.0.0"
 input:
   files: [agent/state/service_health.json]
-  config_keys: [health_endpoints, test_command]
+  config_keys: [health_endpoints, health_check_timeout_seconds]
 output:
   files: [agent/state/service_health.json]
 safety:
@@ -48,6 +48,11 @@ Check the HALT file at `config.safety.halt_file`. If it exists, print:
 Check `config.health_endpoints`. If missing or empty:
 `No health endpoints configured. Skipping.` — exit 0.
 
+Validate the list before proceeding:
+- **Deduplicate** — remove duplicate URLs (keep first occurrence).
+- **Reject malformed URLs** — entries that do not start with `http://` or `https://` are skipped with a warning: `[WARN] Skipping malformed URL: <url>`.
+- **Cap at 20 endpoints** — if more than 20 remain after dedup, check only the first 20 and warn: `[WARN] Endpoint list truncated to 20 (had <N>).`
+
 ---
 
 ## Step 0.5: Lens Load (Adaptive Context)
@@ -60,7 +65,7 @@ If lens exists:
   Allocate extra time and retries to high-priority items.
 - **learned_thresholds** (confidence >= 0.6): Override default thresholds. For
   example, if the lens says endpoint X has a learned threshold of 800ms instead
-  of the default 3000ms, use 800ms for anomaly detection on that endpoint.
+  of the default 1500ms, use 800ms for anomaly detection on that endpoint.
 - **discovered_signals** (actionable=true): Include these as additional diagnostic
   checks beyond the base behavior. For example, if the lens says "deploy failures
   correlate with health degradation", check recent deploy status first.
@@ -96,13 +101,14 @@ for use in anomaly detection.
 For each URL in `config.health_endpoints`:
 
 ```bash
-curl -s -o /dev/null -w "%{http_code} %{time_total}" --max-time 10 <url>
+curl -s -o /dev/null -w "%{http_code} %{time_total}" --max-time <timeout_seconds> <url>
 ```
 
 Record: `url`, `status_code`, `response_time_ms`, `timestamp`.
-Timeout: 10s. Retry once on network failure.
+Timeout: `config.health_check_timeout_seconds` (default 10, valid range 2-30).
+Retry once on network failure (status 0 / connection refused).
 
-If `curl` unavailable, fall back to `wget --server-response --timeout=10`.
+If `curl` unavailable, fall back to `wget --server-response --timeout=<timeout_seconds>`.
 If both unavailable, record `status_code: 0`, `error: "no_http_client"`.
 
 ---
@@ -111,9 +117,11 @@ If both unavailable, record `status_code: 0`, `error: "no_http_client"`.
 
 | Condition | Alert type | Severity |
 |---|---|---|
-| status_code != 200 (single endpoint) | `endpoint_down` | warning |
-| status_code != 200 (2+ endpoints) | `multiple_endpoints_down` | critical |
-| response_time_ms > 3000 | `slow_response` | warning |
+| status_code 5xx or 0 (single endpoint) | `endpoint_down` | warning |
+| status_code 5xx or 0 (2+ endpoints) | `multiple_endpoints_down` | critical |
+| status_code 3xx | `endpoint_redirect` | info |
+| status_code 403 | `endpoint_forbidden` | warning |
+| response_time_ms > 1500 | `slow_response` | warning |
 | response_time_ms > 2x baseline avg | `response_degradation` | warning |
 
 **Baseline comparison on failure** — when an endpoint is DOWN (HTTP 000, connection refused, or timeout with no response), include baseline context in the alert detail so the user understands what changed:
@@ -128,7 +136,8 @@ If no baseline exists for the endpoint (first run), omit the "Previous baseline"
 
 Alert shape: `{ "severity": "warning", "type": "...", "endpoint": "...", "detail": "..." }`
 
-Increment `consecutive_failures` per endpoint on non-200; reset to 0 on success.
+Increment `consecutive_failures` per endpoint on 5xx or status 0 (timeout/connection refused).
+Reset to 0 on any 2xx response. Do NOT increment on 3xx or 403 (endpoint is reachable).
 
 ---
 
@@ -149,8 +158,10 @@ Write to `agent/state/service_health.json`:
 }
 ```
 
-Status: `healthy` = all 200 + no alerts. `degraded` = warning alerts only. `critical` = any critical alert.
-Update `avg_response_ms` as a rolling average (weight new reading at 0.2).
+Status: `healthy` = all 2xx, no warning/critical alerts (info alerts are OK). `degraded` = any warning alert. `critical` = any critical alert.
+Update `avg_response_ms` using an exponential moving average:
+`new_avg = old_avg * 0.8 + current_response_ms * 0.2`.
+On the first run for an endpoint (no prior baseline), set `avg_response_ms = current_response_ms` directly.
 
 **Note:** This skill does NOT write to `agent/state/service_health/lens.json`.
 Lens updates (learning thresholds, promoting signals, adjusting focus) happen
@@ -183,4 +194,5 @@ If `consecutive_failures >= 3`, note that the `dev-cycle` chain trigger conditio
 | `curl` not available | Fall back to `wget`; if both missing, record `status_code: 0` |
 | All endpoints unreachable | Record `status: "critical"`, write state, report — do NOT crash |
 | `service_health.json` missing | Create with initial structure and continue |
+| First run (no baseline for endpoint) | Record current values as baseline; skip `response_degradation` alert (no prior avg to compare) |
 | HALT file present | Print reason, exit immediately before any checks |
