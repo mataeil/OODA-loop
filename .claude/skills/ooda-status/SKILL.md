@@ -21,6 +21,9 @@ Do not abort — status must always be readable regardless of HALT state.
 ## Step 1: Gather Data
 
 Read each file below. If a file is missing, note it and use a safe default value.
+If a file exists but contains invalid JSON (parse error), treat it the same as missing
+and append an alert: `[WARN] Corrupt state file: <path> — skipped (parse error)`.
+Do not let a single corrupt file abort the entire dashboard.
 
 **config.json** — project name, current level, cost limit, domain list, domain status fields
 ```bash
@@ -108,7 +111,21 @@ Replace `{placeholders}` with the computed values from Step 2.
 ```
 
 One row per enabled domain. Pad domain names and numbers so columns align.
-If HALT is active, write `HALT: ACTIVE` (all caps, no color codes needed — emphasis via caps).
+If HALT is active, write `HALT: ACTIVE` (all caps, no color codes needed -- emphasis via caps).
+
+**Narrow terminal fallback** — The box-drawing layout above assumes >= 50 columns.
+If the output environment is narrow (e.g. split pane, mobile terminal), fall back to
+a compact plain-text list without box-drawing characters:
+```
+OODA-loop status
+Cycle #0 | Last — | Level 0
+---
+service_health  — — — ?
+test_coverage   — — — ?
+---
+Actions: — pending, — proposed
+Alerts: none | HALT: inactive | Cost: —/—
+```
 
 ## Step 4: Suggestions
 
@@ -139,6 +156,7 @@ After rendering the dashboard, check whether a suggestion should be shown:
 | config.json missing | Print: `Not configured. Run /ooda-setup first.` — stop. |
 | state files missing (all) | Show dashboard with `Cycle: #0  Last: —  Level: 0` and domain rows as `?`. Add note: `No cycles run yet. Run /evolve to start.` |
 | Individual domain state file missing | Show `?` for score, conf, last, status for that domain only. |
+| Any state file contains invalid JSON | Treat as missing (use defaults), add `[WARN] Corrupt state file: <path>` to alerts section. |
 | action_queue.json missing | Show `Actions: — pending, — proposed` and `Next: —`. |
 | metrics.json missing | Show `Cost: —/— today`. |
 | HALT active | Show full dashboard. Mark `HALT: ACTIVE`. Do not suppress any data. |

@@ -107,7 +107,8 @@
       "agent/skills/meta/*",
       "agent/contracts/*"
     ],
-    "skill_allowlist": ["/scan-health", "/check-tests", "/plan-backlog", "/run-deploy", "/dev-cycle", "/scan-market", "/scan-ux", "/scan-competitors"]
+    "skill_allowlist": ["/scan-health", "/check-tests", "/plan-backlog", "/run-deploy", "/dev-cycle", "/scan-market", "/scan-ux", "/scan-competitors"],
+    "lock_timeout_minutes": 30
   },
   "progressive_complexity": {
     "current_level": 0,
@@ -155,8 +156,13 @@
     "action_queue_decay_amount": 0.05
   },
   "test_command": "npm test",
+  "test_timeout_seconds": 300,
   "health_endpoints": [],
+  "health_check_timeout_seconds": 10,
   "deploy_workflow": null,
+  "deploy_workflow_inputs": {},
+  "deploy_monitor_timeout_seconds": 600,
+  "deploy_health_wait_seconds": 30,
   "notifications": {
     "telegram": {
       "enabled": false,

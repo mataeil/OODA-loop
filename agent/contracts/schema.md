@@ -42,16 +42,24 @@ of its `SKILL.md`, OR a standalone `contract.yaml` in the same directory.
 ```yaml
 # --- REQUIRED FIELDS ---
 
+contract_version: "1.0"       # Schema version of the contract format itself.
+                              # Bump when adding new required fields or changing semantics.
 name: skill-name              # Unique identifier. Must match directory name.
 ooda_phase: observe            # One of: meta, observe, detect, strategize, execute, support
-version: "1.0.0"              # Semver. Bump on breaking input/output changes.
+version: "1.0.0"              # Semver (MAJOR.MINOR.PATCH). Bump MAJOR on breaking
+                              # input/output changes, MINOR on additive changes,
+                              # PATCH on bug fixes that don't alter I/O.
 description: >
   One-paragraph summary of what this skill does and why it exists.
 
 input:
   files: []                   # State files this skill READS (relative to repo root)
+  apis: []                    # External API endpoints called (for documentation)
+  web_search: false           # true if skill uses web search
+  config_keys: []             # config.json keys this skill reads (e.g., "health_endpoints")
 output:
   files: []                   # State files this skill WRITES (relative to repo root)
+  prs: none                   # none | "Draft PR" | "Ready PR"
 
 safety:
   halt_check: true            # Must check HALT file before any action. Always true.
@@ -60,17 +68,14 @@ safety:
 
 # --- OPTIONAL FIELDS ---
 
-input:
-  apis: []                    # External API endpoints called (for documentation)
-  web_search: false           # true if skill uses web search
-  config_keys: []             # config.json keys this skill reads (e.g., "health_endpoints")
-
-output:
-  prs: none                   # none | "Draft PR" | "Ready PR"
+status: active                # active | deprecated. Deprecated skills are loaded
+                              # but never auto-selected by scoring. They remain
+                              # callable via direct invocation or chain triggers
+                              # until fully removed.
 
 chain_triggers: []            # List of trigger rules (see Chain Triggers section)
 
-safety:
+safety:                       # (merged with required safety block above)
   branch_prefix: "auto/name/" # Required only when read_only is false
   cost_limit_usd: 0.05        # Per-invocation cost cap. Optional but recommended.
   max_files: 20               # PR size guard. Inherits from config if omitted.
@@ -83,14 +88,16 @@ domains: []                   # Which config domains this skill serves (for rout
 
 | Field | Required | Default | Notes |
 |------------------------|----------|-----------------|-----------------------------------------------|
+| contract_version | YES | -- | Schema version (currently `"1.0"`) |
 | name | YES | -- | Must match directory name |
 | ooda_phase | YES | -- | One of the 6 phases |
-| version | YES | -- | Semver string |
+| version | YES | -- | Semver `MAJOR.MINOR.PATCH` string |
 | description | YES | -- | Human-readable, one paragraph |
 | input.files | YES | `[]` | Empty list is valid (skill reads nothing) |
 | output.files | YES | `[]` | Empty list is valid (skill writes nothing) |
 | safety.halt_check | YES | `true` | Must always be true. Engine rejects false. |
 | safety.read_only | YES | -- | true = no PRs (state writes OK). false = PRs allowed |
+| status | no | `active` | `active` or `deprecated` |
 | input.apis | no | `[]` | |
 | input.web_search | no | `false` | |
 | input.config_keys | no | `[]` | |
@@ -121,8 +128,17 @@ chain_triggers:
 - `target` must be a skill name in the `skill_allowlist` (config.json).
 - `condition` is a simple expression evaluated against the skill's output JSON.
 - Supported operators: `>=`, `<=`, `==`, `!=`, `>`, `<`, `AND`, `OR`.
-- Chain depth is capped at 3 to prevent runaway loops.
+- String literals must use single quotes: `status == 'green'`. Unquoted tokens
+  are treated as field references into the output JSON.
+- `AND` binds tighter than `OR` (standard precedence). Parentheses are NOT
+  supported; split complex conditions into separate trigger entries instead.
+- Chain depth is capped at **3** (configurable via `config.safety.max_chain_depth`,
+  hard ceiling of 5). If a chain would exceed this depth, the remaining triggers
+  are skipped and a warning is logged: `[WARN] Chain depth {N} exceeded max {max}. Remaining triggers skipped.`
 - Each chained skill still checks HALT before running.
+- Circular chains (A triggers B triggers A) are detected at validation time and
+  rejected. The engine builds a directed graph of all `chain_triggers` and
+  rejects any skill whose triggers form a cycle.
 
 ---
 
@@ -186,10 +202,9 @@ input:
     - agent/state/service_health.json
   apis:
     - "config: health_endpoints[]"
-    - "GitHub Actions API (latest runs)"
   config_keys:
     - health_endpoints
-    - test_command
+    - health_check_timeout_seconds
 
 output:
   files:
@@ -225,6 +240,7 @@ input:
     - agent/state/test_coverage.json
   config_keys:
     - test_command
+    - test_timeout_seconds
 
 output:
   files:
@@ -297,10 +313,17 @@ description: >
 input:
   files:
     - agent/state/service_health.json
+    - agent/state/test_coverage.json
   apis:
     - "GitHub Actions API (workflow_dispatch)"
   config_keys:
     - deploy_workflow
+    - deploy_workflow_inputs
+    - deploy_monitor_timeout_seconds
+    - deploy_health_wait_seconds
+    - health_endpoints
+    - safety.halt_file
+    - safety.branch_prefix
 
 output:
   files:
@@ -309,13 +332,13 @@ output:
 
 chain_triggers:
   - target: scan-health
-    condition: "deploy_completed == true"
+    condition: "post_deploy_health_check == 'failed'"
 
 safety:
   halt_check: true
   read_only: false
   branch_prefix: "auto/deploy/"
-  cost_limit_usd: 0.02
+  cost_limit_usd: 0.05
 
 domains:
   - service_health
@@ -336,9 +359,14 @@ description: >
 input:
   files:
     - agent/state/evolve/action_queue.json
-    - agent/state/evolve/confidence.json
-    - agent/state/test_coverage.json
+    - agent/state/evolve/state.json
+    - config.json
+    - CLAUDE.md
   config_keys:
+    - safety.halt_file
+    - safety.max_files_per_pr
+    - safety.max_lines_per_pr
+    - safety.protected_paths
     - test_command
 
 output:
@@ -347,14 +375,14 @@ output:
   prs: "Draft PR"
 
 chain_triggers:
-  - target: run-deploy
-    condition: "pr_merged == true AND health_status == 'green'"
+  - target: scan-health
+    condition: "pr_created == true"
 
 safety:
   halt_check: true
   read_only: false
   branch_prefix: "auto/dev-cycle/"
-  cost_limit_usd: 0.50
+  cost_limit_usd: 0.10
   max_files: 20
   max_lines: 500
 
@@ -382,13 +410,39 @@ input:
     - agent/state/evolve/goals.json
     - agent/state/evolve/action_queue.json
     - agent/state/evolve/memos.json
+    - agent/state/evolve/skill_gaps.json
+    - agent/state/evolve/metrics.json
+    - agent/state/evolve/episodes.json
+    - agent/state/evolve/principles.json
+    - "config.domains.*.state_file (all domain state files)"
+    - "agent/state/external/*.json (if present)"
+  apis:
+    - "GitHub CLI (gh pr list, gh issue list, gh pr merge, gh pr view)"
+    - "Health endpoints (config.health_endpoints)"
+    - "Notification APIs (config.notifications)"
+  config_keys:
+    - domains
+    - implementation
+    - scoring
+    - confidence
+    - safety
+    - progressive_complexity
+    - signals
+    - memory
 
 output:
   files:
     - agent/state/evolve/state.json
     - agent/state/evolve/confidence.json
+    - agent/state/evolve/memos.json
+    - agent/state/evolve/action_queue.json
     - agent/state/evolve/metrics.json
+    - agent/state/evolve/skill_gaps.json
+    - agent/state/evolve/goals.json
     - agent/state/evolve/CHANGELOG.md
+    - agent/state/evolve/episodes.json (weekly)
+    - agent/state/evolve/principles.json (rare)
+  prs: "Determined by executed skill (evolve itself creates no PRs)"
 
 safety:
   halt_check: true
@@ -449,17 +503,21 @@ needed.
 The engine validates every contract at cycle start. A skill is skipped (with a
 warning in the cycle log) if any of these checks fail:
 
-| Check | Rule |
-|-------------------------------|------------------------------------------------------|
-| Required fields present | All YES fields from the table above must exist |
-| Phase is valid | Must be one of the 6 defined phases |
-| Name matches directory | `name` field must equal the skill's directory name |
-| HALT check is true | `safety.halt_check` must be `true` |
-| Branch prefix when writable | `safety.branch_prefix` required if `read_only: false` |
-| Allowlist membership | Skill must appear in `safety.skill_allowlist` |
-| Chain targets exist | Every `chain_triggers[].target` must be a known skill |
-| Version is semver | Must match `MAJOR.MINOR.PATCH` format |
+| Check | Rule | Error message |
+|-------------------------------|------------------------------------------------------|-------------------------------------------------------|
+| Required fields present | All YES fields from the table above must exist | `[contract] {skill}: missing required field '{field}'` |
+| Contract version supported | `contract_version` must be a version the engine knows | `[contract] {skill}: unsupported contract_version '{v}' (engine supports up to '{max}')` |
+| Phase is valid | Must be one of the 6 defined phases | `[contract] {skill}: invalid ooda_phase '{phase}'` |
+| Name matches directory | `name` field must equal the skill's directory name | `[contract] {skill}: name '{name}' does not match directory '{dir}'` |
+| HALT check is true | `safety.halt_check` must be `true` | `[contract] {skill}: safety.halt_check must be true` |
+| Branch prefix when writable | `safety.branch_prefix` required if `read_only: false` | `[contract] {skill}: read_only is false but no branch_prefix set` |
+| Allowlist membership | Skill must appear in `safety.skill_allowlist` | `[contract] {skill}: not in skill_allowlist` |
+| Chain targets exist | Every `chain_triggers[].target` must be a known skill | `[contract] {skill}: chain target '{target}' is not a known skill` |
+| No circular chains | Chain trigger graph must be acyclic (DAG) | `[contract] {skill}: circular chain detected: {cycle_path}` |
+| Version is semver | Must match `MAJOR.MINOR.PATCH` (digits only, no `v` prefix) | `[contract] {skill}: version '{v}' is not valid semver` |
+| Deprecated skill not auto-selected | `status: deprecated` skills pass validation but are excluded from scoring | `[contract] {skill}: status is deprecated, skipping auto-selection` (info, not error) |
 
 Validation errors are logged to `agent/state/evolve/CHANGELOG.md` and the
 skill is excluded from that cycle. The cycle continues with remaining valid
-skills.
+skills. Multiple errors per skill are collected and reported together (the
+engine does not stop at the first error).

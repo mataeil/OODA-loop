@@ -43,8 +43,15 @@ and key safety values (halt_file presence, confidence_threshold, max_prs_per_cyc
 ## Step B — level {N}
 
 1. Validate N is 0–3; fail fast otherwise.
-2. If N == 3, print explicit warning (autonomous mode, auto-merge ON, no manual review)
-   and require the user to type "yes" to confirm. Any other response: `Cancelled.`
+2. If N == 3, print explicit warning and require a typed confirmation phrase:
+   ```
+   [DANGER] Level 3 enables AUTONOMOUS mode:
+     - The agent will create PRs AND auto-merge them without human review
+     - Implementation changes will be deployed automatically
+     - Only HALT file or cost limit can stop a running cycle
+   Type "enable autonomous" to confirm (anything else cancels):
+   ```
+   Only accept the exact phrase `enable autonomous`. Any other response: `Cancelled.`
 3. Back up config.json.
 4. Set `progressive_complexity.current_level = N` and `implementation.enabled = (N == 3)`.
 5. Write + validate JSON. Print: `Level changed: <old> → <N> ("<name>")`.
@@ -102,11 +109,17 @@ Run checks in order; print `[PASS]` or `[FAIL] <reason>` for each:
 4. `project.name`, `project.locale`, `project.timezone` all present
 5. `safety.halt_file`, `safety.confidence_threshold`, `safety.max_prs_per_cycle` present
 6. Value ranges: `confidence_threshold` in [0.0, 1.0]; `max_prs_per_cycle` >= 1; `min_cycle_interval_minutes` >= 1
-7. At least one domain defined
-8. Each domain has `weight`, `primary_skill`, `state_file`, `enabled`
-9. Every enabled domain's `primary_skill` is in `safety.skill_allowlist`
-10. `progressive_complexity.current_level` is 0–3
-11. No sensitive field holds a raw token (must use `$ENV_VAR` form)
+7. If present, `health_check_timeout_seconds` is a number in [2, 30]
+8. If present, `test_timeout_seconds` is a number >= 10
+9. If present, `deploy_monitor_timeout_seconds` is a number >= 60
+10. If present, `deploy_health_wait_seconds` is a number >= 5
+11. If present, `deploy_workflow_inputs` is a plain object (not array, not null)
+12. If present, `safety.lock_timeout_minutes` is a number >= 1
+13. At least one domain defined
+14. Each domain has `weight`, `primary_skill`, `state_file`, `enabled`
+15. Every enabled domain's `primary_skill` is in `safety.skill_allowlist`
+16. `progressive_complexity.current_level` is 0–3
+17. No sensitive field holds a raw token (must use `$ENV_VAR` form)
 
 Final: `Validation: <N> passed, <M> failed`
 On any failure append: `Run /ooda-config show to review your settings.`
@@ -135,8 +148,10 @@ Wipe the lens snapshot for the named domain, forcing a fresh start on the next c
 3. If lens.json does not exist → `No lens file found for <name>. Nothing to reset.` and exit.
 4. Ask for confirmation: `Reset lens for <name>? This clears all accumulated evidence. (yes/no)`
    Any answer other than "yes" → `Cancelled.` and exit.
-5. Overwrite lens.json with: `{ "schema_version": "1.0.0", "domain": "<name>", "reset_at": "<ISO timestamp>", "evidence": [] }`
-6. Print: `Lens reset: <name>  (evidence cleared, next cycle starts fresh)`
+5. Back up the existing lens file to `lens.json.bak` in the same directory before overwriting.
+   Print: `  Backed up: <lens_path>.bak`
+6. Overwrite lens.json with: `{ "schema_version": "1.0.0", "domain": "<name>", "reset_at": "<ISO timestamp>", "evidence": [] }`
+7. Print: `Lens reset: <name>  (evidence cleared, backup saved, next cycle starts fresh)`
 
 ---
 

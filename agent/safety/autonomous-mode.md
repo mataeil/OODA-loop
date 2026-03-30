@@ -19,6 +19,10 @@ Before ANY work, check: `test -f <config.safety.halt_file>`
   delete it under normal operation. (The post-merge health check is the sole
   exception — see below.)
 
+Skills MUST re-check the HALT file before each destructive action (git push,
+PR creation, merge, deploy). A HALT file created mid-cycle takes effect at the
+next re-check point — the maximum reaction window is one skill invocation.
+
 Stop: `touch agent/safety/HALT` | Resume: `rm agent/safety/HALT`
 
 ---
@@ -40,6 +44,12 @@ Read from `config.progressive_complexity.current_level`. Only a human may change
 
 First cycle is observe-only when `config.safety.first_cycle_observe_only` is
 true, regardless of level.
+
+Level transitions are one-way up — the agent cannot suggest or request level
+changes. If the operator skips levels (e.g. 0 to 3), the system MUST enforce
+a minimum of 3 observe-only cycles at the new level before acting, to
+establish baseline state. The `progressive_complexity.last_level_change`
+timestamp in config records when the level was last changed.
 
 ---
 
@@ -74,6 +84,11 @@ Every agent-created PR must respect:
 - `config.safety.max_lines_per_pr` — max lines changed (additions + deletions)
 - `config.safety.max_prs_per_cycle` — max PRs per evolve cycle
 
+Generated files (lock files, compiled output, vendored dependencies) are
+excluded from line counts but still count toward the file limit. If
+`config.safety.generated_file_patterns` is set, matching paths are exempt
+from `max_lines_per_pr` only.
+
 Exceeding limits: split into smaller PRs, or escalate to human review.
 
 ---
@@ -86,6 +101,11 @@ Tracks estimated API cost against `config.cost.daily_limit_usd`.
 - At 100%: **stop the cycle gracefully**. Complete in-progress git operations
   (no dirty state), write decision log, halt. No new cycles until next UTC day.
 - `daily_limit_usd: 0` disables the gate (not recommended).
+
+Cost is tracked in `agent/state/evolve/cost_ledger.json`, updated by evolve at
+the end of each cycle. Each entry records cycle ID, timestamp, and estimated
+token cost. The ledger resets daily at 00:00 UTC. If the ledger file is missing
+or corrupt, the cycle MUST treat cost as at-limit and halt (fail-closed).
 
 ---
 
@@ -103,6 +123,11 @@ When auto-merge is active, every merged PR triggers verification:
    d. Log the incident.
 
 No second merge attempt after failure. HALT ensures human intervention.
+
+**Limitation**: `git revert` only undoes code changes. It cannot reverse
+database migrations, external API calls, or published artifacts. PRs that
+include migration files or deploy triggers MUST be treated as protected paths
+and require human review, even at Level 3.
 
 ---
 
@@ -131,18 +156,32 @@ Request before interval elapsed = wait or decline. Prevents runaway loops.
 
 ---
 
-## Secret Management [RECOMMENDED]
+## Secret Management [ENFORCED]
 
 - `config.json` is gitignored — never commit it.
 - Credentials use `$ENV_VAR` references, resolved at runtime.
 - Before staging, verify files do not contain tokens, keys, or passwords.
+- At cycle start, validate that all `$ENV_VAR` references in config resolve to
+  non-empty values. Missing variables: log `[WARN] Unresolved secret: $VAR_NAME`
+  and disable features that depend on them (do not fail the entire cycle).
+- The agent MUST NOT log, print, or write resolved secret values to any file.
+  Decision logs and state files record the variable name (`$ENV_VAR`), never the
+  value.
+- Credential rotation is the operator's responsibility. If an API call fails
+  with a 401/403, log `[AUTH] Credential may be expired: $VAR_NAME` and skip
+  the dependent skill.
 
 ---
 
 ## Notifications [RECOMMENDED]
 
 Notify operator on: HALT creation, health check failure, cost warning, PR events.
-Notification delivery failure is non-fatal — the cycle continues regardless.
+Notification delivery failure is non-fatal for Level 0-2 — the cycle continues.
+
+At **Level 3 (auto-merge active)**, notification failure on HALT or health check
+events MUST be logged as a safety warning. If notifications fail for
+`config.safety.max_silent_failures` consecutive events (default 3), the agent
+creates a HALT file. Autonomous operation without operator visibility is unsafe.
 
 ---
 
@@ -164,3 +203,7 @@ Before advancing complexity level:
 - [ ] Confirmed `protected_paths` covers safety, meta, and contracts
 - [ ] Tested HALT file (create, verify stop, remove, verify resume)
 - [ ] Set `daily_limit_usd` appropriate for your budget
+- [ ] Verified all `$ENV_VAR` secrets in config resolve (no empty values)
+- [ ] Tested notification delivery (at least one successful send)
+- [ ] Confirmed no migration files are in auto-mergeable paths
+- [ ] Reviewed `cost_ledger.json` for unexpected spend patterns

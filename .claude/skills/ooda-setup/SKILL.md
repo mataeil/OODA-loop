@@ -14,17 +14,37 @@ Runs a 3-step interactive wizard: scan → confirm domains → write config.json
 
 Read `agent/safety/HALT`. If the file exists → print `[HALT] Setup blocked. Remove agent/safety/HALT to continue.` and stop immediately.
 
-If `config.json` already exists → ask:
+If `config.json` already exists → back up to `config.json.bak` and ask:
 ```
-[WARNING] config.json already exists. Overwrite? (yes/no)
+[WARNING] config.json already exists.
+  (o) Overwrite — discard current config, start fresh
+  (m) Merge     — keep existing domains and safety settings, update detected values only
+  (a) Abort     — cancel setup
+  Choice (o/m/a):
 ```
-If answer is not "yes" → abort.
+- `o` → overwrite entirely (backed up to config.json.bak)
+- `m` → read existing config, preserve user-modified fields (domains, safety, progressive_complexity.current_level, cost), only update auto-detected values (project.name, test_command, deploy_workflow, health_endpoints)
+- `a` or anything else → abort
 
 ---
 
 ## Step 1/3: Scan Project
 
 Print: `[1/3] Scanning your project...`
+
+**Detect Monorepo** — before language detection, check for monorepo indicators:
+- `package.json` has `"workspaces"` field → npm/yarn workspaces monorepo
+- `pnpm-workspace.yaml` exists → pnpm monorepo
+- `lerna.json` exists → Lerna monorepo
+- `packages/` or `apps/` directory exists with multiple sub-`package.json` files → probable monorepo
+
+If monorepo detected, scan each workspace root for its own indicator files and aggregate results. Print:
+```
+  Structure: monorepo ({N} packages detected)
+```
+If not a monorepo, print `  Structure: single-package`.
+
+For monorepos, auto-detect values from the root config first, then fall back to the first workspace that has the relevant indicator. Use the root `package.json` scripts for test/build commands unless a workspace-level override exists.
 
 **Detect Language** — use Glob to check for indicator files:
 
@@ -38,6 +58,7 @@ Print: `[1/3] Scanning your project...`
 | `pom.xml` / `build.gradle` | Java |
 
 Check framework hints in `package.json` (`"next"` → Next.js, `"react"` → React, `"express"` → Express). If no indicator found → language = null.
+For monorepos, report the primary language (most common across packages) and note others: e.g. `TypeScript (3 packages), Go (1 package)`.
 
 **Detect Test Command** (first match wins):
 1. `package.json` has `scripts.test` → `npm test`
@@ -131,7 +152,8 @@ within 60 seconds of setup, before they ever run `/evolve`.
 
 Print: `[4/4] Taking a first look at your project...`
 
-For each enabled domain, run a lightweight check (15-second overall timeout):
+Each domain check runs independently so one failure cannot block the others.
+Apply a 15-second overall timeout for all checks combined and a 10-second per-domain timeout:
 
 1. **test_coverage**: If `config.test_command` is non-empty, run it with a 10-second
    timeout. Parse the output for pass/fail counts and coverage percentage.
