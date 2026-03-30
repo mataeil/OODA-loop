@@ -35,5 +35,8 @@ Thumbs.db
 *.swo
 *~
 
+# Sandbox test environment (isolated, not part of the project)
+sandbox/
+
 # Node (if user project uses it)
 node_modules/
