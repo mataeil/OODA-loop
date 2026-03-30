@@ -45,9 +45,11 @@ Generate the SKILL.md with these sections in order:
 
 ### 1. YAML Frontmatter (contract block)
 ```yaml
+contract_version: "1.0"
 name: scan-market
 ooda_phase: observe
 version: "1.0.0"
+status: active
 description: >
   Market intelligence scanner. Reads {product_description} context from
   references/context.json, researches {competitors}, and tracks signals
@@ -64,6 +66,7 @@ input:
 output:
   files:
     - agent/state/business_strategy.json
+  prs: none
 
 safety:
   halt_check: true
@@ -84,7 +87,10 @@ If the lens exists and is valid JSON with items of confidence >= 0.6:
 - Load `focus_items` — areas to investigate more deeply this cycle
 - Load `learned_thresholds` — signal thresholds calibrated to this product
 - Load `discovered_signals` — signal types that have proven useful
-If lens is missing or corrupt: proceed with base behavior (search all areas).
+If lens is missing: proceed with base behavior (search all areas).
+If lens is corrupt (invalid JSON, missing schema_version):
+  Log: `[WARN] Lens file corrupt, using base behavior.`
+  Continue normally. Do NOT crash.
 
 Print: `Lens loaded: {N} focus items, {N} thresholds` or `No lens — full scan mode`.
 
@@ -131,6 +137,10 @@ Compute:
 Map each business_goal from context.json to relevant findings (at least one
 finding per goal if data exists, else note "no data found for this goal").
 
+If all tracks returned zero results (no competitor data, no market signals,
+no data source readings): set `status: "no_data"`, write state with empty
+observations, and report: `No data gathered. Check network access and data source configuration.`
+
 ### 8. Step 5: State Write
 Write to `agent/state/business_strategy.json`. Include: schema_version, last_run
 (ISO 8601), run_count (incremented), status, alerts, observations array,
@@ -155,8 +165,10 @@ Top insight: {top_insight}
 ```
 
 ### 10. Graceful Degradation Table
-Cover: HALT, context.json missing, web_search unavailable (fall back to note),
-all competitors unreachable, state file missing (create defaults), cost limit hit.
+Cover: HALT, context.json missing, lens.json corrupt (warn and continue),
+web_search unavailable (fall back to note), all competitors unreachable,
+all tracks return zero results (status "no_data", write empty state),
+state file missing (create defaults), cost limit hit (write partial state).
 
 ---
 
@@ -178,7 +190,9 @@ to keep the skill calibrated over time.
 
 Before finalizing the generated SKILL.md, verify:
 
-- [ ] YAML frontmatter has all required fields (name, ooda_phase, version, description, input.files, output.files, safety.halt_check, safety.read_only)
+- [ ] YAML frontmatter has all required fields (contract_version, name, ooda_phase, version, status, description, input.files, output.files, safety.halt_check, safety.read_only)
+- [ ] `contract_version` equals `"1.0"`
+- [ ] `status` is `active` (or `deprecated` if intentional)
 - [ ] `name` equals `scan-market`
 - [ ] `ooda_phase` equals `observe`
 - [ ] `safety.halt_check` is `true`

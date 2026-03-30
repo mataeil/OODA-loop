@@ -47,9 +47,11 @@ Generate the SKILL.md with these sections in order:
 
 ### 1. YAML Frontmatter (contract block)
 ```yaml
+contract_version: "1.0"
 name: scan-competitors
 ooda_phase: observe
 version: "1.0.0"
+status: active
 description: >
   Competitor intelligence monitor. Tracks {track_what} changes for
   {competitors}. Scrapes configured URLs or uses web search to detect
@@ -66,6 +68,7 @@ input:
 output:
   files:
     - agent/state/competitors.json
+  prs: none
 
 safety:
   halt_check: true
@@ -88,8 +91,10 @@ If the lens exists and is valid JSON with items of confidence >= 0.6:
   (e.g., price change > $5 = high, <= $5 = low for a given competitor)
 - Load `discovered_signals` — URL patterns or page structures that have
   yielded reliable data in past cycles
-If lens is missing or corrupt: proceed with base behavior (scan all competitors
-uniformly).
+If lens is missing: proceed with base behavior (scan all competitors uniformly).
+If lens is corrupt (invalid JSON, missing schema_version):
+  Log: `[WARN] Lens file corrupt, using base behavior.`
+  Continue normally. Do NOT crash.
 
 Print: `Lens loaded: {N} focus items, {N} thresholds` or `No lens — uniform scan mode`.
 
@@ -146,7 +151,7 @@ If curl fails (timeout, 4xx, 5xx): record `fetch_error: true`, continue.
 **B. Web search fallback (if URL unknown or fetch failed)**
 Search query pattern per page type:
 - pricing: `"{competitor_name}" pricing plans site:{competitor_domain}`
-- features: `"{competitor_name}" features OR product 2024 OR 2025`
+- features: `"{competitor_name}" features OR product {current_year-1} OR {current_year}`
 - changelog: `"{competitor_name}" changelog OR release notes`
 Record the top 3 search results as evidence.
 
@@ -224,11 +229,17 @@ Comparison summary:
 
 If no changes: `All competitors stable since last cycle ({last_run}).`
 
+If all competitors were unreachable (every fetch failed and every search
+returned zero usable results): set `status: "error"`, write state with
+previous snapshots preserved and `change_log` entry of type `"scan_failure"`,
+and report: `All competitors unreachable. Check network access. Previous snapshots preserved.`
+
 ### 10. Graceful Degradation Table
-Cover: HALT, context.json missing, competitor URL unreachable (fall back to
-search), web_search unavailable (skip that competitor + note), state file
-missing (create defaults), all competitors unreachable (status = "error", report
-and exit 0), cost limit hit (stop after current competitor, write partial state).
+Cover: HALT, context.json missing, lens.json corrupt (warn and continue),
+competitor URL unreachable (fall back to search), web_search unavailable (skip
+that competitor + note), state file missing (create defaults), all competitors
+unreachable (status = "error", preserve previous snapshots, report and exit 0),
+cost limit hit (stop after current competitor, write partial state).
 
 ---
 
@@ -244,7 +255,9 @@ competitor_urls map. Update this file manually when competitor URLs change.
 
 Before finalizing the generated SKILL.md, verify:
 
-- [ ] YAML frontmatter has all required fields
+- [ ] YAML frontmatter has all required fields (contract_version, name, ooda_phase, version, status, description, input.files, output.files, safety.halt_check, safety.read_only)
+- [ ] `contract_version` equals `"1.0"`
+- [ ] `status` is `active` (or `deprecated` if intentional)
 - [ ] `name` equals `scan-competitors`
 - [ ] `ooda_phase` equals `observe`
 - [ ] `safety.halt_check` is `true`

@@ -103,12 +103,13 @@ of cleanup logic, removing the operator's ability to stop the agent immediately.
 engine, running arbitrary code under the agent's permissions.
 
 **Mitigation.** The `skill_allowlist` in config limits which registered skills
-evolve may call. When the allowlist is empty (the default), all currently
-registered skills are eligible — but "registered" means explicitly present in the
-skills directory with a valid `SKILL.md` contract. Arbitrary shell commands or
-unregistered paths cannot be injected.
+evolve may call. The default `config.example.json` ships with an explicit
+allowlist containing all built-in skills. When the allowlist is empty, all
+currently registered skills are eligible — but "registered" means explicitly
+present in the skills directory with a valid `SKILL.md` contract. Arbitrary
+shell commands or unregistered paths cannot be injected.
 
-In production, set `skill_allowlist` to an explicit list of skill names.
+In production, keep `skill_allowlist` set to an explicit list of skill names.
 
 ---
 
@@ -265,9 +266,9 @@ a per-invocation cap in addition to the global daily limit.
    to see what actions the agent would take without actually creating PRs or
    making changes.
 
-4. **Set an explicit `skill_allowlist` in production.** The default empty list
-   permits all registered skills. Lock it down to only the skills your project
-   actually needs.
+4. **Keep an explicit `skill_allowlist` in production.** The default config
+   ships with all built-in skills listed. Review and trim it to only the skills
+   your project actually needs.
 
 5. **Monitor `agent/state/evolve/state.json` regularly.** Anomalies in domain
    scores, confidence values, or action counts are early indicators of unexpected

@@ -88,7 +88,7 @@ domains: []                   # Which config domains this skill serves (for rout
 
 | Field | Required | Default | Notes |
 |------------------------|----------|-----------------|-----------------------------------------------|
-| contract_version | YES | -- | Schema version (currently `"1.0"`) |
+| contract_version | no | `"1.0"` | Schema version (currently `"1.0"`) |
 | name | YES | -- | Must match directory name |
 | ooda_phase | YES | -- | One of the 6 phases |
 | version | YES | -- | Semver `MAJOR.MINOR.PATCH` string |
@@ -156,7 +156,9 @@ chain_triggers:
         |  (observe) |   |  (detect)   |   | (strategize)|
         +-----+------+   +------+------+   +------+------+
               |                  |                 |
-              |  failures >= 3   |  coverage_drop   |  actionable >= 1
+              | consecutive      | new_failures    | actionable >= 1
+              | _failures >= 3   | OR coverage     | AND top_rice
+              |                  | _drop > 5       | >= 50
               +--------+         +--------+         +--------+
                        |                  |                  |
                        v                  v                  v
@@ -165,14 +167,18 @@ chain_triggers:
                  | (support)  |    | (support)   |    | (support)  |
                  +-----+------+    +-------------+    +-----+------+
                        |                                    |
-                       | deploy_completed                   |
+                       | pr_created == true                 |
                        v                                    |
                  +-----+------+                             |
+                 | scan-health|  (post-impl verification)   |
+                 +------------+                             |
+                                                            |
+                 +------------+                             |
                  | run-deploy |<----------------------------+
                  | (execute)  |  when: approved AND safe
                  +-----+------+
                        |
-                       | deploy_completed
+                       | health_check == 'failed'
                        v
                  +-----+------+
                  | scan-health|  (post-deploy verification)
@@ -274,8 +280,6 @@ description: >
 input:
   files:
     - agent/state/backlog.json
-    - agent/state/evolve/action_queue.json
-    - agent/state/evolve/goals.json
   apis:
     - "GitHub Issues API"
   config_keys: []
@@ -429,6 +433,11 @@ input:
     - progressive_complexity
     - signals
     - memory
+    - test_command
+    - health_endpoints
+    - deploy_workflow
+    - notifications
+    - cost
 
 output:
   files:

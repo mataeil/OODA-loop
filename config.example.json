@@ -108,7 +108,10 @@
       "agent/contracts/*"
     ],
     "skill_allowlist": ["/scan-health", "/check-tests", "/plan-backlog", "/run-deploy", "/dev-cycle", "/scan-market", "/scan-ux", "/scan-competitors"],
-    "lock_timeout_minutes": 30
+    "lock_timeout_minutes": 30,
+    "max_chain_depth": 3,
+    "max_silent_failures": 3,
+    "generated_file_patterns": []
   },
   "progressive_complexity": {
     "current_level": 0,
@@ -137,7 +140,8 @@
         "implementation": true,
         "auto_merge": true
       }
-    }
+    },
+    "last_level_change": null
   },
   "signals": {
     "health_alert_bonus": 5.0,

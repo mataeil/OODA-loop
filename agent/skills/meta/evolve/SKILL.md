@@ -57,6 +57,17 @@ Domain skills write their own state files. evolve reads but never writes them.
 
 ## Step 0: Safety Checks
 
+### 0-Pre: Config Validation
+
+```
+if config.json does not exist:
+  Print "[FATAL] config.json not found. Run /ooda-setup to create it."
+  EXIT immediately.
+if config.json is not valid JSON:
+  Print "[FATAL] config.json parse error: {error_message}. Fix syntax and retry."
+  EXIT immediately.
+```
+
 ### 0-A: HALT Check
 
 ```
@@ -229,7 +240,7 @@ for each PR in closed_prs (not merged):
   Print "[Orient] PR #{n} rejected -> {domain} confidence -{penalty}"
 
 for domains not yet in confidence.json:
-  set to config.confidence.initial (default 0.5)
+  set to config.confidence.initial (default 0.7)
 ```
 
 If config.implementation.enabled: apply same logic to implementation PRs.
@@ -257,7 +268,9 @@ for each goal in goals.json where status == "active":
 
 Read memos.json.score_adjustments -- one-shot bonuses/penalties keyed by domain.
 They will be applied in Step 3-A. After application, DELETE them (set to {}).
-They apply exactly once.
+They apply exactly once. If a key does not match any domain in config.domains,
+log `[WARN] Memo adjustment for unknown domain '{key}' -- ignored and cleared.`
+and discard it.
 
 ### 2-E: Orient Summary
 
@@ -267,6 +280,8 @@ What predictions held? What was surprising? This creates a cumulative world mode
 evolves across cycles rather than being rebuilt from scratch each time.
 
 Write 2-3 sentence world model: what changed, what's urgent, what to focus on.
+Truncate orient_summary to 500 characters max. If the previous cycle's summary
+exceeds 500 chars when read, truncate it before using as prior context.
 Store as orient_summary in the decision_log entry being built.
 Print: `[Orient] {orient_summary}`
 
@@ -293,6 +308,12 @@ Level 3: all active domains + implementation (if config.implementation.enabled).
 ```
 
 Filter domains BEFORE scoring.
+
+If zero domains remain after filtering (all disabled/available/over limit):
+  Print "[Decide] No scoreable domains. All are disabled or not yet configured."
+  Print "[Decide] Configure a domain with /ooda-skill or set status to 'active'."
+  Log decision_log: { action: "skip", reason: "no_scoreable_domains" }
+  Jump to Step 6.
 
 ### 3-A0: Implicit Guidance Check (Boyd Shortcut)
 
@@ -480,7 +501,7 @@ Re-check HALT file. If appeared: EXIT immediately.
 
 ### 4-B: Execution Rules
 
-6 rules govern execution:
+7 rules govern execution:
 
 1. **confidence >= threshold**: execute primary skill, then chain[] sequentially (max 3). Re-check HALT before each chain skill.
 2. **confidence < threshold**: primary skill only, skip chain.
@@ -488,6 +509,7 @@ Re-check HALT file. If appeared: EXIT immediately.
 4. **Error during execution**: log to skill_gaps.json, continue to Reflect.
 5. **Chain failure tracking**: if chain skill failed 3+ times (skill_gaps.json), mark action as "blocked".
 6. **Chain depth cap**: max 3 skills. Truncate with warning if more.
+7. **Skill timeout**: if a skill runs longer than `config.safety.lock_timeout_minutes` (default 30 min), treat as error. Print `[Act] TIMEOUT: /{skill} exceeded {timeout}m. Treating as error.` Log to skill_gaps.json and continue to Reflect.
 
 Execute by calling the slash command:
 
@@ -636,6 +658,9 @@ If patterns suggest recurring unaddressed area, propose new goal with status
 
 ```
 cycle_count += 1
+# cycle_count is a plain integer with no upper cap. At one cycle per 30 min,
+# reaching Number.MAX_SAFE_INTEGER (9e15) takes ~500 billion years.
+# No overflow guard needed; if encountered, it is a bug elsewhere.
 last_cycle = now (ISO 8601)
 cycle_in_progress = false
 Append to decision_log: {
@@ -644,6 +669,7 @@ Append to decision_log: {
   score_verified, risk_tier
 }
 Cap decision_log at config.memory.working_memory_size (default 20).
+When cap is reached, remove the oldest entry (index 0) before appending.
 ```
 
 ### 6-B: confidence.json
@@ -735,6 +761,11 @@ git add agent/state/*/lens_changelog.json   # if updated
 
 git commit -m "evolve: cycle #{N} -- {domain} ({result})"
 git push origin HEAD
+# If git push fails (network error, auth, etc.):
+#   Print "[WARN] git push failed: {error}. State committed locally."
+#   Print "  Local commit preserved. Will push on next successful cycle."
+#   Do NOT revert the local commit. Continue to lock cleanup.
+#   Push failure is non-fatal -- state integrity is maintained locally.
 ```
 
 Delete the lock file: `rm agent/state/evolve/.lock`

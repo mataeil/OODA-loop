@@ -48,9 +48,11 @@ Generate the SKILL.md with these sections in order:
 
 ### 1. YAML Frontmatter (contract block)
 ```yaml
+contract_version: "1.0"
 name: scan-ux
 ooda_phase: observe
 version: "1.0.0"
+status: active
 description: >
   UX audit skill for {frontend_stack}. Evaluates {key_flows} user flows
   using {ux_framework}. Uses Playwright to capture screenshots, applies
@@ -66,6 +68,7 @@ input:
 output:
   files:
     - agent/state/ux_evolution.json
+  prs: none
 
 safety:
   halt_check: true
@@ -86,8 +89,10 @@ If the lens exists and is valid JSON with items of confidence >= 0.6:
 - Load `focus_items` — specific UI areas or heuristics to prioritize this cycle
 - Load `learned_thresholds` — severity calibration learned from past cycles
 - Load `discovered_signals` — UI patterns that have repeatedly surfaced issues
-If lens is missing or corrupt: proceed with base behavior (audit all focus_areas
-in rotation).
+If lens is missing: proceed with base behavior (audit all focus_areas in rotation).
+If lens is corrupt (invalid JSON, missing schema_version):
+  Log: `[WARN] Lens file corrupt, using base behavior.`
+  Continue normally. Do NOT crash.
 
 Print: `Lens loaded: {N} focus items, {N} thresholds` or `No lens — full rotation mode`.
 
@@ -189,10 +194,16 @@ Top fix: {highest severity finding in 1 sentence}
 
 If no findings: `No violations found in scanned areas. Next cycle: {next_areas}.`
 
+If all URLs were unreachable and Playwright was also unavailable (zero pages
+evaluated): set `status: "no_data"`, write state with empty findings, and report:
+`No pages could be evaluated. Check that the service is running and endpoints are configured.`
+
 ### 10. Graceful Degradation Table
-Cover: HALT, context.json missing, Playwright unavailable (heuristic-only mode),
-service not running (skip URL, log and continue), state file missing (create
-defaults), screenshot capture fails (continue without screenshot), cost limit hit.
+Cover: HALT, context.json missing, lens.json corrupt (warn and continue),
+Playwright unavailable (heuristic-only mode), service not running (skip URL,
+log and continue), all URLs unreachable (status "no_data", write empty state),
+state file missing (create defaults), screenshot capture fails (continue
+without screenshot), cost limit hit (write partial state).
 
 ---
 
@@ -208,7 +219,9 @@ focus_areas. Keep it up to date as the UI evolves.
 
 Before finalizing the generated SKILL.md, verify:
 
-- [ ] YAML frontmatter has all required fields
+- [ ] YAML frontmatter has all required fields (contract_version, name, ooda_phase, version, status, description, input.files, output.files, safety.halt_check, safety.read_only)
+- [ ] `contract_version` equals `"1.0"`
+- [ ] `status` is `active` (or `deprecated` if intentional)
 - [ ] `name` equals `scan-ux`
 - [ ] `ooda_phase` equals `observe`
 - [ ] `safety.halt_check` is `true`
