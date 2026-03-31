@@ -83,7 +83,7 @@ Read `agent/state/service_health.json`. If missing, create with initial structur
 ```json
 {
   "schema_version": "1.0.0",
-  "last_check": null,
+  "last_run": null,
   "run_count": 0,
   "status": "unknown",
   "alerts": [],
@@ -106,7 +106,24 @@ curl -s -o /dev/null -w "%{http_code} %{time_total}" --max-time <timeout_seconds
 
 Record: `url`, `status_code`, `response_time_ms`, `timestamp`.
 Timeout: `config.health_check_timeout_seconds` (default 10, valid range 2-30).
-Retry once on network failure (status 0 / connection refused).
+
+**Method support**: if the endpoint object includes a `method` field (e.g., `"method": "POST"`),
+pass it to curl via `-X {method}`. Default: `GET`.
+
+```bash
+curl -s -o /dev/null -w "%{http_code} %{time_total}" -X {method} --max-time <timeout_seconds> <url>
+```
+
+**Status code note**: curl's `%{http_code}` returns a three-digit string. On connection
+refused, DNS failure, or timeout it returns `000` (not `0`). Treat **both `0` and `000`**
+as network failure — always compare numerically (e.g., `parseInt(code) === 0`) rather than
+by string equality.
+
+**Response time**: curl's `%{time_total}` is in **seconds** (float). Convert to milliseconds:
+`response_time_ms = time_total * 1000`.
+
+Retry once on network failure (status 0 / 000 / connection refused). **Skip retry on
+timeout** (saves waiting another full timeout period).
 
 If `curl` unavailable, fall back to `wget --server-response --timeout=<timeout_seconds>`.
 If both unavailable, record `status_code: 0`, `error: "no_http_client"`.
@@ -117,12 +134,18 @@ If both unavailable, record `status_code: 0`, `error: "no_http_client"`.
 
 | Condition | Alert type | Severity |
 |---|---|---|
-| status_code 5xx or 0 (single endpoint) | `endpoint_down` | warning |
-| status_code 5xx or 0 (2+ endpoints) | `multiple_endpoints_down` | critical |
-| status_code 3xx | `endpoint_redirect` | info |
-| status_code 403 | `endpoint_forbidden` | warning |
+| status_code 5xx or 0/000 (single endpoint) | `endpoint_down` | warning |
+| status_code 5xx or 0/000 (2+ endpoints) | `multiple_endpoints_down` | critical |
+| status_code 3xx (without expected_status override) | `endpoint_redirect` | info |
+| status_code 403 (without expected_status override) | `endpoint_forbidden` | warning |
 | response_time_ms > 1500 | `slow_response` | warning |
 | response_time_ms > 2x baseline avg | `response_degradation` | warning |
+
+**Expected status override**: if the endpoint object includes `expected_status` (e.g., `301`),
+treat that status code as healthy (equivalent to 2xx). This allows monitoring redirect-based
+or custom health endpoints. When `expected_status` is set, suppress the corresponding alert
+type (e.g., `endpoint_redirect` for 3xx). If the response does NOT match `expected_status`,
+generate an `unexpected_status` alert with severity `warning`.
 
 **Baseline comparison on failure** — when an endpoint is DOWN (HTTP 000, connection refused, or timeout with no response), include baseline context in the alert detail so the user understands what changed:
 
@@ -136,7 +159,7 @@ If no baseline exists for the endpoint (first run), omit the "Previous baseline"
 
 Alert shape: `{ "severity": "warning", "type": "...", "endpoint": "...", "detail": "..." }`
 
-Increment `consecutive_failures` per endpoint on 5xx or status 0 (timeout/connection refused).
+Increment `consecutive_failures` per endpoint on 5xx or status 0/000 (timeout/connection refused).
 Reset to 0 on any 2xx response. Do NOT increment on 3xx or 403 (endpoint is reachable).
 
 ---
@@ -148,7 +171,7 @@ Write to `agent/state/service_health.json`:
 ```json
 {
   "schema_version": "1.0.0",
-  "last_check": "<ISO 8601>",
+  "last_run": "<ISO 8601>",
   "run_count": "<N>",
   "status": "healthy | degraded | critical",
   "alerts": [{ "severity": "warning", "type": "slow_response", "endpoint": "...", "detail": "..." }],
@@ -162,6 +185,11 @@ Status: `healthy` = all 2xx, no warning/critical alerts (info alerts are OK). `d
 Update `avg_response_ms` using an exponential moving average:
 `new_avg = old_avg * 0.8 + current_response_ms * 0.2`.
 On the first run for an endpoint (no prior baseline), set `avg_response_ms = current_response_ms` directly.
+
+**EMA on failure**: when `status_code` is 0/000 (connection refused, DNS failure, timeout),
+do NOT update `avg_response_ms` — the response time is meaningless (either ~0ms for
+connection refused or the full timeout duration). Keep the previous `avg_response_ms` intact
+so it remains a reliable baseline of healthy performance.
 
 **Note:** This skill does NOT write to `agent/state/service_health/lens.json`.
 Lens updates (learning thresholds, promoting signals, adjusting focus) happen

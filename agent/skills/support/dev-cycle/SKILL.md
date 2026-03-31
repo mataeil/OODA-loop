@@ -94,14 +94,24 @@ Read `agent/state/evolve/action_queue.json`.
 Find the top pending item by highest `effective_rice` (after decay adjustment):
 
 ```
-if queue is not a list or queue is empty:
+data = read action_queue.json as JSON object
+if data is not a valid object:
   Print "Action queue is empty or malformed. Nothing to implement."
   EXIT cleanly.
 
-candidates = [item for item in queue if item.status == "pending"]
-if candidates is empty:
-  Print "No pending actions (total items: {len(queue)}, none with status=pending)."
+# The canonical format uses {pending:[], in_progress:[], completed:[]}
+# Read from data.pending (preferred). Fallback: if data.actions exists, filter
+# items with status=="pending". Fallback: if data is a plain array, filter by status.
+candidates = data.pending   # or fallback as described above
+
+if candidates is empty or not a list:
+  Print "No pending actions. Nothing to implement."
   EXIT cleanly.
+
+# Sort by effective_rice. If effective_rice is missing, fall back to rice_score.
+for item in candidates:
+  if item.effective_rice is undefined:
+    item.effective_rice = item.rice_score * (1.0 - (item.decay_applied or 0.0))
 selected = max(candidates, key=lambda x: x.effective_rice)
 
 if selected.effective_rice <= 0:
@@ -129,7 +139,10 @@ Generate a URL-safe slug from the action title:
 2. Replace spaces and underscores with hyphens.
 3. Strip all characters except `[a-z0-9-]`.
 4. Collapse consecutive hyphens into one and trim leading/trailing hyphens.
-5. Truncate to 40 characters (cut at a hyphen boundary if possible).
+5. If the slug is empty after stripping (e.g., non-ASCII title like Korean),
+   use the action ID as the slug instead (e.g., `action-001`). If the action ID
+   is also empty, generate a random 8-char hex string.
+6. Truncate to 40 characters (cut at a hyphen boundary if possible).
 
 Get today's date in `YYYYMMDD` format.
 

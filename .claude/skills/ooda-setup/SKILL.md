@@ -57,12 +57,17 @@ For monorepos, auto-detect values from the root config first, then fall back to 
 | `Gemfile` | Ruby |
 | `pom.xml` / `build.gradle` | Java |
 
-Check framework hints in `package.json` (`"next"` → Next.js, `"react"` → React, `"express"` → Express). If no indicator found → language = null.
+Check framework hints:
+- `package.json`: `"next"` → Next.js, `"react"` → React, `"express"` → Express
+- `requirements.txt` / `pyproject.toml`: `fastapi` → FastAPI, `django` → Django, `flask` → Flask
+- `go.mod`: `gin` → Gin, `echo` → Echo, `fiber` → Fiber
+
+If no indicator found → language = null.
 For monorepos, report the primary language (most common across packages) and note others: e.g. `TypeScript (3 packages), Go (1 package)`.
 
 **Detect Test Command** (first match wins):
 1. `package.json` has `scripts.test` → `npm test`
-2. `pytest.ini` or `conftest.py` exists → `pytest`
+2. `pytest.ini` or `conftest.py` exists → `pytest` (enhanced: if `pytest-cov` found in `requirements.txt` or `pyproject.toml` dependencies, append `--cov`; detect main source directory from project structure for `--cov=<dir>`)
 3. `go.mod` present → `go test ./...`
 4. `Cargo.toml` present → `cargo test`
 5. `Gemfile` contains `rspec` → `bundle exec rspec`
@@ -70,7 +75,15 @@ For monorepos, report the primary language (most common across packages) and not
 
 **Detect CI** — Glob `.github/workflows/*.yml`. If a file contains `deploy` in its name → deploy_workflow = that filename. If workflows exist but none named deploy → use the first one. None found → null.
 
-**Detect Health Endpoints** — check `package.json` `scripts.start` for a port, or `docker-compose.yml` port mappings. Framework defaults: Next.js/Express → `http://localhost:3000`, FastAPI/Django → `http://localhost:8000`, Go → `http://localhost:8080`. None detected → `[]`.
+**Detect Health Endpoints** — multi-strategy detection:
+1. Check `package.json` `scripts.start` for a port, or `docker-compose.yml` port mappings.
+2. **Source-code scan**: grep for health route patterns in source files:
+   - Python: `@app.get("/health")`, `@app.route("/health")`, `path("health/"`, `url(r"^health")`
+   - JS/TS: `app.get('/health')`, `router.get('/health')`
+   - Go: `HandleFunc("/health"`, `Handle("/health"`
+   If a `/health` route is found, include it with the detected port.
+3. Framework defaults: Next.js/Express → `http://localhost:3000`, FastAPI/Django → `http://localhost:8000`, Go → `http://localhost:8080`.
+4. None detected → `[]`.
 
 **Detect Project Name** — from `package.json` `.name`, `go.mod` module last segment, `Cargo.toml` `[package] name`, or current directory name.
 

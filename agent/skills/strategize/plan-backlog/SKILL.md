@@ -44,12 +44,16 @@ Exit cleanly (not an error).
 **Remote check** — before fetching issues, verify a GitHub remote exists:
 
 ```bash
-git remote -v 2>/dev/null | grep -q origin
+git remote -v 2>/dev/null | grep -qE 'github\.com[:/]'
 ```
 
-If no remote is found:
+This checks for any remote pointing to GitHub (regardless of remote name — `origin`,
+`upstream`, etc.) and rejects non-GitHub remotes (GitLab, Bitbucket, etc.) that would
+cause `gh` to fail with a confusing error.
+
+If no GitHub remote is found:
 - Print `[plan-backlog] No GitHub remote configured. Backlog scoring requires a GitHub repository with issues. Skipping.`
-- Write state file with `"status": "no_remote"` (preserve `run_count` if state already exists)
+- Write state file with `"status": "no_remote"` (preserve and **increment** `run_count` if state already exists)
 - Exit 0 — do NOT crash or show raw git errors
 
 ```bash

@@ -73,14 +73,22 @@ Execute with a configurable timeout (read `config.test_timeout_seconds`; default
 
 Capture exit code, stdout, stderr. Parse:
 - **Counts**: try framework-specific patterns in order:
-    - **Jest**: `Tests:\s+(\d+) failed.*?(\d+) passed.*?(\d+) total` (also `(\d+) skipped`)
+    - **Jest**: Parse each token independently from the `Tests:` summary line — `(\d+) failed`, `(\d+) passed`, `(\d+) skipped`, `(\d+) total` as separate optional matches (default 0 when absent). IMPORTANT: the `Tests:` line omits "failed" when all tests pass (e.g., `Tests: 26 passed, 26 total`), so a combined pattern requiring all tokens will fail.
     - **pytest**: `(\d+) passed`, `(\d+) failed`, `(\d+) skipped`, `(\d+) error`
-    - **Go**: count `ok` lines as passed packages, `FAIL` lines as failed packages
+    - **Go**: count lines matching `^ok\s+\t` as passed packages, lines matching `^FAIL\t` as failed packages (IMPORTANT: Go emits multiple lines containing `FAIL` per failed package — `--- FAIL: TestName`, standalone `FAIL`, `FAIL\tpkg/path`, and a trailing `FAIL` summary. ONLY `^FAIL\t` followed by a package path represents a failed package. Similarly, `--- PASS:` lines are per-test, not per-package.) In verbose mode (`-v`), also count `--- PASS:` lines for individual test counts and `--- FAIL:` for individual test failures, reporting both: `Tests: {test_passed}/{test_total} passed (packages: {pkg_passed}/{pkg_total})`
     - **Mocha**: `(\d+) passing`, `(\d+) failing`, `(\d+) pending`
     - **RSpec**: `(\d+) examples?,\s*(\d+) failures?(?:,\s*(\d+) pending)?`
     - **Fallback**: generic `(\d+)\s+(?:tests?\s+)?passed`, `(\d+)\s+(?:tests?\s+)?failed`
+    - **Go skipped**: count `--- SKIP:` lines for skipped tests (only visible in verbose `-v` mode; if not verbose, skipped count defaults to 0)
     - Compute `total = passed + failed + skipped` when the framework does not emit a total
-- **Coverage**: try patterns in order — `All files.*?\|\s*([\d.]+)%` (Istanbul/nyc), `TOTAL\s+.*?([\d.]+)%` (pytest-cov), `coverage:\s*([\d.]+)%` (Go), `Statements\s*:\s*([\d.]+)%` (Jest), `([\d.]+)%\s*coverage`; use first match; if none match record `null`
+- **Coverage**: try patterns in order:
+    1. `All files\s*\|\s*([\d.]+)` (Istanbul/nyc table format — NOTE: data rows use bare numbers, no `%` sign. The first column after `All files |` is statement coverage.)
+    2. `TOTAL\s+.*?([\d.]+)%` (pytest-cov)
+    3. `coverage:\s*([\d.]+)%` (Go)
+    4. `Statements\s*:\s*([\d.]+)%` (Jest text-summary reporter, NOT the default table)
+    5. `([\d.]+)%\s*coverage` (generic fallback)
+    Use first match; if none match record `null`.
+    **Go multi-package note**: Go emits one `coverage:` line per package. When multiple matches exist, compute the average across all matched values (this approximates aggregate coverage since Go does not produce a single aggregate figure). Ignore `coverage: 0.0%` from packages with `[no test files]`.
 - **Status**: exit 0 → `"passing"`, exit 127 (command not found) or 126 (permission denied) → `"error"` with detail `"test command not found or not executable"`, timeout → `"error"` with detail `"timeout after Ns"`, other non-zero → `"failing"`
 
 ---

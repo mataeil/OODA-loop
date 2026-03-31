@@ -136,6 +136,12 @@ if state.json.cycle_count === 0 AND config.safety.first_cycle_observe_only:
   Print "First cycle complete. Here's what I found:" + score table.
   Print "Run /evolve again to take action."
   Jump to Step 6.
+
+  In Step 6, record decision_log entry as:
+  { cycle: 1, timestamp, action: "observe_only", reason: "first_cycle",
+    domain: winner_domain, skill: winner_skill, score: winner_score,
+    orient_summary, result: "observe_only", score_verified: true }
+  cycle_count MUST increment to 1 so the next cycle proceeds normally.
 ```
 
 Set `cycle_in_progress = true` in state.json before proceeding.
@@ -163,6 +169,8 @@ for each domain_name, domain_config in config.domains:
     mark as "never_run", hours_since_last = config.scoring.hours_if_never_run
   else:
     read JSON. Calculate hours_since_last from data.last_run to now.
+    (Legacy: if `last_run` is missing, also check `last_check` — older scan-health
+    versions used this key. Treat either as the last-run timestamp.)
     Extract: status, run_count, alerts.
 
   Also read lens file: agent/state/{domain_name}/lens.json
@@ -175,7 +183,10 @@ for each domain_name, domain_config in config.domains:
 ```
 
 Also read evolve self-state: state.json, confidence.json, memos.json,
-goals.json, action_queue.json, skill_gaps.json.
+goals.json, action_queue.json, skill_gaps.json, cost_ledger.json.
+
+If `cost_ledger.json` is missing, create with initial structure:
+`{"date": "<today YYYY-MM-DD>", "entries": [], "total_estimated_usd": 0.0}`
 
 If `config.implementation.enabled`: read action_queue.json for pending_count,
 oldest_pending_hours, highest_rice.
@@ -223,6 +234,7 @@ Read last 5 entries from state.json.decision_log. Detect:
 - **Consecutive same domain**: count recent consecutive selections of same domain.
 - **Execution-result correlation**: match decision_log PR numbers to merged/closed PRs.
 - **Repeated failures**: count entries with result "error"/"failed" for same domain. If >= 2, flag as infrastructure_issue.
+- **Futile loop**: count consecutive cycles where the selected domain produced result "success" but no actionable output (no actions extracted, no alerts generated, no PRs created — e.g., plan-backlog returning "no_remote" repeatedly). If >= 3 consecutive futile cycles for the same domain, add a memo penalty of -10.0 to that domain and log `[Orient] Futile loop detected: {domain} produced no output for {N} consecutive cycles. Penalizing.` This prevents the staleness score from endlessly selecting an unproductive domain.
 
 Store patterns for Steps 2-E and 5-C.
 
@@ -268,7 +280,13 @@ for each goal in goals.json where status == "active":
 
 ### 2-D: Memo Adjustments
 
-Read memos.json.score_adjustments -- one-shot bonuses/penalties keyed by domain.
+Read memos.json. The canonical format is:
+`{"schema_version":"1.0.0", "score_adjustments":{}, "history":[], "last_memo":null}`
+
+If the file has a `memos` array but no `score_adjustments` key (legacy format),
+treat `score_adjustments` as empty `{}` and `history` as the `memos` array.
+
+Read `score_adjustments` -- one-shot bonuses/penalties keyed by domain.
 They will be applied in Step 3-A. After application, DELETE them (set to {}).
 They apply exactly once. If a key does not match any domain in config.domains,
 log `[WARN] Memo adjustment for unknown domain '{key}' -- ignored and cleared.`
@@ -357,6 +375,8 @@ in the score table. The decision_log still records the raw (pre-clamp) score
 for diagnostics.
 
 Tie-break: prefer domain with fewer total executions (metrics.json.domain_executions).
+If still tied, prefer domain with higher weight. If still tied, prefer the domain
+that appears first in `config.domains` (deterministic by insertion order).
 
 ### 3-A2: Implementation Scoring
 
@@ -610,7 +630,13 @@ If executed skill was NOT implementation's primary_skill:
   `RICE = (Reach * Impact * Confidence) / max(Effort, 0.5)`
   (Effort is floored at 0.5 to prevent division-by-zero or inflated scores.)
 - Dedup: skip if title keyword overlap > 80% with existing queue items.
-- Add to action_queue.json pending. Cap at 20 (remove lowest RICE as "superseded").
+- Each extracted action MUST include these fields:
+  `{ id, title, source_domain, rice_score, effective_rice: rice_score,
+     related_files, status: "pending", extracted_at: ISO_8601,
+     pr_number: null, decay_applied: 0.0 }`
+  Note: `effective_rice` is initialized to equal `rice_score` at extraction time.
+  Step 6-C6 (decay) will later adjust it based on age.
+- Add to action_queue.json `pending` array. Cap at 20 (remove lowest effective_rice as "superseded").
 
 If implementation skill was executed: skip (it manages its own queue).
 
@@ -758,6 +784,7 @@ git add agent/state/evolve/goals.json
 git add agent/state/evolve/CHANGELOG.md
 git add agent/state/evolve/episodes.json    # if updated
 git add agent/state/evolve/principles.json  # if updated
+git add agent/state/deploy.json             # if updated by run-deploy
 git add agent/state/*/lens.json             # if updated
 git add agent/state/*/lens_changelog.json   # if updated
 # NEVER use git add -A or git add .

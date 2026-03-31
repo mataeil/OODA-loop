@@ -19,15 +19,14 @@ output:
   files: [agent/state/deploy.json]
 safety:
   halt_check: true
-  read_only: false
-  branch_prefix: "auto/deploy/"
+  read_only: true
   cost_limit_usd: 0.05
 domains:
   - service_health
 chain_triggers:
   - target: scan-health
-    condition: "post_deploy_health_check == 'failed'"
-    note: "Recommend /run-deploy after successful health check post-merge"
+    condition: "health_check == 'failed'"
+    note: "Trigger health monitoring after a failed post-deploy health check"
 ---
 
 # run-deploy: GitHub Actions Deployment Trigger
@@ -95,11 +94,13 @@ Print which specific check failed so the user can act on it.
 
 ## Step 2: Trigger Deployment
 
-Verify `gh` is available:
+Verify `gh` is available and authenticated:
 ```bash
 gh --version
+gh auth status
 ```
 If not found: print `ERROR: gh (GitHub CLI) is required for deployment. Install from https://cli.github.com/` and exit non-zero.
+If not authenticated: print `ERROR: gh is not authenticated. Run: gh auth login` and exit non-zero.
 
 Determine the current branch:
 ```bash
