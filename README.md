@@ -122,6 +122,26 @@ Cron gives you a heartbeat. OODA-loop gives you a brain.
 
 ---
 
+## Language & Framework Agnostic
+
+OODA-loop is not a code generator tied to a specific stack. It is a **thinking
+framework for AI** -- a structured way for the agent to observe, learn, and act.
+The skills read your test output, check your endpoints, and score your issues.
+The language you write in does not matter.
+
+Any project with a test command, a git repo, or an HTTP endpoint can use it.
+Web servers, CLI tools, libraries, monorepos -- the loop adapts to what you have.
+
+**Verified across:**
+
+| Stack | Project Type | Test Framework |
+|-------|-------------|---------------|
+| Python + FastAPI | REST API | pytest + pytest-cov |
+| Go + net/http | URL shortener | go test |
+| Node.js | CLI tool (no server) | Jest |
+
+---
+
 ## Who is this for?
 
 You are running a side project. Maybe it is a SaaS with a handful of paying
