@@ -28,12 +28,30 @@ cd OODA-loop
 ```
 
 ```
-Cycle: #3  |  Level: 1 (Watching + testing)
-Domains scanned: 2
-  service_health    OK       confidence 0.70
-  backlog           5 scored confidence 0.70
-Actions: 2 pending  |  PRs: 0
+Cycle: #2  |  Level: 2 (Full observation)
+Domains scanned: 3
+  service_health    200 OK   0.7ms    confidence 0.70
+  test_coverage     33/33    94.62%   confidence 0.70
+  backlog           —                 confidence 0.70
+Actions: 0 pending  |  PRs: 0
 HALT: inactive
+```
+
+Preview what the next cycle would do without taking action:
+
+```
+/evolve --dry-run
+```
+
+```
+[Decide] Domain scores:
+| # | Domain         | Hours  | Weight | Urgent | Goal | Conf | SCORE  |
+|---|----------------|--------|--------|--------|------|------|--------|
+| 1 | service_health | 168.0  | 2.0    | +0.0   | 0.15 | 0.14 | 336.29 |
+| 2 | test_coverage  | 168.0  | 1.0    | +0.0   | 0.15 | 0.14 | 168.29 |
+| 3 | backlog        | 168.0  | 0.8    | +0.0   | 0.15 | 0.14 | 134.69 |
+
+Would execute: /scan-health (service_health, score 336.29)
 ```
 
 Nothing changes until you say so. Level 0 just watches. Level 3 opens PRs.
@@ -142,9 +160,10 @@ observe-only -- it looks, writes down what it found, and moves on.
 
 Cycle: #1  |  Level: 0 (Just watching)
 Domains scanned: 3
-  service_health    OK       confidence 0.70
-  test_coverage     87.2%    confidence 0.70
+  service_health    —        score 336.29  confidence 0.70
+  test_coverage     —        score 168.29  confidence 0.70
   backlog           12 open  confidence 0.70
+  backlog           —        score 134.69  confidence 0.70
 Actions: 0 pending  |  PRs: 0
 HALT: inactive
 ```
