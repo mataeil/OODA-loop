@@ -160,13 +160,11 @@ Lens has started learning -- health checks that always pass get deprioritized,
 flaky test patterns get flagged sooner. OODA-loop suggests you set up market
 analysis: `/ooda-skill create scan-market`.
 
-**Day 30.** Level 3. The next cycle, OODA-loop picks the highest-scoring backlog
-item, writes code, runs your tests, and opens a draft PR. The PR is small -- 20
-files max, 500 lines max, enforced by config. You review it over coffee. The loop
-ran at 3am, noticed what you would have noticed at 9am, and acted on it four
-hours before you woke up.
-
-You still have the HALT file. You have not needed it.
+**Day 30.** Level 3. The loop is designed to pick the highest-scoring backlog
+item, write code, run your tests, and open a draft PR. PRs are small -- 20
+files max, 500 lines max, enforced by config. You review it over coffee. The
+loop runs at 3am, notices what you would notice at 9am, and acts on it before
+you wake up.
 
 ---
 
@@ -260,6 +258,11 @@ PR limits, allowlist, `lock_timeout_minutes`), `confidence` (initial value, merg
 reject penalty), `scoring` (formula parameters), `progressive_complexity` (current level),
 `signals` (urgent signal thresholds), `memory` (retention, decay, action queue decay),
 `notifications` (Telegram via `$ENV_VAR`), `cost` (daily limit, warning threshold).
+
+**Cost estimate.** Each observe cycle costs ~$0.02-0.05 in Claude API usage.
+Implementation cycles (Level 3) cost ~$0.05-0.10. At 30-minute intervals, that
+is roughly $1-2/day for continuous Level 2 operation. The default daily cap is
+$10 (`cost.daily_limit_usd`).
 
 See [config.example.json](config.example.json) for the complete annotated schema.
 
