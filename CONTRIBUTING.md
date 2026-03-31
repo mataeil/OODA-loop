@@ -39,7 +39,7 @@ Good documentation lowers the barrier for everyone. Contributions here have broa
 
 What you can do:
 - Improve README, CONCEPTS.md, or inline comments
-- Add domain configuration examples under `examples/` or `templates/domain-examples.yaml`
+- Add domain configuration examples under `examples/`
 - Translate documentation into other languages
 - Write tutorials, how-to guides, or blog-style walkthroughs
 - Fix typos, broken links, or unclear explanations

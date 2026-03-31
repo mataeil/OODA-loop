@@ -4,6 +4,8 @@
 
 It watches your project and gets smarter over time. Start at Level 0. Move up when you trust it.
 
+> **Requires [Claude Code](https://claude.ai/code).** All commands (`/ooda-setup`, `/evolve`, etc.) are Claude Code slash commands.
+
 [한국어](README.ko.md) | English
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -122,8 +124,10 @@ time to review the backlog every morning. It is for the developer who wants thei
 project to grow and improve even when they are not looking at it.
 
 This is not an enterprise platform. There is no dashboard SaaS, no seat-based
-pricing, no sales call. It is a framework that lives in your repo, runs inside
-Claude Code, and earns your trust one cycle at a time.
+pricing, no sales call. It is not a CI/CD pipeline, not a monitoring service,
+and not an auto-coding agent that writes your app for you. It is a framework
+that lives in your repo, runs inside Claude Code, and earns trust one cycle
+at a time.
 
 ---
 

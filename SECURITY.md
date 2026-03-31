@@ -4,9 +4,8 @@
 
 **Do not open public GitHub issues for security bugs.**
 
-Security vulnerabilities in OODA-loop should be reported privately to:
-
-    security@OODA-loop.dev
+Security vulnerabilities in OODA-loop should be reported privately via
+[GitHub Security Advisories](https://github.com/mataeil/OODA-loop/security/advisories/new).
 
 Include a description of the issue, steps to reproduce, and the potential impact.
 We practice responsible disclosure: reporters will receive acknowledgment within
