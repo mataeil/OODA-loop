@@ -13,7 +13,7 @@ your familiarity with the project.
 
 ### Tier 1: Skills (recommended entry point)
 
-Skills are self-contained slash commands in `agent/skills/`. They are the easiest way to extend
+Skills are self-contained slash commands in `skills/`. They are the easiest way to extend
 OODA-loop without touching the core engine.
 
 What you can do:
@@ -51,7 +51,7 @@ No approval is needed before starting documentation changes. Open a PR when read
 Core changes affect every user and every cycle. They require extra care.
 
 What falls under Tier 3:
-- Modifying the evolve orchestrator (`agent/skills/meta/evolve/`)
+- Modifying the evolve orchestrator (`skills/evolve/`)
 - Changing scoring formulas or domain weights
 - Modifying safety policies (`agent/safety/autonomous-mode.md`)
 - Changing the contract interface (`agent/contracts/schema.md`)
@@ -128,10 +128,8 @@ Generator templates are in `templates/skill-generators/`.
 **Step 1.** Copy the template to your target location:
 
 ```bash
-cp templates/SKILL_TEMPLATE.md agent/skills/<phase>/<skill-name>/SKILL.md
+cp templates/SKILL_TEMPLATE.md skills/<skill-name>/SKILL.md
 ```
-
-Valid phases: `observe`, `detect`, `strategize`, `execute`, `support`
 
 Add the required YAML contract front-matter at the top of the file (see
 `agent/contracts/schema.md` for the full field list including `contract_version`,
@@ -149,14 +147,8 @@ Add the required YAML contract front-matter at the top of the file (see
 }
 ```
 
-**Step 3.** Create a symlink so Claude Code can find it:
-
-```bash
-ln -s ../../agent/skills/<phase>/<skill-name> .claude/skills/<skill-name>
-```
-
-The skill is now available as `/<skill-name>` in Claude Code and the evolve orchestrator will
-discover it from config.
+The skill is now available as `/<skill-name>` in Claude Code. The plugin system
+auto-discovers skills from `skills/*/SKILL.md`.
 
 ---
 

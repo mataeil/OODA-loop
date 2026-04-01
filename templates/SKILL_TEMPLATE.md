@@ -106,8 +106,8 @@ Print a summary of what happened. Include:
 
 After creating your skill:
 
-1. Place the file at `agent/skills/{phase}/{skill-name}/SKILL.md`
+1. Place the file at `skills/{skill-name}/SKILL.md`
 2. Add a domain entry in `config.json` with `primary_skill` pointing to your skill
 3. Add your skill name to `config.safety.skill_allowlist`
-4. Create a symlink: `ln -sf ../../agent/skills/{phase}/{skill-name} .claude/skills/{skill-name}`
+4. The plugin system auto-discovers skills from `skills/*/SKILL.md`
 5. To deprecate later, set `status: deprecated` in the contract (skill stays callable but is excluded from auto-selection)

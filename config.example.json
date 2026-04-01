@@ -104,7 +104,7 @@
     "max_lines_per_pr": 500,
     "protected_paths": [
       "agent/safety/*",
-      "agent/skills/meta/*",
+      "skills/evolve/*",
       "agent/contracts/*"
     ],
     "skill_allowlist": ["/scan-health", "/check-tests", "/plan-backlog", "/run-deploy", "/dev-cycle", "/scan-market", "/scan-ux", "/scan-competitors"],

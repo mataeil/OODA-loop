@@ -61,7 +61,7 @@ Any PR touching a protected path:
 1. Requires human review — cannot be auto-merged, even at Level 3.
 2. Must be flagged with `[PROTECTED PATH]` in the PR description.
 
-Default: `agent/safety/*`, `agent/skills/meta/*`, `agent/contracts/*`.
+Default: `agent/safety/*`, `skills/evolve/*`, `agent/contracts/*`.
 
 The agent cannot remove paths from this list. Only human edits to `config.json`
 can change protected paths.

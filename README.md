@@ -261,7 +261,7 @@ Skipping levels (e.g. 0 to 3) enforces a 3-cycle observe-only cooldown at the ne
 OODA-loop is safe by default. Level 0 cannot create PRs. Level 3 requires deliberate opt-in.
 
 - **HALT file** -- `touch agent/safety/HALT` stops everything instantly. Delete to resume. Re-checked before every destructive action (push, merge, deploy) during a cycle.
-- **Protected paths** -- `agent/safety/*`, `agent/skills/meta/*`, `agent/contracts/*` cannot be modified by the agent. It cannot rewrite its own rules.
+- **Protected paths** -- `agent/safety/*`, `skills/evolve/*`, `agent/contracts/*` cannot be modified by the agent. It cannot rewrite its own rules.
 - **Confidence gate** -- Actions below 0.6 confidence are skipped or downgraded.
 - **PR limits** -- Max 20 files, 500 lines per PR. Enforced in config.
 - **First cycle observe-only** -- No action on the first run. Just observation.

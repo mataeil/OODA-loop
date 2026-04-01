@@ -469,7 +469,7 @@ Three steps:
 **1. Create the skill directory and SKILL.md**
 
 ```
-agent/skills/<phase>/<your-skill>/SKILL.md
+skills/<your-skill>/SKILL.md
 ```
 
 Include the contract YAML block at the top of SKILL.md (fenced with `---`).
@@ -495,15 +495,11 @@ Add the skill to `safety.skill_allowlist` and wire it to a domain:
 }
 ```
 
-**3. Create the Claude Code symlink**
+**3. Skill discovery**
 
-```bash
-ln -s ../../agent/skills/<phase>/<your-skill> .claude/skills/<your-skill>
-```
-
-The engine discovers skills by reading `skill_allowlist` from config, then
-loading each skill's contract from its SKILL.md. No other registration is
-needed.
+The plugin system auto-discovers skills from `skills/*/SKILL.md`. The engine
+reads `skill_allowlist` from config and loads each skill's contract from its
+SKILL.md. No symlinks or manual registration needed.
 
 ---
 

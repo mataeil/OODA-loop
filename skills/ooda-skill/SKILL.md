@@ -66,7 +66,7 @@ If `config.domains` is empty: `No domains configured. Run /ooda-setup first.`
 ## Subcommand: enable {domain-name}
 
 1. Look up `config.domains.{domain-name}`. Not found → print `Domain not found: {name}` and exit.
-2. Check if a skill file exists at `agent/skills/observe/{name}/SKILL.md`.
+2. Check if a skill file exists at `skills/{name}/SKILL.md`.
    - If yes → restore status to `"active"`.
    - If no  → restore status to `"available"`.
 3. Back up config.json to config.json.bak.
@@ -86,7 +86,7 @@ If `config.domains` is empty: `No domains configured. Run /ooda-setup first.`
 Look up `config.domains` for an entry whose `primary_skill` matches `/{skill-name}`.
 If not found → `No domain found for skill: {skill-name}. Check /ooda-skill list.` — exit.
 If `domain.status != "available"`:
-- `"active"` → `{skill-name} already exists. Find it at agent/skills/observe/{skill-name}/SKILL.md`
+- `"active"` → `{skill-name} already exists. Find it at skills/{skill-name}/SKILL.md`
 - `"disabled"` → `{skill-name} is disabled. Run /ooda-skill enable {domain-name} first.`
 Exit in both cases.
 
@@ -159,10 +159,10 @@ missing items for manual completion.
 
 ### Step 5: Write files
 
-Create directory: `agent/skills/observe/{skill-name}/`
-Write: `agent/skills/observe/{skill-name}/SKILL.md` (generated content)
+Create directory: `skills/{skill-name}/`
+Write: `skills/{skill-name}/SKILL.md` (generated content)
 
-Write `agent/skills/observe/{skill-name}/references/context.json`:
+Write `skills/{skill-name}/references/context.json`:
 ```json
 {
   "schema_version": "1.0.0",
@@ -174,7 +174,7 @@ Write `agent/skills/observe/{skill-name}/references/context.json`:
 }
 ```
 
-For scan-market also write `agent/skills/observe/{skill-name}/references/known-entities.md`:
+For scan-market also write `skills/{skill-name}/references/known-entities.md`:
 ```markdown
 # Known Entities — {skill-name}
 
@@ -197,23 +197,17 @@ Back up `config.json` to `config.json.bak`.
 Set `config.domains.{domain-name}.status = "active"` in config.json.
 Write and re-parse config.json to confirm valid JSON.
 
-Create symlink (skip silently if it already exists):
-```bash
-ln -sf ../../agent/skills/observe/{skill-name} .claude/skills/{skill-name}
-```
-
 ### Step 7: Print summary
 
 ```
 Skill created: {skill-name}
 
-  SKILL.md:      agent/skills/observe/{skill-name}/SKILL.md
-  References:    agent/skills/observe/{skill-name}/references/context.json
-  Symlink:       .claude/skills/{skill-name}
+  SKILL.md:      skills/{skill-name}/SKILL.md
+  References:    skills/{skill-name}/references/context.json
   Domain status: active
 
 Next steps:
-  Review:  agent/skills/observe/{skill-name}/SKILL.md
+  Review:  skills/{skill-name}/SKILL.md
   Run:     /{skill-name}
   Config:  /ooda-config domain list
 ```

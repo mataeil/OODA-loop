@@ -61,7 +61,7 @@ description: >
 input:
   files:
     - agent/state/competitors.json
-    - agent/skills/observe/scan-competitors/references/context.json
+    - skills/scan-competitors/references/context.json
   web_search: true
   config_keys: []
 

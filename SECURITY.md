@@ -24,7 +24,7 @@ software. The threats and mitigations below reflect deliberate design decisions.
 ### Threat 1: Self-Modification
 
 **Risk.** The agent modifies its own safety rules, contracts, or core engine
-(`agent/safety/*`, `agent/skills/meta/*`, `agent/contracts/*`), removing
+(`agent/safety/*`, `skills/evolve/*`, `agent/contracts/*`), removing
 guardrails that govern its own behavior.
 
 **Mitigation.** Those paths are declared as `protected_paths` in config. Any PR
@@ -186,7 +186,7 @@ current complexity level:
 | Path                  | Contains                                |
 |-----------------------|-----------------------------------------|
 | `agent/safety/*`      | Safety policy, HALT file                |
-| `agent/skills/meta/*` | Core evolve engine                      |
+| `skills/evolve/*`     | Core evolve engine                      |
 | `agent/contracts/*`   | Skill interface contracts               |
 
 Any PR touching these paths requires explicit human review and cannot be

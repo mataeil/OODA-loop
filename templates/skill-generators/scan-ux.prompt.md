@@ -61,7 +61,7 @@ description: >
 input:
   files:
     - agent/state/ux_evolution.json
-    - agent/skills/observe/scan-ux/references/context.json
+    - skills/scan-ux/references/context.json
   config_keys:
     - health_endpoints
 

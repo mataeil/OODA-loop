@@ -59,7 +59,7 @@ description: >
 input:
   files:
     - agent/state/business_strategy.json
-    - agent/skills/observe/scan-market/references/context.json
+    - skills/scan-market/references/context.json
   web_search: true
   config_keys: []
 
