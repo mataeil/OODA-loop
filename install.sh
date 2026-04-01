@@ -32,7 +32,7 @@ for skill in "$OODA_DIR"/skills/*/; do
   if [ -e "$SKILLS_DIR/$name" ] && [ ! -L "$SKILLS_DIR/$name" ]; then
     echo "  [SKIP] $name — file already exists (not a symlink). Remove manually if needed."
   else
-    ln -sf "$skill" "$SKILLS_DIR/$name"
+    ln -sfn "$skill" "$SKILLS_DIR/$name"
     echo "  Linked $name"
   fi
 done

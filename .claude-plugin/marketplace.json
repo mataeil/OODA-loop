@@ -1,0 +1,22 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "ooda-loop",
+  "plugins": [
+    {
+      "name": "ooda-loop",
+      "description": "Autonomous operations agent for side projects. Watches your codebase, learns from outcomes, and acts — health checks, test tracking, backlog scoring, and implementation. Built on Boyd's OODA loop.",
+      "category": "development",
+      "author": {
+        "name": "Taeil Ma",
+        "url": "https://github.com/mataeil"
+      },
+      "source": {
+        "source": "url",
+        "url": "https://github.com/mataeil/OODA-loop.git"
+      },
+      "homepage": "https://github.com/mataeil/OODA-loop",
+      "tags": ["ooda-loop", "autonomous-agent", "operations", "side-projects"],
+      "version": "1.0.0"
+    }
+  ]
+}
