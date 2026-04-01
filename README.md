@@ -117,13 +117,16 @@ The language you write in does not matter.
 Any project with a test command, a git repo, or an HTTP endpoint can use it.
 Web servers, CLI tools, libraries, monorepos -- the loop adapts to what you have.
 
-**Verified across:**
+**Verified across 6 environments:**
 
 | Stack | Project Type | Test Framework |
 |-------|-------------|---------------|
 | Python + FastAPI | REST API | pytest + pytest-cov |
-| Go + net/http | URL shortener | go test |
+| Python (no framework) | Library / package | pytest + pytest-cov |
+| Go + net/http | HTTP server | go test |
+| Node.js + Express | REST API | Jest + supertest |
 | Node.js | CLI tool (no server) | Jest |
+| TypeScript | CLI tool | ts-jest |
 
 ---
 
@@ -154,21 +157,29 @@ at a time.
 
 ---
 
+## What this is NOT
+
+- **Not a code generation agent** (Devin, Cursor Agent) -- those write code on command. This watches, learns, and operates autonomously.
+- **Not a CI/CD pipeline** -- this decides *what* to do, not just *how* to run it.
+- **Not a monitoring SaaS** (Datadog, PagerDuty) -- this lives in your repo, costs ~$1-2/day, no subscription.
+- **Not a cron job** -- cron repeats the same script forever. OODA-loop evolves with every cycle.
+
+---
+
 ## What happens when you run it
 
-**Day 1.** You clone the repo and run the setup wizard. It detects your stack,
-suggests domains to monitor, and writes your config. The first `/evolve` is
-observe-only -- it looks, writes down what it found, and moves on.
+**Day 1.** Install the plugin and run `/ooda-setup` in your project. It detects
+your stack, suggests domains to monitor, and writes your config. The first
+`/evolve` is observe-only -- it looks, writes down what it found, and moves on.
 
 ```
 /ooda-status
 
 Cycle: #1  |  Level: 0 (Just watching)
 Domains scanned: 3
-  service_health    —        score 336.29  confidence 0.70
-  test_coverage     —        score 168.29  confidence 0.70
+  service_health    —        confidence 0.70
+  test_coverage     87.2%    confidence 0.70
   backlog           12 open  confidence 0.70
-  backlog           —        score 134.69  confidence 0.70
 Actions: 0 pending  |  PRs: 0
 HALT: inactive
 ```
@@ -189,6 +200,15 @@ item, write code, run your tests, and open a draft PR. PRs are small -- 20
 files max, 500 lines max, enforced by config. You review it over coffee. The
 loop runs at 3am, notices what you would notice at 9am, and acts on it before
 you wake up.
+
+**Self-development in action.** In sandbox testing, a Python library project ran
+30 OODA cycles autonomously. The results: 15 tests grew to 91, coverage went
+from 91% to 100%, and 25 features were implemented -- including functions the
+agent proposed on its own by recognizing mathematical patterns in the existing
+code. When the agent's own implementation caused a coverage regression, it
+detected the drop, generated a corrective action ranked higher than any
+existing task, and fixed it in the next cycle. The loop does not just execute
+a checklist. It observes the consequences of its own actions and adapts.
 
 ---
 
@@ -276,11 +296,12 @@ See [SECURITY.md](SECURITY.md) for the full threat model and safety architecture
 
 ## Configuration
 
-Copy `config.example.json` to `config.json`. Key sections: `project` (name, locale,
-timezone), `domains` (what to monitor, weights, skills, status), `safety` (HALT path,
-PR limits, allowlist, `lock_timeout_minutes`), `confidence` (initial value, merge boost,
-reject penalty), `scoring` (formula parameters), `progressive_complexity` (current level),
-`signals` (urgent signal thresholds), `memory` (retention, decay, action queue decay),
+`/ooda-setup` generates `config.json` automatically. To edit manually, use `/ooda-config`
+or edit the file directly. Key sections: `project` (name, locale, timezone), `domains`
+(what to monitor, weights, skills, status), `safety` (HALT path, PR limits, allowlist,
+`lock_timeout_minutes`), `confidence` (initial value, merge boost, reject penalty),
+`scoring` (formula parameters), `progressive_complexity` (current level), `signals`
+(urgent signal thresholds), `memory` (retention, decay, action queue decay),
 `notifications` (Telegram via `$ENV_VAR`), `cost` (daily limit, warning threshold).
 
 **Cost estimate.** Each observe cycle costs ~$0.02-0.05 in Claude API usage.
@@ -310,6 +331,18 @@ See [config.example.json](config.example.json) for the complete annotated schema
 Contributions welcome: new domain skills, scoring improvements, integrations, and
 documentation. See [CONTRIBUTING.md](CONTRIBUTING.md) for the skill authoring guide,
 3-tier contribution model (Skills / Docs / Core), and code style rules.
+
+---
+
+## Try it
+
+```
+/plugin marketplace add mataeil/OODA-loop
+/plugin install ooda-loop
+cd your-project && /ooda-setup
+```
+
+Give your side project a brain. Start at Level 0. It just watches.
 
 ---
 
