@@ -127,7 +127,15 @@ Read input: empty → use defaults. Space-separated names → enable exactly tho
 
 Print: `[3/3] Creating config.json...`
 
-Read `config.example.json` (if missing → `[ERROR] config.example.json not found.` and stop). Apply detected values:
+Locate the config template. Search in order (first found wins):
+1. `${CLAUDE_PLUGIN_ROOT}/config.example.json` (plugin installation)
+2. `~/.ooda-loop/config.example.json` (global git clone installation)
+3. `./config.example.json` (running from the OODA-loop repo itself)
+
+If none found → generate a minimal config with sensible defaults (all fields from the
+schema with default values). Print `[WARN] config.example.json not found — using built-in defaults.`
+
+Apply detected values:
 
 - `project.name` → detected name
 - `test_command` → detected command or `""`
@@ -143,6 +151,17 @@ Graceful degradation:
 - Not a git repo → force backlog enabled = false
 
 Validate the JSON structure before writing. Write to `config.json`. Never write tokens, keys, or passwords — skip any detected value that looks like a secret and warn.
+
+**Scaffold project directories** — create the OODA runtime directories if they don't exist:
+```bash
+mkdir -p agent/state/evolve
+mkdir -p agent/safety
+```
+Initialize state files: `state.json`, `confidence.json`, `metrics.json`, `action_queue.json`,
+`memos.json`, `goals.json`, `episodes.json`, `principles.json`, `skill_gaps.json`,
+`cost_ledger.json`, `CHANGELOG.md` in `agent/state/evolve/`. Use canonical schemas.
+
+Add to `.gitignore` if not already present: `config.json`, `agent/state/`, `agent/safety/HALT`.
 
 Print:
 ```

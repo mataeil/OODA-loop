@@ -1,0 +1,22 @@
+{
+  "name": "ooda-loop",
+  "displayName": "OODA-loop",
+  "version": "1.0.0",
+  "description": "Autonomous operations agent for side projects. Watches your codebase, learns from outcomes, and acts — health checks, test tracking, backlog scoring, and implementation. Built on Boyd's OODA loop.",
+  "author": {
+    "name": "Taeil Ma",
+    "url": "https://github.com/mataeil"
+  },
+  "homepage": "https://github.com/mataeil/OODA-loop",
+  "repository": "https://github.com/mataeil/OODA-loop",
+  "license": "MIT",
+  "keywords": [
+    "ooda-loop",
+    "autonomous-agent",
+    "operations",
+    "side-projects",
+    "health-monitoring",
+    "backlog-scoring",
+    "adaptive-lens"
+  ]
+}

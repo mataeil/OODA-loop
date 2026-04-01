@@ -16,45 +16,30 @@ It watches your project and gets smarter over time. Start at Level 0. Move up wh
 
 ## Quick Start
 
+**Install** (choose one):
+
 ```bash
-git clone https://github.com/mataeil/OODA-loop.git
-cd OODA-loop
+# Option A: Claude Code plugin (recommended)
+/plugin marketplace add mataeil/OODA-loop
+/plugin install ooda-loop
+
+# Option B: Global install via git
+git clone https://github.com/mataeil/OODA-loop.git ~/.ooda-loop
+~/.ooda-loop/install.sh
 ```
 
-```
+**Set up your project:**
+
+```bash
+cd your-project/
 /ooda-setup           # auto-detects your stack, writes config
-/evolve               # runs one OODA cycle (first is observe-only)
+/evolve               # first cycle (observe-only — just watches)
 /ooda-status          # check what it found
 ```
 
-```
-Cycle: #2  |  Level: 2 (Full observation)
-Domains scanned: 3
-  service_health    200 OK   0.7ms    confidence 0.70
-  test_coverage     33/33    94.62%   confidence 0.70
-  backlog           —                 confidence 0.70
-Actions: 0 pending  |  PRs: 0
-HALT: inactive
-```
+`/ooda-setup` creates `config.json` and `agent/state/` in your project. Your source code is never modified during observation.
 
-Preview what the next cycle would do without taking action:
-
-```
-/evolve --dry-run
-```
-
-```
-[Decide] Domain scores:
-| # | Domain         | Hours  | Weight | Urgent | Goal | Conf | SCORE  |
-|---|----------------|--------|--------|--------|------|------|--------|
-| 1 | service_health | 168.0  | 2.0    | +0.0   | 0.15 | 0.14 | 336.29 |
-| 2 | test_coverage  | 168.0  | 1.0    | +0.0   | 0.15 | 0.14 | 168.29 |
-| 3 | backlog        | 168.0  | 0.8    | +0.0   | 0.15 | 0.14 | 134.69 |
-
-Would execute: /scan-health (service_health, score 336.29)
-```
-
-Nothing changes until you say so. Level 0 just watches. Level 3 opens PRs.
+**Nothing changes until you say so.** Level 0 just watches. Level 3 opens PRs.
 
 ---
 

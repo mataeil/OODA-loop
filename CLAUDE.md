@@ -2,12 +2,21 @@
 
 Autonomous operations agent harness built on Boyd's OODA loop for Claude Code.
 
+## Structure
+
+- `skills/` — All SKILL.md files (plugin auto-discovers these)
+- `.claude-plugin/plugin.json` — Plugin manifest
+- `agent/contracts/` — Skill contract schema
+- `agent/state/` — Runtime state (gitignored, per-project)
+- `config.example.json` — Config template for user projects
+
 ## Code Rules
 
 - All files written in **English**
 - No secrets in config.json — use environment variable references only (`$ENV_VAR`)
 - Every skill must start with a HALT file check
 - No `git add -A` — explicit file staging only
+- Skills live in `skills/{name}/SKILL.md`, not in `agent/skills/`
 
 ## Session Continuity
 
