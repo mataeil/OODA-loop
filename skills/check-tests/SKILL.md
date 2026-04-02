@@ -78,6 +78,9 @@ Capture exit code, stdout, stderr. Parse:
     - **Go**: count lines matching `^ok\s+\t` as passed packages, lines matching `^FAIL\t` as failed packages (IMPORTANT: Go emits multiple lines containing `FAIL` per failed package — `--- FAIL: TestName`, standalone `FAIL`, `FAIL\tpkg/path`, and a trailing `FAIL` summary. ONLY `^FAIL\t` followed by a package path represents a failed package. Similarly, `--- PASS:` lines are per-test, not per-package.) In verbose mode (`-v`), also count `--- PASS:` lines for individual test counts and `--- FAIL:` for individual test failures, reporting both: `Tests: {test_passed}/{test_total} passed (packages: {pkg_passed}/{pkg_total})`
     - **Mocha**: `(\d+) passing`, `(\d+) failing`, `(\d+) pending`
     - **RSpec**: `(\d+) examples?,\s*(\d+) failures?(?:,\s*(\d+) pending)?`
+    - **Rust/Cargo**: `test result: (?:ok|FAILED)\.\s*(\d+) passed;\s*(\d+) failed;\s*(\d+) ignored` — Cargo emits a single summary line. `ignored` maps to `skipped`. Coverage is not emitted by default; requires `cargo-tarpaulin` or `cargo llvm-cov`.
+    - **Bun**: `(\d+)\s+pass(?:\b)` for passed, `(\d+)\s+fail(?:\b)` for failed — Bun uses present tense (`pass`/`fail`) NOT past tense (`passed`/`failed`). Also `Ran\s+(\d+)\s+tests` for total. `(\d+)\s+skip` for skipped. Coverage requires `--coverage` flag.
+    - **Vitest**: Uses the same Istanbul/v8 table format as Jest for coverage. Test counts use `Tests\s+(\d+)\s+passed\s+\((\d+)\)` format — note: no colon after `Tests`, no comma separators. Parse each token independently as with Jest.
     - **Fallback**: generic `(\d+)\s+(?:tests?\s+)?passed`, `(\d+)\s+(?:tests?\s+)?failed`
     - **Go skipped**: count `--- SKIP:` lines for skipped tests (only visible in verbose `-v` mode; if not verbose, skipped count defaults to 0)
     - Compute `total = passed + failed + skipped` when the framework does not emit a total
