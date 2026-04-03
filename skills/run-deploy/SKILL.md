@@ -19,7 +19,8 @@ output:
   files: [agent/state/deploy.json]
 safety:
   halt_check: true
-  read_only: true
+  read_only: false
+  branch_prefix: "auto/deploy/"
   cost_limit_usd: 0.05
 domains:
   - service_health
