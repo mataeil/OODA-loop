@@ -336,7 +336,7 @@ output:
 
 chain_triggers:
   - target: scan-health
-    condition: "post_deploy_health_check == 'failed'"
+    condition: "health_check == 'failed'"
 
 safety:
   halt_check: true
@@ -418,6 +418,7 @@ input:
     - agent/state/evolve/metrics.json
     - agent/state/evolve/episodes.json
     - agent/state/evolve/principles.json
+    - agent/state/evolve/cost_ledger.json
     - "config.domains.*.state_file (all domain state files)"
     - "agent/state/external/*.json (if present)"
   apis:
@@ -451,7 +452,113 @@ output:
     - agent/state/evolve/CHANGELOG.md
     - agent/state/evolve/episodes.json (weekly)
     - agent/state/evolve/principles.json (rare)
+    - agent/state/evolve/cost_ledger.json
   prs: "Determined by executed skill (evolve itself creates no PRs)"
+
+safety:
+  halt_check: true
+  read_only: true
+
+domains: []
+```
+
+### ooda-setup (support)
+
+```yaml
+name: ooda-setup
+ooda_phase: support
+version: "1.0.0"
+description: >
+  3-step project setup wizard. Auto-detects language, test framework, CI,
+  and endpoints. Creates config.json from config.example.json.
+
+input:
+  files: [config.example.json]
+  config_keys: []
+
+output:
+  files: [config.json]
+  prs: none
+
+safety:
+  halt_check: true
+  read_only: true
+
+domains: []
+```
+
+### ooda-config (support)
+
+```yaml
+name: ooda-config
+ooda_phase: support
+version: "1.0.0"
+description: >
+  View, modify, and validate config.json settings via slash commands.
+
+input:
+  files: [config.json]
+  config_keys: []
+
+output:
+  files: [config.json]
+  prs: none
+
+safety:
+  halt_check: true
+  read_only: true
+
+domains: []
+```
+
+### ooda-status (support)
+
+```yaml
+name: ooda-status
+ooda_phase: support
+version: "1.0.0"
+description: >
+  Display OODA-loop status dashboard. Shows cycle count, domain states,
+  confidence scores, action queue, and alerts in a single view.
+
+input:
+  files:
+    - config.json
+    - agent/state/evolve/state.json
+    - agent/state/evolve/confidence.json
+    - agent/state/evolve/action_queue.json
+    - agent/state/evolve/metrics.json
+    - agent/state/evolve/cost_ledger.json
+  config_keys: []
+
+output:
+  files: []
+  prs: none
+
+safety:
+  halt_check: true
+  read_only: true
+
+domains: []
+```
+
+### ooda-skill (support)
+
+```yaml
+name: ooda-skill
+ooda_phase: support
+version: "1.0.0"
+description: >
+  Create, disable, and enable domain skills. Generates project-specific
+  SKILL.md files via a short interview.
+
+input:
+  files: [config.json]
+  config_keys: []
+
+output:
+  files: [config.json]
+  prs: none
 
 safety:
   halt_check: true

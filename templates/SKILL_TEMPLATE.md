@@ -1,6 +1,23 @@
 ---
 name: your-skill-name
 description: One-line description of what this skill does.
+ooda_phase: observe
+version: "1.0.0"
+input:
+  files:
+    - config.json
+    - agent/state/your_domain.json
+  apis: []
+  config_keys: []
+output:
+  files:
+    - agent/state/your_domain.json
+  prs: none
+safety:
+  halt_check: true
+  read_only: true
+domains: [your_domain]
+chain_triggers: []
 ---
 
 # your-skill-name: Brief Title
@@ -8,38 +25,7 @@ description: One-line description of what this skill does.
 Short description of purpose. 2-3 sentences covering what it does, which OODA
 phase it serves, and what output it produces.
 
-## Contract
-
-```yaml
-contract_version: "1.0"
-name: your-skill-name
-ooda_phase: meta|observe|detect|strategize|execute|support
-version: "1.0.0"
-status: active
-description: Same as frontmatter description.
-
-input:
-  files:
-    - config.json
-    - agent/state/your_domain.json
-  apis: []
-  config_keys: [test_command]
-
-output:
-  files:
-    - agent/state/your_domain.json
-  prs: none
-
-safety:
-  halt_check: true
-  read_only: true
-  branch_prefix: "auto/your-skill/"  # Only required when read_only: false
-  cost_limit_usd: 0.05
-
-domains: [your_domain]
-
-chain_triggers: []
-```
+If your skill creates PRs, set `read_only: false` and add `branch_prefix: "auto/your-skill/"` in the frontmatter above.
 
 ## Safety Rules
 
