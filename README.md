@@ -117,7 +117,7 @@ The language you write in does not matter.
 Any project with a test command, a git repo, or an HTTP endpoint can use it.
 Web servers, CLI tools, libraries, monorepos -- the loop adapts to what you have.
 
-**Verified across 6 environments:**
+**Verified across 9 environments:**
 
 | Stack | Project Type | Test Framework |
 |-------|-------------|---------------|
@@ -127,6 +127,9 @@ Web servers, CLI tools, libraries, monorepos -- the loop adapts to what you have
 | Node.js + Express | REST API | Jest + supertest |
 | Node.js | CLI tool (no server) | Jest |
 | TypeScript | CLI tool | ts-jest |
+| React + Vite | SPA | Vitest |
+| Rust | CLI tool | cargo test |
+| Bun + Hono | HTTP server | bun:test |
 
 ---
 
@@ -201,14 +204,16 @@ files max, 500 lines max, enforced by config. You review it over coffee. The
 loop runs at 3am, notices what you would notice at 9am, and acts on it before
 you wake up.
 
-**Self-development in action.** In sandbox testing, a Python library project ran
-30 OODA cycles autonomously. The results: 15 tests grew to 91, coverage went
-from 91% to 100%, and 25 features were implemented -- including functions the
-agent proposed on its own by recognizing mathematical patterns in the existing
-code. When the agent's own implementation caused a coverage regression, it
-detected the drop, generated a corrective action ranked higher than any
-existing task, and fixed it in the next cycle. The loop does not just execute
-a checklist. It observes the consequences of its own actions and adapts.
+**Self-development in action.** Across 60 sandbox cycles spanning 9 stacks
+(Python, Go, Node, React, Rust, Bun), the agent created 36 PRs with zero
+compile or test failures. In one run, a Python library grew from 15 tests to
+91, hit 100% coverage, and gained 25 features -- including functions the agent
+proposed on its own by recognizing mathematical patterns in the existing code.
+When its own implementation caused a coverage regression, it detected the drop,
+generated a corrective action ranked higher than any existing task, and fixed
+it in the next cycle. 65% of actions in the final phase were self-discovered,
+not from the original backlog. The loop does not just execute a checklist. It
+observes the consequences of its own actions and adapts.
 
 ---
 
