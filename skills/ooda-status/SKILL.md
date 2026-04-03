@@ -1,6 +1,25 @@
 ---
 name: ooda-status
 description: Display OODA-loop status dashboard. Shows cycle count, domain states, confidence scores, action queue, and alerts in a single view.
+ooda_phase: support
+version: "1.0.0"
+input:
+  files:
+    - config.json
+    - agent/state/evolve/state.json
+    - agent/state/evolve/confidence.json
+    - agent/state/evolve/action_queue.json
+    - agent/state/evolve/metrics.json
+    - agent/state/evolve/cost_ledger.json
+  config_keys: []
+output:
+  files: []
+  prs: none
+safety:
+  halt_check: true
+  read_only: true
+domains: []
+chain_triggers: []
 ---
 
 # /ooda-status — Status Dashboard

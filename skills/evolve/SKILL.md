@@ -1,6 +1,58 @@
 ---
 name: evolve
 description: OODA Meta-Orchestrator. Observes all domain states, orients by learning from past outcomes, decides the highest-priority action, and executes it. Run with /evolve or /loop 4h /evolve.
+ooda_phase: meta
+version: "1.0.0"
+input:
+  files:
+    - config.json
+    - agent/state/evolve/state.json
+    - agent/state/evolve/confidence.json
+    - agent/state/evolve/goals.json
+    - agent/state/evolve/action_queue.json
+    - agent/state/evolve/memos.json
+    - agent/state/evolve/skill_gaps.json
+    - agent/state/evolve/metrics.json
+    - agent/state/evolve/episodes.json
+    - agent/state/evolve/principles.json
+    - agent/state/evolve/cost_ledger.json
+  apis:
+    - "GitHub CLI (gh pr list, gh issue list, gh pr merge, gh pr view)"
+    - "Health endpoints (config.health_endpoints)"
+    - "Notification APIs (config.notifications)"
+  config_keys:
+    - domains
+    - implementation
+    - scoring
+    - confidence
+    - safety
+    - progressive_complexity
+    - signals
+    - memory
+    - test_command
+    - health_endpoints
+    - deploy_workflow
+    - notifications
+    - cost
+output:
+  files:
+    - agent/state/evolve/state.json
+    - agent/state/evolve/confidence.json
+    - agent/state/evolve/memos.json
+    - agent/state/evolve/action_queue.json
+    - agent/state/evolve/metrics.json
+    - agent/state/evolve/skill_gaps.json
+    - agent/state/evolve/goals.json
+    - agent/state/evolve/episodes.json
+    - agent/state/evolve/principles.json
+    - agent/state/evolve/cost_ledger.json
+    - agent/state/evolve/CHANGELOG.md
+  prs: none
+safety:
+  halt_check: true
+  read_only: true
+domains: []
+chain_triggers: []
 ---
 
 # evolve: OODA Meta-Orchestrator -- Autonomous Decision Engine

@@ -1,6 +1,19 @@
 ---
 name: ooda-skill
 description: Create, disable, and enable domain skills. Generates project-specific SKILL.md files via a short interview.
+ooda_phase: support
+version: "1.0.0"
+input:
+  files: [config.json]
+  config_keys: []
+output:
+  files: [config.json]
+  prs: none
+safety:
+  halt_check: true
+  read_only: true
+domains: []
+chain_triggers: []
 ---
 
 # ooda-skill — Domain Skill Wizard

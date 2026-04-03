@@ -1,15 +1,19 @@
 ---
 name: ooda-config
-description: Configuration management for OODA-loop. View, modify, and validate config.json settings via slash commands.
+description: View, modify, and validate config.json settings via slash commands.
+ooda_phase: support
 version: "1.0.0"
 input:
   files: [config.json]
+  config_keys: []
 output:
   files: [config.json]
+  prs: none
 safety:
   halt_check: true
-  backup_before_write: true
-  validate_json_after_write: true
+  read_only: true
+domains: []
+chain_triggers: []
 ---
 
 # ooda-config: Configuration Management CLI
