@@ -237,8 +237,12 @@ for each domain_name, domain_config in config.domains:
 Also read evolve self-state: state.json, confidence.json, memos.json,
 goals.json, action_queue.json, skill_gaps.json, cost_ledger.json.
 
-If `cost_ledger.json` is missing, create with initial structure:
-`{"date": "<today YYYY-MM-DD>", "entries": [], "total_estimated_usd": 0.0}`
+If `cost_ledger.json` is missing or corrupt (invalid JSON), create with initial structure:
+`{"schema_version": "1.0.0", "date": "<today YYYY-MM-DD>", "entries": [], "total_estimated_usd": 0.0}`
+
+**Daily reset**: Compare `cost_ledger.json.date` to current UTC date (`YYYY-MM-DD`).
+If different: reset `total_estimated_usd` to 0.0, clear `entries`, update `date` to today.
+Cost accounting always uses UTC regardless of `config.project.timezone`.
 
 If `config.implementation.enabled`: read action_queue.json for pending_count,
 oldest_pending_hours, highest_rice.
@@ -287,6 +291,9 @@ Read last 5 entries from state.json.decision_log. Detect:
 - **Execution-result correlation**: match decision_log PR numbers to merged/closed PRs.
 - **Repeated failures**: count entries with result "error"/"failed" for same domain. If >= 2, flag as infrastructure_issue.
 - **Futile loop**: count consecutive cycles where the selected domain produced result "success" but no actionable output (no actions extracted, no alerts generated, no PRs created — e.g., plan-backlog returning "no_remote" repeatedly). If >= 3 consecutive futile cycles for the same domain, add a memo penalty of -10.0 to that domain and log `[Orient] Futile loop detected: {domain} produced no output for {N} consecutive cycles. Penalizing.` This prevents the staleness score from endlessly selecting an unproductive domain.
+  - **Scope**: penalty applies only to the specific futile domain, not globally.
+  - **Lifetime**: written as `score_adjustments[domain] = -10.0` in memos.json. Consumed (deleted) after one application in Step 3-A scoring. Does not persist across multiple cycles.
+  - **Recovery**: domain recovers automatically by producing a non-empty observation in any subsequent cycle (the consecutive futile counter resets to 0).
 
 Store patterns for Steps 2-E and 5-C.
 
@@ -502,14 +509,21 @@ if highest score < 0.5:
 winner = highest scoring domain
 if winner confidence < config.safety.confidence_threshold:
   Print "[Decide] {winner} confidence below threshold."
-  Try next-highest domain. Repeat until:
-    a) domain with confidence >= threshold found -> use it
-    b) all below -> use any fallback=true domain
-    c) no fallback:
-       Print "[Decide] All domains below confidence threshold and no fallback domain."
-       Print "[Decide] Skipping Act. Run will proceed to Reflect."
-       Log decision_log: { action: "skip", reason: "all_below_confidence_no_fallback" }
-       Skip to Step 5.
+  # Iterate candidates in descending score order (from Step 3-D sort).
+  for candidate in scored_domains_descending:
+    if candidate.confidence >= threshold:
+      winner = candidate
+      break
+  else:
+    # No domain meets threshold. Try fallback.
+    fallback = first domain where config.domains[name].fallback == true
+    if fallback:
+      winner = fallback
+    else:
+      Print "[Decide] All domains below confidence threshold and no fallback domain."
+      Print "[Decide] Observe-only cycle. Skipping Act, proceeding to Reflect."
+      Log decision_log: { action: "skip", reason: "all_below_confidence_no_fallback" }
+      Skip to Step 5.
   When confidence-gated: primary skill ONLY, skip chain[].
   Print "[Decide] Confidence-gated: primary skill only, no chain."
 ```
@@ -681,7 +695,7 @@ If executed skill was NOT implementation's primary_skill:
 - Parse output for actionable items. Assign RICE scores:
   `RICE = (Reach * Impact * Confidence) / max(Effort, 0.5) * 100`
   (Effort is floored at 0.5 to prevent division-by-zero or inflated scores. The ×100 normalizes scores to the same scale used by plan-backlog and chain triggers.)
-- Dedup: skip if title keyword overlap > 80% with existing queue items.
+- Dedup: tokenize titles to lowercase keyword sets (strip stop words: "the", "a", "an", "is", "for", "in", "to", "of"). Compute Jaccard similarity against each existing queue item: `|A ∩ B| / |A ∪ B|`. If >= 0.8, treat as duplicate — keep existing item (lower ID wins), skip new extraction.
 - Each extracted action MUST include these fields:
   `{ id, title, source_domain, rice_score, effective_rice: rice_score,
      related_files, status: "pending", extracted_at: ISO_8601,
@@ -762,7 +776,7 @@ Persist score_adjustments (2-D cleared consumed ones) and history (cap 10).
 
 ### 6-C2: action_queue.json
 
-Persist queue: pending sorted by RICE desc (cap 20), in_progress, completed (keep last 20).
+Persist queue: pending sorted by RICE desc (cap 20), in_progress, completed (keep last 30).
 
 ### 6-C3: CHANGELOG.md
 
@@ -781,12 +795,40 @@ Cap at 50 entries (remove oldest from bottom).
 
 ### 6-C4: Memory Cascade
 
-**Tier 2 -- Episodes**: If ISO week changed since last episode, generate weekly
-summary (cycles, domains, PRs, goal deltas, learnings). Append to episodes.json.
-Cap at config.memory.episode_retention_weeks.
+**Tier 2 -- Episodes**: Compare current ISO week+year vs `episodes[-1].week_year`
+(or empty if no episodes). If different (or episodes array is empty), generate a
+weekly episode summary from working memory (last 20 entries in decision_log):
 
-**Tier 3 -- Contrarian Check**: If cycle_count % config.memory.contrarian_check_interval === 0,
-identify dominant strategy, generate counter-argument, store in memos with type "contrarian".
+```
+episode = {
+  week_year: "2026-W14",
+  domain_distribution: { backlog: 3, test_coverage: 2, ... },
+  outcomes: { prs_merged: 2, prs_rejected: 0, actions_completed: 4 },
+  key_decisions: ["Chose backlog 3x due to high RICE", ...],
+  lessons: ["Rust parser needed manual config", ...]
+}
+```
+
+Append to episodes.json. Cap at `config.memory.episode_retention_weeks` (default 52).
+If cap exceeded: evict oldest episode and trigger principle extraction (Step 6-C4b).
+
+**Tier 2b -- Principle Extraction** (triggered by episode eviction, gap resolution,
+or contrarian validation):
+- Scan episodes for recurring patterns: same lesson appears in >= 3 episodes.
+- Promote to principle in principles.json with confidence 0.3 (tentative).
+- Principle activates (used in Orient) after 3 confirmations raise confidence to >= 0.6.
+- Cap at 50 principles. Items with confidence < 0.1 are deprecated (removed).
+- Disconfirming evidence: -0.2; confirming: +0.1 (asymmetric, same as Adaptive Lens).
+- See STATE_DESIGN.md Section 5.3 for full extraction rules and confidence formulas.
+
+**Tier 3 -- Contrarian Check**: If `cycle_count % config.memory.contrarian_check_interval === 0`:
+- **Dominant strategy** = same domain won >= 5 of last 7 decisions (from decision_log).
+- If dominant found: generate counter-argument memo exploring what would happen if
+  the neglected lowest-scoring domain were chosen instead.
+- Store in memos.json: `{ type: "contrarian", domain: <neglected_domain>, argument: <what-if scenario>, expires_after_cycles: 3 }`.
+- If the neglected domain's confidence drops before memo expiry, the contrarian was
+  right — log as a negative signal for the dominant domain (orient adjustment -0.1).
+- If no dominant strategy detected: skip (no memo written).
 
 ### 6-C5: Metrics Update
 
