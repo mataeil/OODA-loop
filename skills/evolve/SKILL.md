@@ -627,8 +627,8 @@ Store in memos.json.history (cap at 10). Each entry:
 
 If executed skill was NOT implementation's primary_skill:
 - Parse output for actionable items. Assign RICE scores:
-  `RICE = (Reach * Impact * Confidence) / max(Effort, 0.5)`
-  (Effort is floored at 0.5 to prevent division-by-zero or inflated scores.)
+  `RICE = (Reach * Impact * Confidence) / max(Effort, 0.5) * 100`
+  (Effort is floored at 0.5 to prevent division-by-zero or inflated scores. The ×100 normalizes scores to the same scale used by plan-backlog and chain triggers.)
 - Dedup: skip if title keyword overlap > 80% with existing queue items.
 - Each extracted action MUST include these fields:
   `{ id, title, source_domain, rice_score, effective_rice: rice_score,

@@ -93,7 +93,7 @@ same defaults; this is expected — relative ordering then falls back to Impact 
 heuristics derived from the title and body text.
 
 ```
-RICE = (Reach × Impact × Confidence) / Effort   [round to 2 decimal places]
+RICE = (Reach × Impact × Confidence) / Effort × 100   [round to 2 decimal places]
 ```
 
 ---
