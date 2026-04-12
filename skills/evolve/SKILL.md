@@ -297,6 +297,42 @@ Read last 5 entries from state.json.decision_log. Detect:
 
 Store patterns for Steps 2-E and 5-C.
 
+### 2-A2: Saturation Circuit Breaker
+
+Track `consecutive_observe_only_cycles` in state.json. A cycle is "observe-only"
+if it produced result "success" but: no PRs created, no actions extracted, no
+new alerts generated, and no confidence changes occurred. Increment the counter
+each time; reset to 0 when any of those events occurs.
+
+```
+-- Check if this cycle produced actionable output
+has_output = (prs_created > 0 OR actions_extracted > 0 OR new_alerts > 0 OR confidence_changed)
+
+if has_output:
+  state.consecutive_observe_only_cycles = 0
+else:
+  state.consecutive_observe_only_cycles += 1
+  N = state.consecutive_observe_only_cycles
+
+  warn_threshold = config.saturation.warn_threshold      -- default 5
+  boost_threshold = config.saturation.boost_threshold    -- default 10
+  halt_threshold = config.saturation.halt_threshold      -- default 15
+
+  if N == warn_threshold:
+    Add memo: { type: "saturation_warning", message: "Observation saturation: {N} cycles without actionable output. Consider enabling implementation or reviewing domain configuration." }
+    Print "[Orient] ⚠ Saturation warning: {N} consecutive observe-only cycles."
+
+  if N == boost_threshold:
+    -- Boost pending actions and implementation domain to break out of observation loop
+    for each item in action_queue.pending:
+      item.effective_rice += config.saturation.implementation_boost  -- default 5.0
+    Print "[Orient] ⚠ Saturation boost applied: action queue +{boost}, implementation domain boosted."
+
+  if N >= halt_threshold AND config.saturation.auto_halt (default true):
+    Create HALT file: "Observation saturation: {N} cycles without actionable output. Human review needed. Delete this file to resume."
+    Print "[Orient] 🛑 Saturation halt: {N} cycles. HALT file created. Review required."
+```
+
 ### 2-B: Confidence Update
 
 ```
@@ -459,11 +495,45 @@ staleness_term:
   ones, preventing extreme scores that caused domain monopoly in production
   (e.g., 168h × 2.0 = 336 under linear).
 
+-- Per-domain cooldown (skip if within min_interval_hours)
+if domain.min_interval_hours is set AND hours_since_last < domain.min_interval_hours:
+  score = 0   -- hard cooldown, domain cannot be selected this cycle
+  Print "[Decide] {domain} cooldown: {hours_since_last}h < {min_interval_hours}h minimum"
+  continue to next domain
+
+-- Alert recency dampener (prevents alert-driven domain monopoly)
+cooldown_hours = config.signals.alert_cooldown_hours  -- default 4
+if urgent_signal > 0 AND alert severity is NOT "critical":
+  recency_factor = max(0, 1.0 - hours_since_last / cooldown_hours)
+  dampened_alert = urgent_signal * (1.0 - recency_factor)
+  -- Example: domain ran 0h ago → dampened to 0. Ran 2h ago → 50%. Ran 4h+ → full bonus.
+else:
+  dampened_alert = urgent_signal  -- critical alerts bypass dampener (Step 3-A0 still fires)
+
+-- Consecutive alert cap: after N consecutive alert-driven selections, auto-acknowledge
+max_alert_cycles = config.signals.max_consecutive_alert_cycles  -- default 3
+if domain was selected by alert in last max_alert_cycles consecutive cycles:
+  dampened_alert = 0
+  Print "[Decide] {domain} alert auto-acknowledged after {max_alert_cycles} consecutive cycles"
+
+-- Entropy-based domain balance penalty (prevents systematic monopoly)
+if config.scoring.balance_enabled (default true):
+  B = config.scoring.balance_weight                   -- default 5.0
+  N = count of active domains
+  domain_share = metrics.domain_executions[domain] / max(metrics.total_skill_executions, 1)
+  expected_share = 1.0 / N
+  balance_penalty = max(-B * (domain_share - expected_share), -10.0)
+  -- Example: 5 domains, domain ran 50% of the time (expected 20%): penalty = -5.0 * 0.3 = -1.5
+  -- A domain that ran LESS than expected gets a bonus (penalty is positive).
+else:
+  balance_penalty = 0
+
 score = staleness
-      + urgent_signal                              -- from 3-B (0 if none)
+      + dampened_alert                             -- from 3-B, with recency dampener
       + (goal_contribution * config.scoring.goal_weight)   -- from 3-C
       + (confidence * config.scoring.confidence_weight)
       + memo_adjustment                            -- from memos.json, consumed in 2-D
+      + balance_penalty                            -- entropy-based domain balance
 ```
 
 Floor: if computed score < 0, clamp to 0. Negative scores indicate a domain
@@ -644,12 +714,42 @@ Print "[Act] /{skill} starting..."
 Execute: /{skill}
 Print "[Act] /{skill} completed. (elapsed: {time})"
 
-if chain AND confidence >= threshold:
-  for each chain_skill (max 3):
-    Check HALT. If exists: stop.
-    Print "[Act] Chain: /{chain_skill} starting..."
-    Execute: /{chain_skill}
-    Print "[Act] Chain: /{chain_skill} completed."
+-- Chain execution: evaluate chain_triggers from the skill's contract
+-- Production deployments (209 cycles) showed zero chain records in decision_log.
+-- Root cause: chains were read from config.domains[winner].chain (legacy, often empty)
+-- instead of from the skill contract's chain_triggers with condition evaluation.
+
+chain_executed = []
+if confidence >= threshold:
+  -- Source 1: skill contract chain_triggers (preferred, condition-based)
+  contract = read YAML frontmatter from skills/{skill}/SKILL.md
+  if contract.chain_triggers exists and is non-empty:
+    for each trigger in contract.chain_triggers (max config.safety.max_chain_depth, default 3):
+      -- Evaluate condition against skill output (domain state file just written)
+      -- Condition format: "field_name >= value AND other_field == 'string'"
+      condition_met = evaluate trigger.condition against domain state JSON
+      if condition_met:
+        Check HALT. If exists: stop.
+        Print "[Act] Chain trigger: {trigger.condition} → /{trigger.target} starting..."
+        Execute: /{trigger.target}
+        chain_executed.append(trigger.target)
+        Print "[Act] Chain: /{trigger.target} completed."
+      else:
+        Print "[Act] Chain condition not met: {trigger.condition} — skipping /{trigger.target}"
+
+  -- Source 2: legacy config.domains[winner].chain (fallback for old configs)
+  else if config.domains[winner].chain exists and is non-empty:
+    for each chain_skill in config.domains[winner].chain (max 3):
+      Check HALT. If exists: stop.
+      Print "[Act] Chain (legacy): /{chain_skill} starting..."
+      Execute: /{chain_skill}
+      chain_executed.append(chain_skill)
+      Print "[Act] Chain: /{chain_skill} completed."
+
+-- Record chain execution in decision_log (MUST be present even if empty)
+decision_log_entry.chain_executed = chain_executed
+decision_log_entry.chain_count = len(chain_executed)
+Print "[Act] Chain summary: {len(chain_executed)} skills executed: {chain_executed or 'none'}"
 ```
 
 ### 4-C: PR Post-Processing
@@ -748,11 +848,34 @@ Print: `[Reflect] Extracted {N} actions. Queue: {pending_count} pending.`
 
 ### 5-E: Adaptive Lens Update
 
+**This step MUST execute on every cycle.** Production deployments showed 209 cycles
+with zero lens.json files created. The issue was that lens initialization was
+not explicit — the code assumed lens files already existed.
+
 ```
 for each observe-phase skill that ran this cycle:
   Read the skill's observation output (domain state file)
-  Read current lens: agent/state/{domain}/lens.json
-  Read last 3-5 observations from decision_log
+  domain_name = the domain that was executed
+
+  -- Initialize lens file if it does not exist
+  lens_path = agent/state/{domain_name}/lens.json
+  if lens_path does not exist:
+    mkdir -p agent/state/{domain_name}/
+    Write initial lens:
+    {
+      "schema_version": "1.0.0",
+      "domain": "{domain_name}",
+      "last_updated": now (ISO 8601),
+      "focus_items": [],
+      "learned_thresholds": [],
+      "discovered_signals": [],
+      "evidence": [],
+      "deprecated_items": []
+    }
+    Print "[Reflect] Initialized lens for {domain_name}."
+
+  Read current lens from lens_path
+  Read last 3-5 observations from decision_log for this domain
 
   Analyze for patterns:
   - Endpoints/metrics with high variance -> propose focus_item (confidence 0.3)
@@ -766,8 +889,18 @@ for each observe-phase skill that ran this cycle:
   - Item drops below 0.1: move to deprecated_items
   - Cap: max 50 items per lens; prune lowest-confidence items if exceeded
 
-  Write updated lens to agent/state/{domain}/lens.json
-  Append changes to agent/state/{domain}/lens_changelog.json
+  lens.last_updated = now (ISO 8601)
+  Write updated lens to lens_path
+
+  -- Record evidence trail (append, cap at 20 entries)
+  lens.evidence.append({
+    timestamp: now,
+    cycle: cycle_count,
+    source: "evolve Step 5-E",
+    observation: brief summary of what was observed,
+    items_added: count of new focus/threshold/signal items,
+    confidence_changes: count of items with confidence updates
+  })
 
 if cycle_count % config.memory.contrarian_check_interval == 0:
   Compare current observation quality against baseline (first 3 cycles)
@@ -966,6 +1099,43 @@ Update total_prs_created/merged/rejected as applicable.
 domain_executions[winner] += 1
 Update streaks (current_domain, current_streak, longest_streak).
 Set first_cycle_at if null. Set last_updated = now.
+```
+
+### 6-C5b: Cost Ledger Entry
+
+**This step MUST execute every cycle.** Production deployments showed 209 cycles
+with $0.0 total cost — the entry recording logic was never firing.
+
+```
+-- Ensure cost_ledger.json is initialized (Step 0-Pre already handles this,
+-- but re-check here in case Step 0 was bypassed or file was deleted)
+if cost_ledger.json is missing or corrupt:
+  Write: {"schema_version": "1.0.0", "date": "<today>", "entries": [], "total_estimated_usd": 0.0}
+
+-- Estimate cost for this cycle based on skill contract cost_limit_usd
+-- Each skill contract declares a cost_limit_usd (e.g., scan-health: $0.02, check-tests: $0.05)
+skill_cost = read executed skill contract's cost_limit_usd (default 0.02 if not declared)
+chain_cost = sum of chain skill contracts' cost_limit_usd (0 if no chain)
+cycle_cost = skill_cost + chain_cost
+
+-- Record entry
+cost_ledger.entries.append({
+  cycle_id: cycle_count,
+  timestamp: now (ISO 8601),
+  skill: selected_skill,
+  chain: chain_executed,
+  estimated_usd: cycle_cost
+})
+cost_ledger.total_estimated_usd += cycle_cost
+
+-- Check daily limit
+if cost_ledger.total_estimated_usd >= config.cost.daily_limit_usd:
+  Create HALT file: "Daily cost limit reached: ${total} >= ${limit}. Resets at 00:00 UTC."
+  Print "[Reflect] 🛑 Cost limit reached: ${total}. HALT created."
+else if cost_ledger.total_estimated_usd >= config.cost.daily_limit_usd * config.cost.warning_threshold_pct / 100:
+  Print "[Reflect] ⚠ Cost warning: ${total} (${pct}% of daily limit)."
+
+Print "[Reflect] Cost: +${cycle_cost} this cycle, ${total} today."
 ```
 
 ### 6-C6: Action Queue Decay

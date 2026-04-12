@@ -232,18 +232,26 @@ test_status = "skipped"
 GOTO Step 5
 ```
 
-**If configured**, run tests:
+**If configured**, run tests with timeout enforcement:
 ```bash
-{config.test_command}
+timeout {config.test_timeout_seconds or 300}s {config.test_command}
+```
+
+If the test command exceeds the timeout, treat as failure:
+```
+if exit_code == 124 (timeout):
+  Print "ERROR: Test command timed out after {timeout}s. Treating as failure."
+  test_output = "Test timeout after {timeout}s"
 ```
 
 Track attempts:
 ```
 attempt = 1
 max_attempts = 3
+timeout = config.test_timeout_seconds or 300
 
 while attempt <= max_attempts:
-  run test_command
+  run test_command with timeout
   if exit_code == 0:
     test_status = "passed"
     break
