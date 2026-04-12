@@ -92,6 +92,22 @@ data_classification:          # Security classification for skill's data access
   external_apis: []           # List of external APIs called (for audit trail)
                               # At Level < 3, skills with level: external require human approval.
                               # At Level 3, external skills run autonomously but are logged to cost_ledger.
+
+execution_mode: standard     # standard | consensus
+                              #   standard: skill runs once, output is final (default)
+                              #   consensus: skill runs N times with different perspectives,
+                              #              output is the intersection of agreed-upon items
+consensus:                    # Only used when execution_mode is "consensus"
+  agents: 3                   # Number of parallel runs (2-5 recommended)
+  rounds: 2                   # Deliberation rounds (1-3)
+  agreement_threshold: 0.67   # Fraction of agents that must agree for item to be included
+  perspectives: []            # Named perspectives for each agent run
+                              # e.g., ["conservative", "progressive", "user-advocate"]
+                              # If empty, agents run with the same prompt (diversity from temperature)
+                              # The evolve orchestrator runs the skill N times, passing each
+                              # perspective as context. Items present in >= agreement_threshold
+                              # fraction of outputs are included in the final result.
+                              # Consensus mode multiplies cost by N (tracked in cost_ledger).
 ```
 
 ### Required vs Optional Summary

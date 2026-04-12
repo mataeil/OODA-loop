@@ -116,7 +116,9 @@
     "lock_timeout_minutes": 30,
     "max_chain_depth": 3,
     "max_silent_failures": 3,
-    "generated_file_patterns": []
+    "generated_file_patterns": [],
+    "enable_rollback": false,
+    "risk_rules": []
   },
   "progressive_complexity": {
     "current_level": 0,

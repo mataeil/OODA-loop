@@ -837,6 +837,61 @@ Action: `gh pr merge {n} --merge`. Print: "Deploy manually with /run-deploy."
 level < 3, implementation PR):
 Keep as draft. Print: "PR #{n} requires human review."
 
+### 4-C2: Rollback Protocol
+
+When `config.safety.enable_rollback` is true (default false), the engine
+maintains checkpoints for post-merge recovery.
+
+**Pre-action checkpoint** (before Step 4-B execution):
+```
+if config.safety.enable_rollback:
+  checkpoint = {
+    cycle: cycle_count,
+    branch: current git branch,
+    commit_sha: HEAD commit SHA,
+    timestamp: now,
+    state_snapshot: {
+      confidence: copy of confidence.json,
+      action_queue: copy of action_queue.json pending items
+    }
+  }
+
+  -- Read or create checkpoints.json
+  checkpoints_path = agent/state/evolve/checkpoints.json
+  if checkpoints_path does not exist:
+    write { "schema_version": "1.0.0", "checkpoints": [] }
+
+  checkpoints.append(checkpoint)
+  -- Retain last 5 only
+  if len(checkpoints) > 5: remove oldest
+  Write checkpoints.json
+```
+
+**Automatic rollback trigger** (after Risk Tier 1 auto-merge):
+```
+if PR was auto-merged AND health check fails:
+  Print "[Rollback] Health check failed after auto-merge of PR #{n}."
+  -- Revert the merge commit
+  git revert --no-edit HEAD
+  git push origin HEAD
+  -- Restore state from checkpoint
+  restore confidence.json from checkpoint.state_snapshot.confidence
+  restore action_queue.json pending from checkpoint
+  -- Create HALT file
+  Create HALT: "Auto-rollback: PR #{n} merged but health check failed. Reverted to {checkpoint.commit_sha}."
+  Print "[Rollback] Reverted PR #{n}. HALT created. Human review required."
+```
+
+**Manual rollback** via `/ooda-config rollback {cycle}`:
+```
+1. Find checkpoint by cycle number in checkpoints.json
+2. If not found: "No checkpoint for cycle {cycle}" — exit
+3. Confirm: "Rollback to cycle {cycle} (commit {sha})? This reverts all changes since. (yes/no)"
+4. git reset --hard {checkpoint.commit_sha}
+5. Restore state files from checkpoint snapshot
+6. Print "Rolled back to cycle {cycle}."
+```
+
 ### 4-D: Execution Output
 
 ```
