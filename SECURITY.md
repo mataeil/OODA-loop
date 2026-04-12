@@ -129,6 +129,51 @@ persistently.
 
 ---
 
+### Threat 8: Cross-Domain Cascade Amplification (v1.1.0)
+
+**Risk.** A cascade event (e.g., entity rename) triggers +3.0 score bonus on
+multiple dependent domains simultaneously. If cascades are chained, bonuses can
+stack, causing runaway domain selection and bypassing normal rotation.
+
+**Mitigation.**
+- Cascade bonus is one-shot: consumed after the affected domain runs once.
+- Cascades auto-resolve when all affected domains have executed since the event.
+- `domain_dependencies` is explicitly configured by the operator (not auto-detected).
+- Maximum cascade chain depth matches `max_chain_depth` (default 3).
+
+---
+
+### Threat 9: Rollback Abuse (v1.1.0)
+
+**Risk.** The rollback protocol (`/ooda-config rollback {cycle}`) could revert
+intentional changes or be triggered repeatedly to stall progress.
+
+**Mitigation.**
+- Rollback is opt-in (`safety.enable_rollback: false` by default).
+- Manual rollback requires explicit confirmation ("yes/no" prompt).
+- Auto-rollback only fires after auto-merged PRs with health check failure —
+  not for draft PRs or manually-merged PRs.
+- Only 5 checkpoints are retained. Rollback beyond 5 cycles is not possible.
+- Rollback creates a HALT file, requiring human review before resuming.
+
+---
+
+### Threat 10: Observation Saturation Bypass (v1.1.0)
+
+**Risk.** The saturation circuit breaker auto-generates a HALT file at 15
+consecutive observe-only cycles. A malicious or misconfigured skill could
+produce minimal "output" to reset the counter while not producing genuinely
+useful work, effectively bypassing the breaker.
+
+**Mitigation.**
+- The saturation counter resets only on meaningful events: PR created, actions
+  extracted, new alerts generated, or confidence changed.
+- "Success" with unchanged state does NOT reset the counter.
+- The warn/boost/halt thresholds are configurable via `config.saturation` so
+  operators can tighten them for their use case.
+
+---
+
 ## Safety Mechanisms
 
 ### HALT File
@@ -249,6 +294,53 @@ your budget; setting it to `0` disables the hard stop (not recommended).
 Individual skills can also declare a `safety.cost_limit_usd` in their contract
 (e.g., `scan-health` defaults to `$0.02`, `dev-cycle` to `$0.10`). This provides
 a per-invocation cap in addition to the global daily limit.
+
+---
+
+### Saturation Circuit Breaker (v1.1.0)
+
+Prevents the engine from running indefinitely in observe-only mode without
+producing actionable output:
+
+| Threshold | Cycles | Action |
+|-----------|--------|--------|
+| Warn | 5 | Memo: "Observation saturation detected" |
+| Boost | 10 | Action queue items +5.0, implementation boosted |
+| Halt | 15 | HALT file auto-created (requires human review) |
+
+Thresholds are configurable via `config.saturation`. Set `auto_halt: false`
+to disable the automatic HALT at 15 cycles (warning and boost still fire).
+
+---
+
+### Alert Recency Dampener (v1.1.0)
+
+Prevents alert-driven domain monopoly:
+- Alert bonus is dampened for recently-executed domains (linear decay over
+  `signals.alert_cooldown_hours`, default 4 hours).
+- After `signals.max_consecutive_alert_cycles` (default 3) consecutive
+  alert-driven selections, the alert auto-acknowledges.
+- Critical severity alerts bypass the dampener entirely.
+
+---
+
+### Entropy Balance Penalty (v1.1.0)
+
+Prevents any single domain from monopolizing cycle execution:
+- Formula: `-B × (domain_share - 1/N)` where B = `scoring.balance_weight` (default 5.0).
+- A domain running 50% of cycles in a 5-domain setup (expected: 20%) gets
+  -1.5 penalty per cycle until it drops closer to fair share.
+- Domains running less than expected get a proportional bonus.
+
+---
+
+### Rollback Protocol (v1.1.0)
+
+Opt-in via `safety.enable_rollback: true`. Creates pre-action checkpoints
+(last 5 retained) for post-merge recovery:
+- Auto-revert: if health check fails after auto-merge, reverts the merge
+  commit, restores state, and creates HALT file.
+- Manual: `/ooda-config rollback {cycle}` restores from checkpoint.
 
 ---
 

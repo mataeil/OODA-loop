@@ -33,6 +33,16 @@ Requirements:
 - Observe-phase skills must include a Step 0.5 (Adaptive Lens) section that reads
   `agent/state/{domain}/lens.json`
 
+**New in v1.1.0 — Optional Contract Fields:**
+- `data_classification` — declare `level: internal|api|external` for security-aware
+  query routing. Skills that call external APIs or web search should use `external`.
+  At Level < 3, external skills require human approval.
+- `execution_mode: consensus` — run the skill N times with different perspectives
+  and aggregate only agreed-upon items. Ideal for design reviews, UX audits, and
+  strategic decisions. See `agent/contracts/schema.md` for configuration.
+- `chain_triggers` — conditional chains evaluated against skill output JSON.
+  Use `condition: "field >= value AND other == 'string'"` syntax.
+
 ### Tier 2: Documentation
 
 Good documentation lowers the barrier for everyone. Contributions here have broad impact.
