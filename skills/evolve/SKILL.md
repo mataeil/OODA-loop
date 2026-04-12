@@ -386,6 +386,59 @@ For each action in action-queue with status "proposed" (has pr_number):
 - PR has review comments -> summarize feedback in memos.
 - PR still open -> no change.
 
+### 2-B3: Cross-Domain Cascade Detection
+
+If `config.domain_dependencies` is defined, check for cascade events that
+affect multiple domains simultaneously.
+
+```
+if config.domain_dependencies exists:
+  -- Read cascades.json (create if missing)
+  cascades_path = agent/state/evolve/cascades.json
+  if cascades_path does not exist:
+    write { "schema_version": "1.0.0", "cascades": [] }
+
+  -- Check for new cascade events from executed skill output
+  for each domain_dep in config.domain_dependencies:
+    source = domain_dep key
+    depends_on = domain_dep.depends_on (array of domain names)
+    cascade_events = domain_dep.cascade_events (array of event types)
+
+    -- Detect cascade: if source domain's state changed significantly
+    if source was executed this cycle AND state changed:
+      for each event_type in cascade_events:
+        -- Pattern match against domain state changes
+        if event_type matches observed change (e.g., entity_rename, schema_change):
+          cascade = {
+            id: "C-{date}-{seq}",
+            event_type: event_type,
+            source_domain: source,
+            affected_domains: depends_on,
+            details: description of what changed,
+            status: "pending",
+            created_at: now
+          }
+          cascades.append(cascade)
+          Print "[Orient] Cascade detected: {event_type} from {source} → affects {depends_on}"
+
+  -- Apply cascade scoring bonus to affected domains
+  for each pending cascade:
+    for each affected_domain in cascade.affected_domains:
+      -- Add +3.0 bonus to affected domain's score (via memo)
+      memos.score_adjustments[affected_domain] = (memos.score_adjustments[affected_domain] or 0) + 3.0
+      Print "[Orient] Cascade bonus: {affected_domain} +3.0 (from {cascade.source_domain} {cascade.event_type})"
+
+    -- Check if all affected domains have run since cascade was created
+    all_updated = all(
+      domain.last_run > cascade.created_at
+      for domain in cascade.affected_domains
+    )
+    if all_updated:
+      cascade.status = "resolved"
+      cascade.resolved_at = now
+      Print "[Orient] Cascade resolved: {cascade.id}"
+```
+
 ### 2-C: Goal Progress
 
 ```
@@ -879,15 +932,36 @@ Store in memos.json.history (cap at 10). Each entry:
 
 If executed skill was NOT implementation's primary_skill:
 - Parse output for actionable items. Assign RICE scores:
-  `RICE = (Reach * Impact * Confidence) / max(Effort, 0.5) * 100`
+
+  **Base RICE formula:**
+  `base_RICE = (Reach * Impact * Confidence) / max(Effort, 0.5) * 100`
   (Effort is floored at 0.5 to prevent division-by-zero or inflated scores. The ×100 normalizes scores to the same scale used by plan-backlog and chain triggers.)
+
+  **Extended RICE dimensions** (optional, project-specific):
+  If `config.scoring.rice_extensions` is defined, apply extension multiplier:
+  ```
+  extension_bonus = sum(extension.score * extension.weight for each rice_extension)
+  RICE = base_RICE * (1 + extension_bonus)
+  ```
+  Extensions are defined in config.json:
+  ```json
+  "rice_extensions": {
+    "timing": { "weight": 0.3 },
+    "novelty": { "weight": 0.2 }
+  }
+  ```
+  Each skill provides extension scores in its output (e.g., `timing: 0.8, novelty: 0.5`).
+  If no extensions defined or no extension scores in output, `RICE = base_RICE`.
+
 - Dedup: tokenize titles to lowercase keyword sets (strip stop words: "the", "a", "an", "is", "for", "in", "to", "of"). Compute Jaccard similarity against each existing queue item: `|A ∩ B| / |A ∪ B|`. If >= 0.8, treat as duplicate — keep existing item (lower ID wins), skip new extraction.
 - Each extracted action MUST include these fields:
   `{ id, title, source_domain, rice_score, effective_rice: rice_score,
      related_files, status: "pending", extracted_at: ISO_8601,
-     pr_number: null, decay_applied: 0.0 }`
+     pr_number: null, decay_applied: 0.0, risk_tier: null }`
   Note: `effective_rice` is initialized to equal `rice_score` at extraction time.
   Step 6-C6 (decay) will later adjust it based on age.
+  `risk_tier` is set by matching related_files against `config.safety.risk_rules` patterns
+  (if defined). Null means no risk classification assigned.
 - Add to action_queue.json `pending` array. Cap at 20 (remove lowest effective_rice as "superseded").
 
 If implementation skill was executed: skip (it manages its own queue).

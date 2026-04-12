@@ -82,6 +82,16 @@ safety:                       # (merged with required safety block above)
   max_lines: 500              # PR size guard. Inherits from config if omitted.
 
 domains: []                   # Which config domains this skill serves (for routing)
+
+data_classification:          # Security classification for skill's data access
+  level: internal             # internal | api | external
+                              #   internal: reads only local files/SQLite (safest)
+                              #   api: calls first-party or trusted APIs
+                              #   external: calls third-party APIs or web search (requires Level >= 2)
+  pii_handling: false         # true if skill processes personally identifiable information
+  external_apis: []           # List of external APIs called (for audit trail)
+                              # At Level < 3, skills with level: external require human approval.
+                              # At Level 3, external skills run autonomously but are logged to cost_ledger.
 ```
 
 ### Required vs Optional Summary

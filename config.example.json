@@ -70,6 +70,7 @@
       "description": "Competitor monitoring and intelligence. Run /ooda-skill create scan-competitors to configure."
     }
   },
+  "domain_dependencies": {},
   "implementation": {
     "enabled": false,
     "weight": 1.5,
