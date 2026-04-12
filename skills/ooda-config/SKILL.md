@@ -159,6 +159,130 @@ Wipe the lens snapshot for the named domain, forcing a fresh start on the next c
 
 ---
 
+## Action Queue Management
+
+### Step J — action list
+
+Print pending actions from `agent/state/evolve/action_queue.json`:
+
+```
+[Action Queue] {pending_count} pending, {completed_count} completed
+
+| # | ID     | Title                        | RICE  | Age  | Status  |
+|---|--------|------------------------------|-------|------|---------|
+| 1 | a15-1  | Update context.json names    | 50400 | 3.2d | pending |
+| 2 | a17-1  | Pipeline FTS index           | 25200 | 3.0d | approved |
+```
+
+Show `effective_rice` (with decay applied) and age since `extracted_at`.
+
+---
+
+### Step K — action approve {id}
+
+Set action status to `"approved"`. Approved items are prioritized over pending
+items in dev-cycle selection regardless of RICE score.
+
+```
+1. Find action by id in action_queue.pending
+2. If not found: "Action not found: {id}" — exit
+3. Set status = "approved", approved_at = now
+4. Boost effective_rice by 20% (item.effective_rice *= 1.2)
+5. Print "Approved: {title} (effective RICE: {new_rice})"
+```
+
+---
+
+### Step L — action defer {id} [days]
+
+Defer an action for N days (default 7). Deferred items are excluded from
+dev-cycle selection until their defer period expires.
+
+```
+1. Find action by id
+2. Set status = "deferred", deferred_until = now + N days
+3. Print "Deferred: {title} until {date} ({N} days)"
+```
+
+---
+
+### Step M — action reject {id} [reason]
+
+Move action to completed with status `"rejected_by_human"`.
+
+```
+1. Find action by id
+2. Move to completed array with status = "rejected_by_human", reason = reason
+3. Print "Rejected: {title} — {reason or 'no reason given'}"
+```
+
+---
+
+### Step N — action prioritize {id}
+
+Move action to top of queue by setting effective_rice above current highest.
+
+```
+1. Find action by id
+2. Set effective_rice = max(all pending effective_rice) + 1.0
+3. Re-sort pending by effective_rice descending
+4. Print "Prioritized: {title} → top of queue (RICE: {new_rice})"
+```
+
+---
+
+### Step O — mode {name}
+
+Switch season/phase mode. Mode overrides domain weights and settings.
+
+```
+1. Read config.season_modes.modes
+2. If modes not configured: "No season modes defined. Add season_modes to config.json." — exit
+3. If {name} not in modes: "Unknown mode: {name}. Available: {list}" — exit
+4. Back up config.json
+5. Set config.season_modes.current_mode = {name}
+6. Print applied overrides (weight changes, disabled domains)
+7. Write + validate JSON
+8. Print "Mode changed: {old} → {name}"
+```
+
+---
+
+## Step G — validate (extended)
+
+Run checks in order; print `[PASS]` or `[FAIL] <reason>` for each:
+
+1. config.json exists and is readable
+2. Parses as valid JSON
+3. `schema_version` field present
+4. `project.name`, `project.locale`, `project.timezone` all present
+5. `safety.halt_file`, `safety.confidence_threshold`, `safety.max_prs_per_cycle` present
+6. Value ranges: `confidence_threshold` in [0.0, 1.0]; `max_prs_per_cycle` >= 1; `min_cycle_interval_minutes` >= 1
+7. If present, `health_check_timeout_seconds` is a number in [2, 30]
+8. If present, `test_timeout_seconds` is a number >= 10
+9. If present, `deploy_monitor_timeout_seconds` is a number >= 60
+10. If present, `deploy_health_wait_seconds` is a number >= 5
+11. If present, `deploy_workflow_inputs` is a plain object (not array, not null)
+12. If present, `safety.lock_timeout_minutes` is a number >= 1
+13. At least one domain defined
+14. Each domain has `weight`, `primary_skill`, `state_file`, `enabled`
+15. Every enabled domain's `primary_skill` is in `safety.skill_allowlist`
+16. `progressive_complexity.current_level` is 0–3
+17. No sensitive field holds a raw token (must use `$ENV_VAR` form)
+18. At least one domain has `fallback: true` (confidence gate escape)
+19. No duplicate `branch_prefix` values across domains
+20. `signals.health_alert_bonus` should be <= 2× max domain weight (monopoly risk)
+21. `memory.contrarian_check_interval` is in range [1, 100]
+22. `memory.action_queue_decay_days` > 0 and `action_queue_decay_amount` in (0, 1]
+23. If `implementation.enabled`, `progressive_complexity.current_level` must be 3
+24. `memory.working_memory_size` >= 5 (minimum for pattern detection)
+25. If `saturation` block present, `warn_threshold < boost_threshold < halt_threshold`
+
+Final: `Validation: <N> passed, <M> failed`
+On any failure append: `Run /ooda-config show to review your settings.`
+
+---
+
 ## Usage
 
 ```
@@ -171,4 +295,10 @@ Wipe the lens snapshot for the named domain, forcing a fresh start on the next c
 /ooda-config validate              Validate config.json structure and values
 /ooda-config lens review {domain}  Show lens.json for a domain with evidence trails
 /ooda-config lens reset {domain}   Wipe lens.json for a domain (start fresh)
+/ooda-config action list           List pending actions with RICE and age
+/ooda-config action approve {id}   Approve action for priority execution
+/ooda-config action defer {id} [N] Defer action for N days (default 7)
+/ooda-config action reject {id}    Reject action with optional reason
+/ooda-config action prioritize {id} Move action to top of queue
+/ooda-config mode {name}           Switch season/phase mode
 ```

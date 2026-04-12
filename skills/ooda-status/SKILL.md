@@ -112,22 +112,31 @@ Print the dashboard using box-drawing characters exactly as shown below.
 Replace `{placeholders}` with the computed values from Step 2.
 
 ```
-╔══════════════════════════════════════════╗
-║  OODA-loop status                     ║
-╠══════════════════════════════════════════╣
-║ Cycle: #{N}  Last: {ago}  Level: {N}     ║
-╠══════════════════════════════════════════╣
-║ Domain           Score  Conf  Last  Status║
-║ {domain_name}    {score} {conf} {ago} {sym}║
-╠══════════════════════════════════════════╣
-║ Actions: {N} pending, {N} proposed       ║
-║ Next: {top_action_title} (RICE {score})  ║
-╠══════════════════════════════════════════╣
-║ Alerts: {count_or_none}                  ║
-║ HALT: {ACTIVE / inactive}                ║
-║ Cost: ${spent}/${limit} today            ║
-╚══════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════╗
+║  OODA-loop status                                    ║
+╠══════════════════════════════════════════════════════╣
+║ Cycle: #{N}  Last: {ago}  Level: {N}  Vel: {N}/day   ║
+╠══════════════════════════════════════════════════════╣
+║ Domain           Score  Conf  Trend  Last  Status    ║
+║ {domain_name}    {score} {conf} {↑↓→}  {ago} {sym}   ║
+╠══════════════════════════════════════════════════════╣
+║ Actions: {N} pending, {N} proposed  Oldest: {age}d   ║
+║ Next: {top_action_title} (RICE {score})              ║
+╠══════════════════════════════════════════════════════╣
+║ Saturation: {N} observe-only cycles {bar}            ║
+║ Alerts: {count_or_none}                              ║
+║ HALT: {ACTIVE / inactive}                            ║
+║ Cost: ${spent}/${limit} today (${rate}/h)             ║
+╚══════════════════════════════════════════════════════╝
 ```
+
+**New columns and rows explained:**
+
+- **Vel (Velocity)**: cycles per day = `total_cycles / days_since_first_cycle`. Helps detect runaway loops or idle periods.
+- **Trend**: confidence direction over last 5 cycles. `↑` = increased, `↓` = decreased, `→` = unchanged. Computed by comparing current confidence to the confidence 5 cycles ago (from decision_log snapshots).
+- **Oldest**: age of the oldest pending action in action_queue, in days. Shows `—` if queue is empty. Highlights aging items that may need human review.
+- **Saturation**: `consecutive_observe_only_cycles` from state.json. Render as a progress bar toward `saturation.halt_threshold` (e.g., `████░░░░░░ 40%`). Shows `0` if no saturation.
+- **$/h (Cost rate)**: `cost_ledger.total_estimated_usd / hours_since_midnight_utc`. Helps predict whether daily limit will be hit.
 
 One row per enabled domain. Pad domain names and numbers so columns align.
 If HALT is active, write `HALT: ACTIVE` (all caps, no color codes needed -- emphasis via caps).

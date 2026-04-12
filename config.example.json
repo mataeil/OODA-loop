@@ -172,6 +172,16 @@
     "action_queue_decay_days": 14,
     "action_queue_decay_amount": 0.05
   },
+  "season_modes": {
+    "enabled": false,
+    "current_mode": "default",
+    "modes": {
+      "default": {
+        "weight_overrides": {},
+        "disabled_domains": []
+      }
+    }
+  },
   "test_command": "npm test",
   "test_timeout_seconds": 300,
   "health_endpoints": [],

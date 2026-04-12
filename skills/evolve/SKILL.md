@@ -638,14 +638,20 @@ if winner confidence < config.safety.confidence_threshold:
 
 ### 3-H: Dry-Run Exit
 
+Invocation: `/evolve --dry-run` or `/evolve dry-run`
+
 ```
 if invoked with --dry-run:
   Print score table + "Would execute: {skill}". Chain if any.
-  Print "[Dry-run] No changes applied. State files not modified."
-  Skip Steps 4-5. In Step 6: update ONLY metrics.json (increment
-  total_cycles) and CHANGELOG.md (mark result as "dry-run"). Do NOT
-  update confidence.json, memos.json, action_queue.json, or
-  decision_log. Do NOT git commit or push. Delete lock file.
+  Print chain_triggers conditions and whether they would fire.
+  Print confidence snapshot for all domains.
+  Print saturation counter: "Observe-only streak: {N} cycles"
+  Print "[Dry-run] No changes applied. No state files modified."
+
+  -- TRUE dry-run: do NOT modify ANY state files.
+  -- Previous behavior updated metrics.json and CHANGELOG.md which
+  -- was not truly "dry". Now: zero writes, zero side effects.
+  -- Delete lock file only.
   EXIT.
 ```
 
@@ -795,14 +801,56 @@ Keep as draft. Print: "PR #{n} requires human review."
 
 ### 5-A: Skill Gap Analysis
 
-Check: execution errors (missing capability), chain stopped early (broken
-connection), data insufficient (missing collection), no skill matched domain.
+**This step MUST execute on every cycle.** Production deployments showed 209
+cycles with zero skill_gaps detected. The gap detection must be more proactive.
+
+Check for gaps across multiple signal sources:
 
 ```
+-- Initialize skill_gaps.json if missing
+if skill_gaps.json does not exist or is malformed:
+  Write: {"schema_version": "1.0.0", "gaps": []}
+
+gaps_detected = []
+
+-- Source 1: execution errors (missing capability, chain failure, timeout)
+if Step 4 produced an error:
+  gaps_detected.append({
+    name: "execution_error_{skill}",
+    type: "execution_failure",
+    detail: error message
+  })
+
+-- Source 2: domain without recent execution (starvation)
+for each active domain:
+  if domain not executed in last 10 cycles (from decision_log):
+    gaps_detected.append({
+      name: "domain_starvation_{domain}",
+      type: "coverage_gap",
+      detail: "Domain not executed in {N} cycles"
+    })
+
+-- Source 3: action queue items aging beyond 2x decay_days without progress
+for each pending item older than 2 * config.memory.action_queue_decay_days:
+  gaps_detected.append({
+    name: "stale_action_{item.id}",
+    type: "action_aging",
+    detail: "Action '{item.title}' pending for {age} days"
+  })
+
+-- Source 4: chain trigger conditions met but chain not executed (blocked)
+if chain_triggers evaluated but not executed (due to confidence gate or disabled impl):
+  gaps_detected.append({
+    name: "chain_blocked_{trigger.target}",
+    type: "chain_gap",
+    detail: "Chain to {trigger.target} blocked: {reason}"
+  })
+
 for each detected gap:
   if gap_name exists in skill_gaps.json: increment frequency, update last_seen
   else: add with frequency=1, first_seen=now
-Print "[Reflect] Gaps: {count}. Top: {highest_freq_gap}" or "No new gaps."
+
+Print "[Reflect] Gaps: {len(gaps_detected)}. Top: {highest_freq_gap}" or "No new gaps."
 ```
 
 ### 5-B: Auto Skill Proposal
@@ -951,18 +999,28 @@ Persist queue: pending sorted by RICE desc (cap 20), in_progress, completed (kee
 
 ### 6-C3: CHANGELOG.md
 
-Prepend entry:
+Prepend entry using this **mandatory schema** (do not abbreviate or compress
+over time — consistent format enables automated parsing and trend detection):
 
 ```
-## Cycle #{N} -- {date} -- {domain}
-- **Skill**: {skill} {chain}
-- **Result**: {success/error/skip}
-- **Score**: {score} (confidence: {conf})
-- **Orient**: {summary}
+## Cycle #{N} -- {YYYY-MM-DD HH:MM UTC} -- {domain}
+- **Skill**: {skill}
+- **Chain**: {chain_executed or "none"}
+- **Result**: {success/error/skip/observe_only/dry-run}
+- **Score**: {score} (staleness: {staleness_term}, alert: {dampened_alert}, balance: {balance_penalty})
+- **Confidence**: {conf} (trend: {↑↓→}, micro-adj: {delta or "none"})
+- **Orient**: {summary — 1-2 sentences explaining WHY this domain was selected}
 - **PR**: #{n} (Risk Tier {tier}) or "none"
+- **Elapsed**: {seconds}s
+- **Saturation**: {consecutive_observe_only_cycles} observe-only cycles
+- **Cost**: +${cycle_cost} (total today: ${daily_total})
 ```
 
 Cap at 50 entries (remove oldest from bottom).
+
+Every field is REQUIRED. This prevents the format drift observed in production
+where later cycles had progressively less detail. The Orient field must contain
+the reasoning, not just the domain name.
 
 ### 6-C4: Memory Cascade
 
