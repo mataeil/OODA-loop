@@ -18,6 +18,10 @@ safety:
   read_only: true
 domains: [your_domain]
 chain_triggers: []
+data_classification:
+  level: internal
+  pii_handling: false
+  external_apis: []
 ---
 
 # your-skill-name: Brief Title

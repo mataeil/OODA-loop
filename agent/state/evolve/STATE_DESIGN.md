@@ -18,8 +18,71 @@ schemas, retention policies, cascade rules, and the rationale behind each design
 | metrics.json | Long-term counters | Permanent (append-only counters) | None (terminal) |
 | episodes.json | Weekly episode summaries (Tier 2) | 52 weeks | principles.json |
 | principles.json | Permanent learned rules (Tier 3) | Permanent | None (terminal) |
+| cost_ledger.json | Daily API cost tracking | Daily (resets at 00:00 UTC) | None |
+| cascades.json | Cross-domain cascade events | Until resolved | None |
+| checkpoints.json | Pre-action rollback checkpoints | Last 5 | None |
 | CHANGELOG.md | Human-readable activity log | 50 entries | None |
 | `agent/state/{domain}/lens.json` | Per-domain Adaptive Lens (focus items, thresholds, signals) | Permanent (overwritten by evolve) | None |
+
+### New in v1.1.0
+
+**state.json** gained `consecutive_observe_only_cycles` field (integer, default 0).
+Tracks saturation for the circuit breaker.
+
+**action_queue.json** items gained new fields:
+- `last_decay_at` — ISO 8601 timestamp of last decay application (prevents double-decay)
+- `risk_tier` — null or 1/2/3 from file pattern matching against `config.safety.risk_rules`
+- New statuses: `"approved"`, `"deferred"`, `"rejected_by_human"`, `"review_feedback"`
+
+**cost_ledger.json** — Entries now recorded every cycle (was previously empty in production):
+```json
+{
+  "schema_version": "1.0.0",
+  "date": "2026-04-13",
+  "entries": [
+    { "cycle_id": 5, "timestamp": "...", "skill": "/scan-health", "chain": [], "estimated_usd": 0.02 }
+  ],
+  "total_estimated_usd": 0.15
+}
+```
+
+**cascades.json** — Tracks cross-domain cascade events:
+```json
+{
+  "schema_version": "1.0.0",
+  "cascades": [
+    {
+      "id": "C-2026-04-13-001",
+      "event_type": "entity_rename",
+      "source_domain": "agency_tracking",
+      "affected_domains": ["audit_intelligence", "document_research"],
+      "details": "Agency renamed: X -> Y",
+      "status": "pending",
+      "created_at": "...",
+      "resolved_at": null
+    }
+  ]
+}
+```
+
+**checkpoints.json** — Pre-action rollback snapshots (opt-in via `config.safety.enable_rollback`):
+```json
+{
+  "schema_version": "1.0.0",
+  "checkpoints": [
+    {
+      "cycle": 42,
+      "branch": "main",
+      "commit_sha": "abc123",
+      "timestamp": "...",
+      "state_snapshot": {
+        "confidence": { "service_health": 0.8, "backlog": 0.7 },
+        "action_queue_pending": [...]
+      }
+    }
+  ]
+}
+```
 
 ---
 
