@@ -175,6 +175,27 @@ Read context files before writing any code:
 Analyze what needs to change based on the action title and source report, then
 implement the changes (write and/or edit files).
 
+**Protected paths enforcement:**
+
+Before writing any file, check against `config.safety.protected_paths`.
+This prevents dev-cycle from modifying safety-critical files that could
+compromise the framework's integrity (self-modification prevention).
+
+```
+protected = config.safety.protected_paths    -- e.g., ["agent/safety/*", "skills/evolve/*", "agent/contracts/*"]
+
+before writing or editing any file:
+  for each pattern in protected:
+    if file path matches glob pattern:
+      Print "BLOCKED: {file} matches protected path '{pattern}'. Skipping."
+      Print "Protected paths cannot be modified by dev-cycle, even at Level 3."
+      Add to PR body notes: "⚠ Protected path {file} was NOT modified (blocked by safety policy)."
+      DO NOT write/edit this file — continue to next file.
+```
+
+If ALL planned files are protected, mark the action as "blocked" with memo
+"All target files are protected paths" and EXIT cleanly.
+
 **Size limit enforcement:**
 
 Track changes as you write. After each file edit, run `git diff --stat` on

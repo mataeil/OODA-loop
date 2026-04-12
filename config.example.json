@@ -77,6 +77,7 @@
     "observe_loop_escape_bonus": 5.0
   },
   "scoring": {
+    "staleness_curve": "logarithmic",
     "goal_weight": 0.3,
     "confidence_weight": 0.2,
     "hours_if_never_run": 168,
@@ -92,7 +93,8 @@
     "merge_boost": 0.1,
     "reject_penalty": 0.2,
     "min": 0.1,
-    "max": 1.0
+    "max": 1.0,
+    "observation_micro_adjustments": true
   },
   "safety": {
     "halt_file": "agent/safety/HALT",

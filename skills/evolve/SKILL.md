@@ -318,6 +318,30 @@ for domains not yet in confidence.json:
 
 If config.implementation.enabled: apply same logic to implementation PRs.
 
+### 2-B1: Observation-Based Micro-Adjustments
+
+When `config.confidence.observation_micro_adjustments` is true (default) AND
+`progressive_complexity.current_level < 3`, apply observation-based confidence
+updates. This prevents confidence stagnation in observation-only deployments
+where no PRs are created and PR-based updates never fire.
+
+```
+for each domain that was executed this cycle:
+  if skill produced actionable findings (actions extracted > 0 or alerts found):
+    confidence[domain] += 0.02   (cap at config.confidence.max)
+    Print "[Orient] {domain} produced findings -> confidence +0.02"
+  else if skill produced alerts (domain state has severity warning or critical):
+    confidence[domain] += 0.03   (cap at config.confidence.max)
+    Print "[Orient] {domain} alert detected -> confidence +0.03"
+  else if skill produced no new data (status unchanged from previous cycle):
+    confidence[domain] -= 0.01   (floor at config.confidence.min)
+    Print "[Orient] {domain} no new data -> confidence -0.01"
+```
+
+At Level 3 (autonomous mode), these micro-adjustments are suppressed to avoid
+double-counting with PR-based confidence updates. The PR merge/reject deltas
+(+0.1/-0.2) are the primary signal at Level 3.
+
 ### 2-B2: Action-Queue Sync
 
 For each action in action-queue with status "proposed" (has pr_number):
@@ -421,7 +445,21 @@ is on fire.
 For each enabled domain (after filtering):
 
 ```
-score = (hours_since_last * domain.weight)
+staleness_term:
+  if config.scoring.staleness_curve == "linear":
+    staleness = hours_since_last * domain.weight           -- legacy behavior
+  else:  -- "logarithmic" (default)
+    K = 10.0                                               -- scaling constant
+    T = 4.0                                                -- time constant (hours)
+    staleness = domain.weight * K * ln(1 + hours_since_last / T)
+
+  Reference values (logarithmic, weight=1.0):
+    1h → 2.23,  4h → 6.93,  12h → 13.86,  24h → 19.46,  168h → 37.62
+  The curve rises quickly for recently-stale domains but plateaus for very stale
+  ones, preventing extreme scores that caused domain monopoly in production
+  (e.g., 168h × 2.0 = 336 under linear).
+
+score = staleness
       + urgent_signal                              -- from 3-B (0 if none)
       + (goal_contribution * config.scoring.goal_weight)   -- from 3-C
       + (confidence * config.scoring.confidence_weight)
@@ -795,40 +833,129 @@ Cap at 50 entries (remove oldest from bottom).
 
 ### 6-C4: Memory Cascade
 
-**Tier 2 -- Episodes**: Compare current ISO week+year vs `episodes[-1].week_year`
-(or empty if no episodes). If different (or episodes array is empty), generate a
-weekly episode summary from working memory (last 20 entries in decision_log):
+**This step is MANDATORY on every cycle.** The episode and contrarian logic below
+must execute — do not skip even if the cycle was observe-only or no actions were
+taken. Production deployments showed 209 cycles with only 1 episode generated
+due to this step being skipped; the learning loop depends on it.
+
+**Tier 2 -- Episodes**: Compare current ISO week+year vs the most recent episode's
+`week_year` (read from `episodes.json`; treat missing file or empty array as "no
+episodes yet").
 
 ```
-episode = {
-  week_year: "2026-W14",
-  domain_distribution: { backlog: 3, test_coverage: 2, ... },
-  outcomes: { prs_merged: 2, prs_rejected: 0, actions_completed: 4 },
-  key_decisions: ["Chose backlog 3x due to high RICE", ...],
-  lessons: ["Rust parser needed manual config", ...]
-}
+current_week = ISO week+year (e.g., "2026-W15")
+last_episode_week = episodes[-1].week_year  OR  null if empty
+
+if current_week != last_episode_week:
+  -- Generate weekly summary from decision_log entries since last episode
+  -- (or from the oldest decision_log entry if no prior episode exists)
+
+  relevant_entries = decision_log entries where timestamp falls within last_episode_week
+                     (if last_episode_week is null, use ALL decision_log entries)
+
+  episode = {
+    week_year: last_episode_week OR current_week (the week being summarized),
+    cycle_range: [first_cycle_number, last_cycle_number],
+    domain_distribution: { backlog: 3, test_coverage: 2, ... },
+    outcomes: {
+      prs_merged: count,
+      prs_rejected: count,
+      actions_completed: count,
+      actions_extracted: count
+    },
+    key_decisions: [top 3 decisions by score, with domain and rationale],
+    lessons: [
+      -- Extract lessons from:
+      -- 1. Domains selected 3+ consecutive times (monopoly pattern)
+      -- 2. Domains never selected (starvation pattern)
+      -- 3. Confidence changes (what caused boost/penalty)
+      -- 4. Alert patterns (what triggered, how resolved)
+      -- 5. Any memos written during the week
+    ],
+    confidence_snapshot: { domain: score for each active domain }
+  }
+
+  -- Initialize episodes.json if file missing or malformed
+  if episodes.json does not exist or is not valid JSON:
+    write { "schema_version": "1.0.0", "episodes": [] }
+
+  Append episode to episodes.json.
+  Cap at config.memory.episode_retention_weeks (default 52).
+  If cap exceeded: evict oldest episode and trigger Tier 2b (principle extraction).
+
+  Print "[Reflect] Episode {week_year} generated: {cycle_count} cycles, {prs_merged} PRs, {lessons_count} lessons."
+else:
+  Print "[Reflect] Same week ({current_week}) — episode generation deferred."
 ```
 
-Append to episodes.json. Cap at `config.memory.episode_retention_weeks` (default 52).
-If cap exceeded: evict oldest episode and trigger principle extraction (Step 6-C4b).
+**Tier 2b -- Principle Extraction**: Triggered when:
+- Episode cap is exceeded (oldest episode evicted), OR
+- 5+ episodes exist (sufficient data for pattern detection), OR
+- Contrarian check found a dominant strategy (validation needed)
 
-**Tier 2b -- Principle Extraction** (triggered by episode eviction, gap resolution,
-or contrarian validation):
-- Scan episodes for recurring patterns: same lesson appears in >= 3 episodes.
-- Promote to principle in principles.json with confidence 0.3 (tentative).
-- Principle activates (used in Orient) after 3 confirmations raise confidence to >= 0.6.
-- Cap at 50 principles. Items with confidence < 0.1 are deprecated (removed).
-- Disconfirming evidence: -0.2; confirming: +0.1 (asymmetric, same as Adaptive Lens).
-- See STATE_DESIGN.md Section 5.3 for full extraction rules and confidence formulas.
+```
+-- Scan ALL episodes for recurring patterns
+for each unique lesson text across episodes:
+  occurrences = count of episodes containing this lesson (fuzzy match: 80% Jaccard similarity)
+  if occurrences >= 3:
+    if lesson not already in principles.json:
+      Add to principles.json: {
+        text: lesson,
+        confidence: 0.3,
+        source_episodes: [week_year list],
+        created_at: now,
+        last_confirmed: now
+      }
+      Print "[Reflect] New principle extracted: '{lesson}' (confidence 0.3, from {occurrences} episodes)"
+    else:
+      -- Confirming existing principle
+      principle.confidence += 0.1 (cap at 1.0)
+      principle.last_confirmed = now
+      Print "[Reflect] Principle confirmed: '{lesson}' -> confidence {new_confidence}"
 
-**Tier 3 -- Contrarian Check**: If `cycle_count % config.memory.contrarian_check_interval === 0`:
-- **Dominant strategy** = same domain won >= 5 of last 7 decisions (from decision_log).
-- If dominant found: generate counter-argument memo exploring what would happen if
-  the neglected lowest-scoring domain were chosen instead.
-- Store in memos.json: `{ type: "contrarian", domain: <neglected_domain>, argument: <what-if scenario>, expires_after_cycles: 3 }`.
-- If the neglected domain's confidence drops before memo expiry, the contrarian was
-  right — log as a negative signal for the dominant domain (orient adjustment -0.1).
-- If no dominant strategy detected: skip (no memo written).
+-- Initialize principles.json if missing
+if principles.json does not exist or malformed:
+  write { "schema_version": "1.0.0", "principles": [] }
+
+-- Deprecate weak principles
+for each principle in principles.json:
+  if not confirmed in last 10 episodes: principle.confidence -= 0.05
+  if principle.confidence < 0.1: remove (deprecated)
+
+Cap at 50 principles. Remove lowest-confidence first.
+```
+
+**Tier 3 -- Contrarian Check**: This check is MANDATORY when the modulo condition
+is met. Do not silently skip it.
+
+```
+if cycle_count % config.memory.contrarian_check_interval === 0:
+  Print "[Reflect] Contrarian check triggered (cycle {cycle_count})."
+
+  -- Dominant strategy = same domain won >= 5 of last 7 decisions
+  last_7 = decision_log[-7:]
+  domain_counts = count occurrences of each domain in last_7
+  dominant = domain with count >= 5 (if any)
+
+  if dominant found:
+    neglected = domain with lowest count in last_7 (excluding disabled domains)
+    -- Generate counter-argument: what would happen if neglected were chosen?
+    argument = "If {neglected} were chosen instead of {dominant}, it would
+                address: {neglected domain's staleness}, {pending actions for neglected},
+                {confidence trend for neglected}."
+    Store in memos.json: {
+      type: "contrarian",
+      domain: neglected,
+      dominant_domain: dominant,
+      argument: argument,
+      created_at: now,
+      expires_after_cycles: 3,
+      applied: false
+    }
+    Print "[Reflect] Contrarian: {dominant} dominated (5/{last_7_count}). Counter-argument for {neglected} stored."
+  else:
+    Print "[Reflect] Contrarian: no dominant strategy detected. No memo written."
+```
 
 ### 6-C5: Metrics Update
 
@@ -843,12 +970,37 @@ Set first_cycle_at if null. Set last_updated = now.
 
 ### 6-C6: Action Queue Decay
 
+Unconditionally run decay on every cycle (not conditionally on item age).
+The age check is inside the loop to prevent items from being missed when
+they are exactly at the threshold boundary.
+
 ```
-for each pending item older than config.memory.action_queue_decay_days:
-  periods_overdue = floor((age_days - decay_days) / decay_days) + 1
-  decay_factor = min(periods_overdue * config.memory.action_queue_decay_amount, 1.0)
-  item.effective_rice = item.rice_score * (1.0 - decay_factor)
+decay_days = config.memory.action_queue_decay_days       -- default 14
+decay_amount = config.memory.action_queue_decay_amount   -- default 0.05
+
+for each pending item in action_queue.pending:
+  -- ensure effective_rice is initialized (bug fix: missing in some legacy items)
+  if item.effective_rice is undefined or null:
+    item.effective_rice = item.rice_score
+
+  age_days = (now - item.extracted_at).total_days()
+  if age_days >= decay_days:                              -- ">=" not ">" (threshold fix)
+    periods_overdue = floor((age_days - decay_days) / decay_days) + 1
+    decay_factor = min(periods_overdue * decay_amount, 1.0)
+    new_effective = item.rice_score * (1.0 - decay_factor)
+
+    -- prevent double-decay within same period
+    if item.last_decay_at is not null:
+      days_since_decay = (now - item.last_decay_at).total_days()
+      if days_since_decay < decay_days: continue          -- skip, already decayed this period
+
+    item.effective_rice = new_effective
+    item.decay_applied = decay_factor
+    item.last_decay_at = now (ISO 8601)
+    Print "[Reflect] Decay: '{item.title}' effective_rice {old} -> {new_effective} (factor {decay_factor})"
+
   if item.effective_rice <= 0: move to completed as "superseded"
+
 Re-sort pending by effective_rice descending.
 ```
 
