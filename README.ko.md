@@ -231,7 +231,9 @@ HALT 파일은 여전히 있습니다. 쓸 필요가 없었을 뿐입니다.
 5. **행동(Act)** -- 선택된 스킬 실행. 신뢰도가 높으면 체인 실행. PR 리스크 티어 처리(자동 머지 / 수동 배포 / 사람 리뷰).
 6. **반성(Reflect)** -- 스킬 갭 업데이트, 메모 작성, 액션 추출, Adaptive Lens 업데이트, 메모리 캐스케이드.
 
-도메인 스코어링: `score = (마지막 실행 이후 시간 x 가중치) + 긴급 시그널 + (목표 기여 x 0.3) + (신뢰도 x 0.2) + 메모 조정`
+도메인 스코어링 (v1.1.0): `score = staleness + dampened_alert + (목표 × 0.3) + (신뢰도 × 0.2) + 메모 + 밸런스_페널티`
+
+Staleness는 대수 곡선을 기본 사용합니다. Alert 감쇠기가 도메인 독점을 방지합니다. 엔트로피 밸런스 페널티가 건강한 도메인 순환을 보장합니다.
 
 전체 용어집, 아키텍처 다이어그램, 공식 상세는 [CONCEPTS.md](CONCEPTS.md)를 참조하세요.
 
@@ -311,6 +313,23 @@ PR 제한, 허용목록, `lock_timeout_minutes`), `confidence`(초기값, 머지
 `notifications`(Telegram, `$ENV_VAR` 방식), `cost`(일일 한도, 경고 임계값).
 
 전체 스키마는 [config.example.json](config.example.json)을 참조하세요.
+
+---
+
+## 프로덕션 검증 (v1.1.0)
+
+두 개의 프로덕션 배포에서 209 사이클의 실전 데이터를 수집하여 v1.1.0 개선에 반영했습니다:
+
+| 배포 | 도메인 | 사이클 | PR | 성공률 |
+|------|--------|--------|-----|--------|
+| [fwd.page](https://fwd.page) | URL 단축기 | 144 | 28 (24 머지, 86%) | 100% |
+| Lynceus | 국정감사 자동화 | 65 | 0 (Level 2) | 100% |
+
+**프로덕션 데이터 기반 수정사항:**
+- **설계됐으나 미작동 기능 7개 복구** — episode, principles, adaptive lens, contrarian, cost ledger, chain, skill gaps
+- **스코어링 독점** — 단일 도메인이 36% 차지. 대수 staleness + 엔트로피 페널티 + alert 감쇠로 해결
+- **41사이클 관찰 포화** — circuit breaker가 5회 경고, 10회 부스트, 15회 정지
+- **신뢰도 정체** — Level < 3에서 관찰 기반 micro-adjustments로 고정 방지
 
 ---
 

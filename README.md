@@ -228,7 +228,9 @@ Every `/evolve` run executes one complete OODA cycle:
 5. **Act** -- Execute the winning skill. Run chain if confidence is high enough. Re-check HALT before each chain step. Handle PR risk tiers (auto-merge / manual deploy / human review).
 6. **Reflect** -- Update skill gaps, write memos, extract actions, update the Adaptive Lens, cascade memory.
 
-Domain scoring: `score = (hours_since_last x weight) + urgent + (goals x 0.3) + (confidence x 0.2) + memo_adjustment`
+Domain scoring (v1.1.0): `score = staleness + dampened_alert + (goals × 0.3) + (confidence × 0.2) + memo + balance_penalty`
+
+Staleness uses a logarithmic curve by default. Alert dampener prevents domain monopoly. Entropy balance penalty ensures healthy rotation.
 
 See [CONCEPTS.md](CONCEPTS.md) for the full glossary, architecture diagram, and formula details.
 
@@ -325,9 +327,26 @@ See [config.example.json](config.example.json) for the complete annotated schema
 | `[SKIP] Another evolve cycle is running` | Stale lock. Remove `agent/state/evolve/.lock` (auto-cleaned after 30 min). |
 | `[SKIP] Too soon` | Wait for `min_cycle_interval_minutes` (default 30) to elapse, or add a critical alert to bypass. |
 | `All scores below 0.5` | No domain needs attention yet. Normal on early cycles. |
-| Confidence stuck at 0.7 | Initial value. Merge or reject a PR to move it. |
+| Confidence stuck at 0.7 | At Level < 3, observation micro-adjustments (+0.02/-0.01) now apply automatically. At Level 3, merge or reject a PR. |
 | `/evolve` skips a domain | Check its `status` in config -- `available` means the skill has not been created yet. Run `/ooda-skill create <name>`. |
 | Cost limit hit | Check `agent/state/evolve/cost_ledger.json`. Resets at 00:00 UTC, or raise `cost.daily_limit_usd`. |
+
+---
+
+## Production Validation (v1.1.0)
+
+Two production deployments provided 209 cycles of real-world data that drove v1.1.0 improvements:
+
+| Deployment | Domain | Cycles | PRs | Success |
+|------------|--------|--------|-----|---------|
+| [fwd.page](https://fwd.page) | URL shortener | 144 | 28 (24 merged, 86%) | 100% |
+| Lynceus | Parliamentary audit (국정감사) | 65 | 0 (Level 2) | 100% |
+
+**What we fixed based on production data:**
+- **7 features designed but not working** — episode generation, principles extraction, adaptive lens, contrarian check, cost ledger, chain execution, skill gaps detection
+- **Scoring monopoly** — one domain took 36% of all cycles. Logarithmic staleness + entropy penalty + alert dampener fixed this
+- **41-cycle observation saturation** — circuit breaker now warns at 5, boosts at 10, halts at 15
+- **Confidence stagnation** — observation micro-adjustments prevent frozen confidence at Level < 3
 
 ---
 
