@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0.0",
+  "cycle_count": 42,
+  "last_cycle": "2026-04-19T06:00:00Z",
+  "cycle_in_progress": false,
+  "consecutive_observe_only_cycles": 0,
+  "decision_log": [
+    { "cycle": 42, "timestamp": "2026-04-19T06:00:00Z", "selected_domain": "service_health", "selected_skill": "/scan-health", "result": "success", "memo_written": false }
+  ]
+}

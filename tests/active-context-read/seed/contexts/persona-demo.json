@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0.0",
+  "kind": "demo_persona",
+  "name": "Demo Stakeholder",
+  "role": "product_owner",
+  "tone": "direct, data-driven",
+  "priorities": [
+    "reliability > features",
+    "weekly reviews over ad-hoc meetings"
+  ],
+  "notes": "Opaque blob — evolve does not interpret these fields; each skill reads what it needs."
+}

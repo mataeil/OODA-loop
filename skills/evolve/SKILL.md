@@ -205,14 +205,63 @@ Record `cycle_start_time = now`.
 
 ### 1-A: Domain State Reading
 
+**Season mode pre-apply (v1.2.0)**: Before iterating domains, check if
+`config.season_modes.enabled == true`. If so, resolve the active mode:
+
+```
+if config.season_modes.enabled:
+  mode_name = config.season_modes.current_mode or "default"
+  mode = config.season_modes.modes[mode_name]
+  weight_overrides = mode.weight_overrides or {}
+  disabled_by_season = set(mode.disabled_domains or [])
+  Print "[Observe] Season mode: {mode_name} ({len(weight_overrides)} weight overrides, {len(disabled_by_season)} disabled domains)"
+else:
+  weight_overrides = {}
+  disabled_by_season = set()
+```
+
+Apply overrides in-memory only (do NOT mutate config.json on disk). Each
+domain's effective weight becomes `weight_overrides.get(domain_name, domain_config.weight)`.
+
+**Active context pre-load (v1.2.0)**: Load stakeholder context blob if
+configured, so skills receive it via a standard context var.
+
+```
+if config.active_context and config.active_context.path:
+  try:
+    active_context_blob = read JSON from config.active_context.path
+    active_context.path_resolved = config.active_context.path
+    -- Check staleness for refresh_skill policy
+    if config.active_context.refresh_skill:
+      file_age_hours = hours since file mtime
+      if file_age_hours >= config.active_context.refresh_interval_hours:
+        Schedule a chain-trigger refresh via config.active_context.refresh_skill
+        (recorded as a memo, consumed by Step 4-B's chain logic)
+  except (file missing or malformed):
+    Print "[Observe] active_context not loadable: {error}. Proceeding without context."
+    active_context_blob = null
+else:
+  active_context_blob = null
+```
+
+The resolved `active_context_blob` is passed to every invoked skill in Step 4-B
+as a context variable (opaque blob; skills interpret domain-specifically).
+
 ```
 for each domain_name, domain_config in config.domains:
+  if domain_name in disabled_by_season:
+    log "[{domain}] Disabled by season mode '{mode_name}'. Skipping."
+    skip, do not score
   if domain_config.status == "disabled": skip entirely, do not score
   if domain_config.status == "available":
     log "[{domain}] Not yet configured. Skipping."
     skip, do not score
   if domain_config.status == "active": proceed normally
   # Legacy: if no status field, treat as "active" (backward compat)
+
+  # Season mode weight override (v1.2.0): replace the static weight in-memory
+  if domain_name in weight_overrides:
+    domain_config.weight = weight_overrides[domain_name]
 
   # Legacy: "enabled" field is superseded by "status" but still honored as fallback
   if not domain_config.enabled: skip
@@ -224,6 +273,27 @@ for each domain_name, domain_config in config.domains:
     (Legacy: if `last_run` is missing, also check `last_check` — older scan-health
     versions used this key. Treat either as the last-run timestamp.)
     Extract: status, run_count, alerts.
+
+  # Lens pre-init (v1.2.0): initialize the lens file here, before reading, so
+  # first cycles and domains with custom observe skills (which may not call the
+  # Step 5-E init helper) always have a valid lens file on disk. Production
+  # deployments observed 152 cycles with zero lens.json files created because
+  # the only init path was inside Step 5-E's observe-skill loop.
+  lens_path = agent/state/{domain_name}/lens.json
+  if lens_path does not exist:
+    mkdir -p agent/state/{domain_name}/
+    Write initial lens:
+    {
+      "schema_version": "1.0.0",
+      "domain": "{domain_name}",
+      "last_updated": now (ISO 8601),
+      "focus_items": [],
+      "learned_thresholds": [],
+      "discovered_signals": [],
+      "evidence": [],
+      "deprecated_items": []
+    }
+    Print "[Observe] Initialized lens for {domain_name}."
 
   Also read lens file: agent/state/{domain_name}/lens.json
   If lens exists and is valid JSON:
@@ -452,17 +522,40 @@ for each goal in goals.json where status == "active":
 
 ### 2-D: Memo Adjustments
 
-Read memos.json. The canonical format is:
-`{"schema_version":"1.0.0", "score_adjustments":{}, "history":[], "last_memo":null}`
+Read memos.json. The canonical format (v1.1.0, bumped in v1.2.0) is:
+`{"schema_version":"1.1.0", "score_adjustments":{}, "interventions":[], "history":[], "last_memo":null}`
 
-If the file has a `memos` array but no `score_adjustments` key (legacy format),
+If the file has `schema_version: "1.0.0"` and no `interventions` key, treat
+`interventions` as an empty list and leave the file's schema_version at 1.0.0
+until the next write (6-C) promotes it to 1.1.0 automatically.
+If the file has a `memos` array but no `score_adjustments` key (pre-v1.1.0 legacy),
 treat `score_adjustments` as empty `{}` and `history` as the `memos` array.
 
-Read `score_adjustments` -- one-shot bonuses/penalties keyed by domain.
-They will be applied in Step 3-A. After application, DELETE them (set to {}).
-They apply exactly once. If a key does not match any domain in config.domains,
-log `[WARN] Memo adjustment for unknown domain '{key}' -- ignored and cleared.`
-and discard it.
+**Two memo kinds:**
+
+1. **Score adjustments** (one-shot, consumed) — `score_adjustments: { domain: delta }`.
+   Applied once in Step 3-A. After application, DELETE them (set to {}). They do
+   not persist across cycles. If a key does not match any domain in
+   config.domains, log `[WARN] Memo adjustment for unknown domain '{key}' --
+   ignored and cleared.` and discard it.
+
+2. **Interventions** (multi-cycle, decremented) — `interventions: [{domain, delta, type, reason, created_at_cycle, expires_after_cycles, applied_count}]`.
+   For each entry, apply `delta` to the named domain's score in Step 3-A (same
+   place as score_adjustments — their effects sum). After application:
+   - `applied_count += 1`
+   - `expires_after_cycles -= 1`
+   - if `expires_after_cycles <= 0`: remove the intervention.
+   Interventions are written by Step 5-C (auto-starvation, monopoly-breaker,
+   contrarian) and by external operators. They formalize the "memo-as-active-
+   intervention" pattern observed in production (Lynceus cycles 61, 107 used
+   manual +1.0/−10.0 score deltas that spanned multiple cycles).
+
+Compute the combined `memo_adjustment[domain]` for Step 3-A as:
+```
+memo_adjustment[domain] = score_adjustments.get(domain, 0)
+                        + sum(iv.delta for iv in interventions if iv.domain == domain)
+```
+This value flows into the Step 3-A formula as the `memo_adjustment` term.
 
 ### 2-E: Orient Summary
 
@@ -631,6 +724,14 @@ Add implementation as virtual domain in score table.
 health_alert only applies to domains with fallback=true.
 queue_pressure/queue_age/observe_loop_escape only when config.implementation.enabled.
 
+**Season mode signal bonuses (v1.2.0)**: If the active season mode defines
+`signal_bonuses: { signal_key: value }`, merge those values on top of
+`config.signals.*` for this cycle only (in-memory). Example: a "launch" mode
+may set `signal_bonuses: { health_alert_bonus: 10.0, queue_pressure_bonus: 1.0 }`
+to temporarily amplify health alerts and dampen queue pressure. When the
+season flips back to default, the bonuses no longer apply — no disk writes
+are needed to revert.
+
 ### 3-C: Goal Contribution
 
 ```
@@ -769,9 +870,40 @@ Re-check HALT file. If appeared: EXIT immediately.
 Execute by calling the slash command:
 
 ```
+-- Rotation primitive (v1.2.0): if the winning domain has a rotation list,
+-- read the cursor, pass the focus_item as a context var, and schedule the
+-- cursor increment for after execution.
+rotation_focus_item = null
+rotation_cursor_path = null
+if config.domains[winner].rotation is a non-empty list:
+  rotation_list = config.domains[winner].rotation
+  rotation_cursor_path = "agent/state/{winner}/rotation_cursor.json"
+  if rotation_cursor_path exists and is valid JSON:
+    cursor = (cursor_json.cursor or 0) % len(rotation_list)
+  else:
+    cursor = 0
+  rotation_focus_item = rotation_list[cursor]
+  next_cursor = (cursor + 1) % len(rotation_list)
+  -- Schedule write (only if not dry-run). For dry-run, print what would happen.
+  rotation_cursor_next = next_cursor
+  Print "[Act] Rotation: {winner} focus='{rotation_focus_item}' (cursor {cursor} -> {next_cursor})"
+
+-- Active context pass-through (v1.2.0): if active_context_blob is loaded,
+-- expose it to the invoked skill via a documented context var. The blob is
+-- opaque to evolve; each skill interprets it (e.g., a lawmaker persona for
+-- draft-inquiry, a launch config for deploy, etc.).
+
 Print "[Act] /{skill} starting..."
 Execute: /{skill}
+  context_vars:
+    - focus_item: rotation_focus_item        (may be null)
+    - active_context: active_context_blob    (may be null)
 Print "[Act] /{skill} completed. (elapsed: {time})"
+
+-- After primary skill execution, persist rotation cursor if it was consumed.
+if rotation_cursor_path and NOT dry_run:
+  Write {"cursor": rotation_cursor_next, "last_updated": now, "focus_item": rotation_focus_item}
+  to rotation_cursor_path
 
 -- Chain execution: evaluate chain_triggers from the skill's contract
 -- Production deployments (209 cycles) showed zero chain records in decision_log.
@@ -972,16 +1104,73 @@ for each gap in skill_gaps.json where frequency >= 3:
 
 ### 5-C: Memo Writing
 
-Consecutive domain detection (from 2-A patterns):
+Consecutive domain detection (from 2-A patterns) writes one-shot
+`score_adjustments` (consumed next cycle):
 - Same domain 2 consecutive: all other domains +0.5 adjustment.
 - Same domain 3 consecutive: all other domains +1.0 adjustment.
 
-PR outcome memos:
+PR outcome memos (one-shot `score_adjustments`):
 - PR merged this cycle: that domain gets -0.3 (focus elsewhere).
 - PR rejected this cycle: that domain gets +0.5 (retry needed).
 
 Store in memos.json.history (cap at 10). Each entry:
 `{ timestamp, cycle, domain, type, message }`.
+
+**Auto-starvation intervention (v1.2.0)**:
+Formalizes the Lynceus +1.0 starvation pattern so it no longer requires
+manual memo editing.
+
+```
+for each active domain D in config.domains where D.status == "active":
+  executions_in_last_10 = count of decision_log entries where
+                          entry.selected_domain == D
+                          AND cycle >= (cycle_count - 10)
+  if executions_in_last_10 == 0:
+    -- Skip if an active starvation intervention for this domain already exists
+    if interventions contains iv where iv.domain == D AND iv.type == "starvation":
+      continue
+    interventions.append({
+      domain: D,
+      delta: +1.0,
+      type: "starvation",
+      reason: "No executions in last 10 cycles",
+      created_at_cycle: cycle_count,
+      expires_after_cycles: 3,
+      applied_count: 0
+    })
+    Print "[Reflect] Starvation intervention: {D} boosted +1.0 for 3 cycles."
+```
+
+**Auto monopoly-breaker intervention (v1.2.0)**:
+Formalizes the Lynceus −10.0 monopoly-breaker pattern and complements the
+existing 5-C "consecutive domain" one-shot adjustments above. Where the
+one-shots nudge *other* domains up, the monopoly-breaker pushes the
+dominant domain *down* directly so the next cycle has no pull toward it.
+
+```
+consecutive = same-domain run length from 2-A pattern analysis
+if consecutive >= 2:
+  dominant = decision_log[-1].selected_domain
+  -- Skip if an active monopoly_breaker for this domain already exists
+  if interventions contains iv where iv.domain == dominant AND iv.type == "monopoly_breaker":
+    continue
+  interventions.append({
+    domain: dominant,
+    delta: -10.0,
+    type: "monopoly_breaker",
+    reason: "Selected {consecutive} consecutive cycles",
+    created_at_cycle: cycle_count,
+    expires_after_cycles: 1,
+    applied_count: 0
+  })
+  Print "[Reflect] Monopoly-breaker intervention: {dominant} penalized -10.0 for 1 cycle."
+```
+
+**Contrarian interventions (v1.2.0)**: When Tier 3 contrarian check (below)
+writes a score adjustment, it can optionally emit an intervention with
+`type: "contrarian"` instead of a one-shot `score_adjustments` entry, if the
+operator wants the adjustment to persist beyond one cycle. The default
+contrarian path continues to use one-shot adjustments for backward compatibility.
 
 ### 5-C2: Action Extraction
 
@@ -1120,7 +1309,16 @@ Persist updated confidence scores from Step 2-B.
 
 ### 6-C: memos.json
 
-Persist score_adjustments (2-D cleared consumed ones) and history (cap 10).
+Persist:
+- `score_adjustments` (2-D cleared consumed ones, so this is `{}` unless 5-C
+  wrote new one-shots this cycle).
+- `interventions` — after Step 3-A applied each entry's delta, decrement its
+  `expires_after_cycles` and remove entries where it reached 0. New entries
+  from Step 5-C are appended.
+- `history` (cap 10).
+- `schema_version: "1.1.0"` — if the file previously had 1.0.0 and did not
+  carry `interventions`, write it as 1.1.0 with `interventions: []` on this
+  first v1.2.0 commit.
 
 ### 6-C2: action_queue.json
 
@@ -1143,6 +1341,8 @@ over time — consistent format enables automated parsing and trend detection):
 - **Elapsed**: {seconds}s
 - **Saturation**: {consecutive_observe_only_cycles} observe-only cycles
 - **Cost**: +${cycle_cost} (total today: ${daily_total})
+- **Season**: {current_mode or "default" if season_modes.enabled, else "disabled"}
+- **Focus**: {rotation_focus_item or "none"}  (v1.2.0: present when domain has a rotation list)
 ```
 
 Cap at 50 entries (remove oldest from bottom).
@@ -1208,17 +1408,37 @@ else:
   Print "[Reflect] Same week ({current_week}) — episode generation deferred."
 ```
 
-**Tier 2b -- Principle Extraction**: Triggered when:
+**Tier 2b -- Principle Extraction**: Triggered when any of:
 - Episode cap is exceeded (oldest episode evicted), OR
-- 5+ episodes exist (sufficient data for pattern detection), OR
-- Contrarian check found a dominant strategy (validation needed)
+- 2+ episodes exist and fuzzy pattern match fires (see below — was 5+ in v1.1.0), OR
+- Contrarian check found a dominant strategy (validation needed), OR
+- Cluster fallback (v1.2.0): total lesson count across all episodes >= 10
+
+v1.2.0 note: The pre-v1.2.0 thresholds (80% Jaccard, occurrences >= 3) were
+too strict for short lesson strings — in production, Lynceus ran 119 cycles
+with 2 valid episodes and extracted 0 principles because lessons rarely
+share 80% of their tokens. Defaults are now 0.5 Jaccard and 2 occurrences,
+with both knobs exposed as config.
+
+Initialize principles.json if missing:
+```
+if principles.json does not exist or malformed:
+  write { "schema_version": "1.0.0", "principles": [] }
+```
 
 ```
--- Scan ALL episodes for recurring patterns
+-- Tunable thresholds (v1.2.0)
+similarity_threshold = config.memory.principle_similarity_threshold  -- default 0.5
+min_occurrences      = config.memory.principle_min_occurrences       -- default 2
+
+-- Primary extraction: Jaccard-similarity clustering
 for each unique lesson text across episodes:
-  occurrences = count of episodes containing this lesson (fuzzy match: 80% Jaccard similarity)
-  if occurrences >= 3:
-    if lesson not already in principles.json:
+  occurrences = count of episodes containing this lesson
+                (fuzzy match: Jaccard similarity >= similarity_threshold
+                 on lowercase token sets, stop-word stripped)
+  if occurrences >= min_occurrences:
+    if lesson not already in principles.json (Jaccard >= similarity_threshold
+                                              against any existing principle.text):
       Add to principles.json: {
         text: lesson,
         confidence: 0.3,
@@ -1233,9 +1453,29 @@ for each unique lesson text across episodes:
       principle.last_confirmed = now
       Print "[Reflect] Principle confirmed: '{lesson}' -> confidence {new_confidence}"
 
--- Initialize principles.json if missing
-if principles.json does not exist or malformed:
-  write { "schema_version": "1.0.0", "principles": [] }
+-- Cluster fallback (v1.2.0): for projects whose lessons are too lexically
+-- diverse for Jaccard matching (short strings, multilingual, renamed concepts).
+-- Fires when the lesson corpus is big enough but primary extraction produced
+-- no new principle this cycle.
+total_lessons = sum(len(ep.lessons) for ep in episodes)
+if total_lessons >= 10 AND no new principles were extracted above:
+  -- Cluster by the first 3 significant tokens (lowercase, stop-word stripped)
+  -- Take the top-3 clusters by size, emit one representative each
+  -- Mark them as low-confidence "candidate" principles for human review
+  clusters = group_lessons_by_first_3_tokens(all_lessons)
+  for cluster in top_3(clusters by cluster.size):
+    representative = cluster.most_frequent_lesson
+    if representative not already a principle:
+      Add to principles.json: {
+        text: representative,
+        confidence: 0.15,
+        source_episodes: cluster.source_week_years,
+        created_at: now,
+        last_confirmed: now,
+        kind: "candidate",
+        cluster_size: cluster.size
+      }
+      Print "[Reflect] Candidate principle (cluster fallback): '{representative}' (confidence 0.15, {cluster.size} lessons)"
 
 -- Deprecate weak principles
 for each principle in principles.json:
@@ -1244,6 +1484,14 @@ for each principle in principles.json:
 
 Cap at 50 principles. Remove lowest-confidence first.
 ```
+
+**Manual principle seeding**: Operators may add principles directly by
+editing `agent/state/evolve/principles.json` with entries of the form
+`{text, confidence: 0.5, kind: "manual", created_at, last_confirmed}`.
+The engine treats manual principles identically to extracted ones
+(subject to the same deprecation rule). Useful for seeding hard-won
+domain knowledge that has not yet accumulated enough episodes to trigger
+automatic extraction.
 
 **Tier 3 -- Contrarian Check**: This check is MANDATORY when the modulo condition
 is met. Do not silently skip it.
@@ -1372,6 +1620,55 @@ for each provider in config.notifications where enabled:
     (do NOT modify config.json on disk).
   Notification failure is non-fatal.
 ```
+
+### 6-C8: Cost Ledger Integrity Gate (v1.2.0)
+
+**This gate MUST run before 6-D Git Commit.** Production deployments showed a
+13-day stretch where cost_ledger.json received no new entries while cycles
+continued to complete — the optional Step 6-C5b write was being silently skipped.
+The integrity gate ensures the ledger is always in sync with state.cycle_count.
+
+```
+-- Load cost_ledger.json
+last_entry = cost_ledger.entries[-1] if cost_ledger.entries else null
+
+if last_entry is null OR last_entry.cycle_id != state.cycle_count:
+  Print "[Reflect] ⚠ cost_ledger missing entry for cycle #{state.cycle_count}. Auto-patching."
+
+  -- Append synthetic entry (use 0.02 as safe minimum)
+  cost_ledger.entries.append({
+    cycle_id: state.cycle_count,
+    timestamp: now (ISO 8601),
+    skill: selected_skill or "unknown",
+    chain: chain_executed or [],
+    estimated_usd: 0.02,
+    synthetic: true,
+    reason: "6-C8 auto-patch: cycle completed without 6-C5b write"
+  })
+  cost_ledger.total_estimated_usd += 0.02
+
+  -- Emit skill_gaps signal so the operator can diagnose why 6-C5b skipped
+  skill_gaps.gaps.append({
+    id: "gap-cost-ledger-autopatch-{cycle_count}",
+    description: "cost_ledger.json missing entry for cycle {cycle_count} — auto-patched with synthetic entry",
+    detected_at: now,
+    detected_in_cycle: state.cycle_count,
+    ooda_phase: "meta",
+    frequency: 1,
+    last_seen_cycle: state.cycle_count,
+    related_domain: null,
+    proposed_skill: null,
+    resolved: false,
+    resolution: null,
+    type: "learning_loop_break"
+  })
+
+Print "[Reflect] Cost ledger gate: cycle #{state.cycle_count} recorded (total ${cost_ledger.total_estimated_usd})."
+```
+
+Rationale: fails loud, not silent. If Step 6-C5b ever misses a cycle, the
+operator sees a warning AND a skill_gaps entry — visible in `/ooda-status` —
+so the root cause can be investigated instead of accumulating silent drift.
 
 ### 6-D: Git Commit
 

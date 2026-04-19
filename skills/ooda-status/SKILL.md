@@ -11,6 +11,11 @@ input:
     - agent/state/evolve/action_queue.json
     - agent/state/evolve/metrics.json
     - agent/state/evolve/cost_ledger.json
+    - agent/state/evolve/memos.json
+    - agent/state/evolve/episodes.json
+    - agent/state/evolve/principles.json
+    - agent/state/evolve/skill_gaps.json
+    - "agent/state/*/lens.json"
   config_keys: []
 output:
   files: []
@@ -106,6 +111,30 @@ Show `none` if count is 0, otherwise show the count.
 
 **Cost** — from metrics.json: `cost_today` / `cost_limit`. Show `—/—` if unavailable.
 
+**Orient Health (v1.2.0)** — parsed from the Orient layer state files:
+
+- `episodes_count` and `last_episode_week` — from `episodes.json.episodes[]`.
+  Show `0` and `—` if empty or missing.
+- `principles_count` and `principles_high_conf` — from `principles.json.principles[]`,
+  where `high_conf` is `count(confidence >= 0.5)`.
+- `lens_domains` — number of `agent/state/*/lens.json` files that exist; denominator
+  is the count of active domains in config.domains.
+- `chain_count_last_10` — in `state.json.decision_log[-10:]`, count entries
+  where `chain_executed` exists and is non-empty.
+- `active_interventions` — length of `memos.json.interventions[]`.
+- `skill_gaps_unaddressed` — `count(gap.resolved != true)` in `skill_gaps.json.gaps[]`.
+  Break out `learning_loop_break` count separately since those flag internal
+  evolve invariants (e.g., cost_ledger auto-patches).
+
+**Season + Focus (v1.2.0)** — from `config.json`:
+
+- `season_mode` — `config.season_modes.current_mode` if enabled, else `"disabled"`.
+- `season_overrides_count` — length of
+  `config.season_modes.modes[current_mode].weight_overrides`.
+
+**Active context (v1.2.0)** — from `config.json.active_context.path`:
+- if set and file readable: `<path> (age: <mtime>m)`; else `none`.
+
 ## Step 3: Render Dashboard
 
 Print the dashboard using box-drawing characters exactly as shown below.
@@ -127,8 +156,28 @@ Replace `{placeholders}` with the computed values from Step 2.
 ║ Alerts: {count_or_none}                              ║
 ║ HALT: {ACTIVE / inactive}                            ║
 ║ Cost: ${spent}/${limit} today (${rate}/h)             ║
+╠══ Orient Health (v1.2.0) ═══════════════════════════╣
+║ Episodes: {episodes_count} (last: {week})            ║
+║ Principles: {principles_count} ({high_conf} conf≥0.5)║
+║ Lens: {lens_domains}/{active_domain_count} domains   ║
+║ Chain exec: {chain_count_last_10}/10 cycles          ║
+║ Interventions: {active_interventions} active         ║
+║ Gaps: {skill_gaps_unaddressed} ({loop_break} break)  ║
+╠══ Season + Context (v1.2.0) ════════════════════════╣
+║ Season: {season_mode} ({overrides_count} overrides)  ║
+║ Context: {context_path_or_none}                      ║
 ╚══════════════════════════════════════════════════════╝
 ```
+
+The `--orient` flag opens a detailed view of Orient Health only (useful when
+debugging whether the learning loop is actually running):
+
+```
+/ooda-status --orient
+```
+
+Output focuses on Episodes / Principles / Lens / Chain / Interventions /
+Skill gaps and omits the domain/cost/saturation rows.
 
 **New columns and rows explained:**
 

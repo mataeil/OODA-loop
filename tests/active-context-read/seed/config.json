@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.2.0",
+  "project": { "name": "active-context-fixture", "locale": "en", "timezone": "UTC" },
+  "domains": {
+    "service_health": { "weight": 2.0, "state_file": "agent/state/service_health.json", "primary_skill": "/scan-health", "chain": [], "enabled": true, "status": "active", "fallback": true }
+  },
+  "scoring": { "staleness_curve": "logarithmic", "balance_enabled": false, "hours_if_never_run": 168 },
+  "confidence": { "initial": 0.7, "min": 0.1, "max": 1.0 },
+  "safety": {
+    "halt_file": "agent/safety/HALT",
+    "skill_allowlist": ["/scan-health"],
+    "protected_paths": ["agent/safety/*", "skills/evolve/*", "agent/contracts/*"],
+    "confidence_threshold": 0.6,
+    "max_prs_per_cycle": 1,
+    "min_cycle_interval_minutes": 30
+  },
+  "progressive_complexity": { "current_level": 2 },
+  "memory": { "working_memory_size": 20, "episode_retention_weeks": 52, "contrarian_check_interval": 10 },
+  "active_context": {
+    "path": "contexts/persona-demo.json",
+    "refresh_skill": null,
+    "refresh_interval_hours": 168
+  },
+  "cost": { "daily_limit_usd": 10.0, "warning_threshold_pct": 80 }
+}
