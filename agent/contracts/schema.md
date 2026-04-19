@@ -659,3 +659,53 @@ Validation errors are logged to `agent/state/evolve/CHANGELOG.md` and the
 skill is excluded from that cycle. The cycle continues with remaining valid
 skills. Multiple errors per skill are collected and reported together (the
 engine does not stop at the first error).
+
+---
+
+## Recommended RICE Dimension Palette (v1.2.0)
+
+Phase-4 introduced `config.scoring.rice_extensions` to attach arbitrary
+extra dimensions to the base RICE formula. Skills that emit extended RICE
+scores (e.g., plan-questions, plan-backlog) should pick dimension names
+from this shared palette when possible, so different projects converge on
+the same vocabulary instead of each inventing its own:
+
+| Dimension | Meaning | Typical range |
+|-----------|---------|---------------|
+| `timing` | Window-of-opportunity urgency (e.g., D-day approaching, release train) | 0–10 |
+| `novelty` | Newness / unexpectedness of the angle | 0–10 |
+| `evidence` | Strength of supporting data (citations, logs, repro steps) | 0–10 |
+| `vulnerability` | Severity of the exposure the action addresses | 0–10 |
+| `alignment` | Fit with stakeholder priorities (pair with `active_context`) | 0–10 |
+| `media` | Publicity / visibility potential | 0–10 |
+| `reach_precision` | Accuracy of the Reach estimate (replaces raw reach when data is weak) | 0–1.0 |
+
+These are recommendations, not a closed set. Projects may define additional
+dimensions; the engine accepts any key declared in `config.scoring.rice_extensions`.
+Lynceus's 6D RICE (evidence, media, vulnerability, timing, alignment, novelty)
+is a specialization of this palette — the same upstream machinery handles it.
+
+## Action Difficulty ↔ Risk Tier (v1.2.0 docs)
+
+Action-queue items MAY carry a `difficulty` field as a UX convention:
+
+| `difficulty` | Label examples | Maps to `risk_tier` | Auto-merge policy |
+|--------------|----------------|---------------------|-------------------|
+| `low`        | 하, easy, small | 0 | Eligible for auto-merge at Level 3 if protected-paths clean |
+| `medium`     | 중, medium     | 1 | Requires human review regardless of level |
+| `high`       | 상, large, risky | 2 | Always protected; never auto-merged |
+
+The binding to an actual `risk_tier` is made via
+`config.safety.risk_rules` (Phase-4), which matches PR file paths against
+patterns and assigns a numeric tier. `difficulty` is a display/UX hint for
+the action queue; `risk_tier` is the load-bearing safety gate. fwd's 하 /
+중 / 상 convention maps directly to `low` / `medium` / `high` here.
+
+## execution_mode roadmap
+
+`execution_mode: consensus` ships in v1.1.0 (Phase 5). `execution_mode: debate`
+is reserved for v1.3.0: named role-agents (Evaluator / Planner / Designer /
+…), multi-round deliberation with an anti-agreement rule, and an archived
+markdown transcript. v1.2.0 documents the distinction in CONCEPTS.md under
+"Multi-agent debate vs consensus" but does not implement the new mode —
+use `consensus` for now.

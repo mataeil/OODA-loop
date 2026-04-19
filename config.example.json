@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "project": {
     "name": "my-app",
     "locale": "en",
@@ -173,7 +173,9 @@
     "episode_retention_weeks": 52,
     "contrarian_check_interval": 10,
     "action_queue_decay_days": 14,
-    "action_queue_decay_amount": 0.05
+    "action_queue_decay_amount": 0.05,
+    "principle_similarity_threshold": 0.5,
+    "principle_min_occurrences": 2
   },
   "season_modes": {
     "enabled": false,
@@ -181,9 +183,17 @@
     "modes": {
       "default": {
         "weight_overrides": {},
-        "disabled_domains": []
+        "disabled_domains": [],
+        "signal_bonuses": {}
       }
-    }
+    },
+    "__doc__": "Toggle via /ooda-config season <mode>. When enabled: Step 1-A applies weight_overrides to domain_config.weight in-memory; disabled_domains are filtered out alongside status=disabled; signal_bonuses are merged into the cycle's signal table in Step 3-B. The 'default' mode acts as the static multiplier case (e.g., {\"weight_overrides\":{\"service_health\":2.0}} encodes a permanent 2x). See CONCEPTS.md."
+  },
+  "active_context": {
+    "path": null,
+    "refresh_skill": null,
+    "refresh_interval_hours": 168,
+    "__doc__": "Optional stakeholder context blob loaded by evolve Step 1 and exposed to every invoked skill as a context variable. The blob is opaque; each skill interprets it domain-specifically. If refresh_skill is set and the file is older than refresh_interval_hours, evolve queues a refresh cycle. Read-only by default."
   },
   "test_command": "npm test",
   "test_timeout_seconds": 300,

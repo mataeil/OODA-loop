@@ -228,11 +228,13 @@ Every `/evolve` run executes one complete OODA cycle:
 5. **Act** -- Execute the winning skill. Run chain if confidence is high enough. Re-check HALT before each chain step. Handle PR risk tiers (auto-merge / manual deploy / human review).
 6. **Reflect** -- Update skill gaps, write memos, extract actions, update the Adaptive Lens, cascade memory.
 
-Domain scoring (v1.1.0): `score = staleness + dampened_alert + (goals × 0.3) + (confidence × 0.2) + memo + balance_penalty`
+Domain scoring (v1.2.0): `score = staleness + dampened_alert + (goals × 0.3) + (confidence × 0.2) + memo + balance_penalty`
 
-Staleness uses a logarithmic curve by default. Alert dampener prevents domain monopoly. Entropy balance penalty ensures healthy rotation.
+where `memo = score_adjustments[domain] + Σ interventions[].delta for domain`.
 
-See [CONCEPTS.md](CONCEPTS.md) for the full glossary, architecture diagram, and formula details.
+Staleness uses a logarithmic curve by default. Alert dampener prevents domain monopoly. Entropy balance penalty ensures healthy rotation. `memo` now aggregates one-shot `score_adjustments` with persistent multi-cycle `interventions` (v1.2.0 — see [CONCEPTS.md](CONCEPTS.md#memo-interventions-v120)).
+
+See [CONCEPTS.md](CONCEPTS.md) for the full glossary, architecture diagram, and formula details. For the v1.2.0 release notes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -333,20 +335,30 @@ See [config.example.json](config.example.json) for the complete annotated schema
 
 ---
 
-## Production Validation (v1.1.0)
+## Production Validation
 
-Two production deployments provided 209 cycles of real-world data that drove v1.1.0 improvements:
+Two production deployments have continuously provided real-world data that shape upstream improvements:
 
 | Deployment | Domain | Cycles | PRs | Success |
 |------------|--------|--------|-----|---------|
-| [fwd.page](https://fwd.page) | URL shortener | 144 | 28 (24 merged, 86%) | 100% |
-| Lynceus | Parliamentary audit (국정감사) | 65 | 0 (Level 2) | 100% |
+| [fwd.page](https://fwd.page) | URL shortener | 152+ | 28 (24 merged, 86%) | 100% |
+| Lynceus | Parliamentary audit (국정감사) | 119+ | 0 (Level 2) | 100% |
 
-**What we fixed based on production data:**
+**What v1.1.0 fixed based on early production data** (209 cycles):
 - **7 features designed but not working** — episode generation, principles extraction, adaptive lens, contrarian check, cost ledger, chain execution, skill gaps detection
 - **Scoring monopoly** — one domain took 36% of all cycles. Logarithmic staleness + entropy penalty + alert dampener fixed this
 - **41-cycle observation saturation** — circuit breaker now warns at 5, boosts at 10, halts at 15
 - **Confidence stagnation** — observation micro-adjustments prevent frozen confidence at Level < 3
+
+**What v1.2.0 distills from continued production** (152 + 119 cycles):
+- **Orient layer actually learns** — principles threshold relaxed (0.8 → 0.5 Jaccard, 3 → 2 occurrences) with cluster fallback; Lynceus's 2 valid episodes now produce principles.
+- **Memos-as-interventions** — `memos.json.interventions[]` formalizes the Lynceus +1.0 / −10.0 manual pattern as auto-written `starvation` and `monopoly_breaker` entries that span multiple cycles.
+- **Cost ledger integrity gate** — a 13-day silent drop in fwd's cost tracking is now impossible: Step 6-C8 auto-patches missing entries and emits a `learning_loop_break` skill_gap.
+- **Lens pre-init** — fwd's 152 cycles with zero lens files are caused by initialization living inside an observe-skill loop custom skills never trigger; init now happens in Step 1-A for every active domain.
+- **Primitives extracted upstream** — Lynceus's `weight_presets` becomes `season_modes` wire-up; Lynceus's `active_context` becomes a first-class config key; fwd's `focus_rotation` becomes `config.domains.{name}.rotation`. fwd's hardcoded `service_health × 2.0` collapses into `season_modes.modes.default.weight_overrides`.
+- **Orient Health dashboard** — `/ooda-status --orient` shows episodes, principles, lens coverage, chain execution, active interventions, and skill gaps at a glance.
+
+fwd.page and Lynceus themselves are **not modified** by v1.2.0; they are reference data sources. All changes land in the framework so the next downstream project gets these improvements for free.
 
 ---
 

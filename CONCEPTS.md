@@ -68,6 +68,12 @@ In OODA-loop, each `/evolve` run executes one complete loop:
 | **Data Classification** | Security level for skill data access. `internal` (local files), `api` (first-party APIs), `external` (third-party/web search). External skills at Level < 3 require human approval. |
 | **Consensus Execution** | Optional execution mode where a skill runs N times with different perspectives. Items agreed upon by >= threshold fraction of runs are included in output. Defined in skill contracts as `execution_mode: consensus`. |
 | **Rollback Protocol** | Pre-action checkpoints (5 retained) for post-merge recovery. Auto-reverts on health failure after auto-merge. Manual rollback via `/ooda-config rollback {cycle}`. Opt-in via `config.safety.enable_rollback`. |
+| **Memo Interventions** (v1.2.0) | A memos.json field (`interventions: []`) that persists multi-cycle score deltas, unlike the one-shot `score_adjustments` map. Each entry carries `{domain, delta, type, reason, created_at_cycle, expires_after_cycles, applied_count}`. evolve Step 5-C auto-writes `type: "starvation"` (domain with 0 runs in last 10 cycles → +1.0 for 3 cycles) and `type: "monopoly_breaker"` (domain selected 2+ consecutive → −10.0 for 1 cycle). Formalizes the Lynceus hand-written +1.0 / −10.0 pattern observed across 119 production cycles. |
+| **Active Context** (v1.2.0) | Optional `config.active_context: { path, refresh_skill, refresh_interval_hours }` pointing at an opaque stakeholder blob. evolve Step 1 loads it; Step 4-B passes it to every invoked skill as the `active_context` context var. Skills interpret domain-specifically (e.g., a draft-inquiry skill may read `tone` fields from a lawmaker persona; a deploy skill may read a release config). If `refresh_skill` is set and the file is older than `refresh_interval_hours`, a refresh cycle is queued. Formalizes the Lynceus `contexts/lee_junseok_22.json` pattern. |
+| **Rotation Primitive** (v1.2.0) | Per-domain `config.domains.{name}.rotation: [focus_item_1, focus_item_2, ...]`. When the domain wins a cycle, evolve Step 4-B reads `agent/state/{domain}/rotation_cursor.json`, passes `focus_item = list[cursor]` to the skill as a context var, and increments the cursor (wraps). Round-robin only in v1.2.0; weighted and staleness-aware policies deferred. Formalizes the fwd `focus_rotation` pattern that cycles Observe attention across a fixed list of UI surfaces. |
+| **Orient Health Dashboard** (v1.2.0) | `/ooda-status` gains an "Orient Health" block showing Episodes, Principles, Lens domain coverage, chain execution count in last 10 cycles, active interventions, and unresolved skill_gaps (with `learning_loop_break` broken out separately). `/ooda-status --orient` focuses the view on these fields alone. Answers the operator question "is the learning loop actually learning?" without reading state JSON by hand. |
+| **RICE Dimension Palette** (v1.2.0 docs) | Phase-4's `scoring.rice_extensions` supports arbitrary extra dimensions. The palette in `agent/contracts/schema.md` is a recommended vocabulary — `timing | novelty | evidence | vulnerability | alignment | media | reach_precision` — so the next project does not reinvent dimension names. Lynceus's 6D RICE is a specialization of this palette. |
+| **Season Mode Weights** (v1.2.0 wire-up) | `season_modes.modes.{name}.weight_overrides` is now read by evolve Step 1-A and applied in-memory. The `default` mode IS the static-multiplier case — fwd's hardcoded `service_health × 2.0` becomes `season_modes.modes.default.weight_overrides.service_health: 2.0`. No separate `weight_multiplier` primitive. |
 
 > **Scoring Dynamics.** The logarithmic staleness curve ensures no domain scores above ~40 regardless of how long it has been idle (vs 336+ under the legacy linear curve). Combined with the entropy balance penalty, this prevents domain monopoly — the most common pathology observed in production (36% of 64 cycles taken by a single domain before the fix). Alert dampening adds another layer: even with active alerts, a domain cannot monopolize more than 3 consecutive cycles. These three mechanisms (log staleness, entropy penalty, alert dampener) work together to ensure healthy domain rotation while still responding to genuine urgency.
 
@@ -143,8 +149,54 @@ Never commit secrets to `config.json` — use `$ENV_VAR` references for tokens a
 
 ---
 
+## Patterns distilled from production (v1.2.0)
+
+These three patterns were invented in production (fwd.page 152 cycles,
+Lynceus 119 cycles) and documented upstream in v1.2.0. Two became first-class
+primitives; one remains a pattern users may adopt without framework support.
+
+### Memos as active interventions
+
+Early memos carried one-shot `score_adjustments` that were consumed after a
+single cycle. In production this proved insufficient: operators needed
+multi-cycle corrections (a domain that keeps getting starved needs sustained
+boost, not a one-time nudge). Lynceus operators started hand-writing +1.0 /
+−10.0 deltas and manually re-applying them. The v1.2.0 `interventions[]`
+field formalizes this: evolve Step 5-C auto-writes `starvation` and
+`monopoly_breaker` interventions that persist across `expires_after_cycles`
+and decrement on each application. Use `/ooda-status --orient` to see which
+interventions are currently active. External operators may append their own
+interventions directly to memos.json; evolve treats them identically.
+
+### Data-sourcing pipelines (pattern, not a primitive)
+
+Lynceus's `pipeline/` directory (`persona_builder.py`, `fetch_transcripts.py`,
+`db.py`) shows a common shape for domains that need to fetch, parse, enrich,
+and store external data before a domain skill can score it. OODA-loop does
+NOT ship a pipeline framework — but the convention is worth documenting:
+keep ingestion code under `pipeline/` at the project root, invoke it from a
+domain's observe skill, and use `active_context` or state files to surface
+results. Revisit at v1.3.0 if a third project validates the shape.
+
+### Multi-agent debate vs consensus
+
+Phase-5 introduced `execution_mode: consensus` — N parallel runs with
+different perspectives, where output items that ≥ threshold fraction of runs
+agreed on are kept. fwd's `check-ux` skill runs a richer protocol: four
+named role-agents (Evaluator, Planner, Designer-Creative, Designer-Usability),
+three deliberation rounds, an explicit "동의합니다 금지" (no yes-men) rule, a
+weighted consensus score (UNANIMOUS/STRONG), and a markdown transcript
+archived to `agent/state/ux/debates/`. The two mechanisms solve different
+problems: consensus produces a set (the intersection of opinions), debate
+produces a decision + narrative (the synthesis across perspectives). v1.3.0
+is slated to ship `execution_mode: debate` as a first-class primitive; v1.2.0
+documents the distinction and leaves implementation for later.
+
+---
+
 ## Further Reading
 
 - **README.md** — Quick start guide: installation, first cycle, configuration basics
 - **CONTRIBUTING.md** — How to add domains, write new skills, and extend the harness
 - **SECURITY.md** — Safety levels in detail, HALT file usage, and protected path policy
+- **CHANGELOG.md** — Framework release notes (per-milestone v1.2.0 breakdown)

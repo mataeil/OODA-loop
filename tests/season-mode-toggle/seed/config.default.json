@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.2.0",
+  "project": { "name": "season-default", "locale": "en", "timezone": "UTC" },
+  "domains": {
+    "service_health": { "weight": 2.0, "state_file": "agent/state/service_health.json", "primary_skill": "/scan-health", "chain": [], "enabled": true, "status": "active", "fallback": true },
+    "backlog":        { "weight": 0.3, "state_file": "agent/state/backlog.json",         "primary_skill": "/plan-backlog", "chain": [], "enabled": true, "status": "active" },
+    "test_coverage":  { "weight": 0.5, "state_file": "agent/state/test_coverage.json",   "primary_skill": "/check-tests",  "chain": [], "enabled": true, "status": "active" }
+  },
+  "scoring": { "staleness_curve": "logarithmic", "balance_enabled": true, "balance_weight": 5.0, "hours_if_never_run": 168 },
+  "confidence": { "initial": 0.7, "min": 0.1, "max": 1.0 },
+  "safety": {
+    "halt_file": "agent/safety/HALT",
+    "skill_allowlist": ["/scan-health", "/plan-backlog", "/check-tests"],
+    "protected_paths": ["agent/safety/*", "skills/evolve/*", "agent/contracts/*"],
+    "confidence_threshold": 0.6,
+    "max_prs_per_cycle": 1,
+    "min_cycle_interval_minutes": 30
+  },
+  "progressive_complexity": { "current_level": 2 },
+  "signals": { "health_alert_bonus": 5.0, "queue_pressure_bonus": 3.0, "queue_pressure_threshold": 5 },
+  "memory": { "working_memory_size": 20, "episode_retention_weeks": 52, "contrarian_check_interval": 10 },
+  "season_modes": {
+    "enabled": true,
+    "current_mode": "default",
+    "modes": {
+      "default": { "weight_overrides": {}, "disabled_domains": [], "signal_bonuses": {} },
+      "preparation": {
+        "weight_overrides": { "service_health": 1.0, "backlog": 2.0 },
+        "disabled_domains": [],
+        "signal_bonuses": { "queue_pressure_bonus": 5.0 }
+      }
+    }
+  },
+  "cost": { "daily_limit_usd": 10.0, "warning_threshold_pct": 80 }
+}

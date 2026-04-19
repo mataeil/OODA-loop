@@ -23,6 +23,78 @@ schemas, retention policies, cascade rules, and the rationale behind each design
 | checkpoints.json | Pre-action rollback checkpoints | Last 5 | None |
 | CHANGELOG.md | Human-readable activity log | 50 entries | None |
 | `agent/state/{domain}/lens.json` | Per-domain Adaptive Lens (focus items, thresholds, signals) | Permanent (overwritten by evolve) | None |
+| `agent/state/{domain}/rotation_cursor.json` | v1.2.0. Per-domain rotation cursor for `config.domains.{name}.rotation` MVP (round-robin focus_item selection) | Permanent (overwritten) | None |
+
+### New in v1.2.0
+
+**Lens files** (`agent/state/{domain}/lens.json`) are now initialized in
+evolve Step 1-A (Domain State Reading) before the first read, instead of
+relying exclusively on Step 5-E's init inside the observe-skill loop.
+Production deployments had 152 cycles with zero lens files created because
+custom observe skills never called the Step 5-E path; this fix makes lens
+creation unconditional for every active domain.
+
+**cost_ledger.json** gains an implicit invariant: every entry in
+`cost_ledger.entries[]` must correspond one-to-one with a completed cycle.
+evolve Step 6-C8 (new Cost Ledger Integrity Gate) enforces this before the
+git commit — if a cycle completes without a 6-C5b write, the gate appends a
+synthetic entry (marked `synthetic: true, reason: "..."`) and emits a
+`skill_gaps` record of type `learning_loop_break`. Downstream readers can
+detect synthetic entries via the `synthetic: true` flag.
+
+**skill_gaps.json** entries may now carry `type: "learning_loop_break"` for
+gaps that represent internal evolve invariants being violated (as opposed
+to missing capabilities). Readers that filter by type should treat this as
+an operational alert, not a skill-proposal candidate.
+
+**memos.json** schema bumped `1.0.0 → 1.1.0` with a new top-level field
+`interventions: [{domain, delta, type, reason, created_at_cycle,
+expires_after_cycles, applied_count}]`. Unlike `score_adjustments` (one-shot,
+consumed after a single cycle), interventions persist across cycles and
+decrement their `expires_after_cycles` each time they are applied. This
+formalizes the production pattern observed in Lynceus cycles 61/107, where
+operators manually added persistent +1.0 / −10.0 score deltas to break
+scoring monopolies — now auto-written by evolve Step 5-C as
+`type: "starvation"` (domain with 0 executions in last 10 cycles gets +1.0
+for 3 cycles) and `type: "monopoly_breaker"` (domain selected ≥ 2
+consecutive cycles gets −10.0 for 1 cycle). Readers seeing `schema_version:
+"1.0.0"` should treat missing `interventions` as an empty list and wait for
+the next write to promote the file.
+
+**principles.json** extraction is now config-tunable and adds a cluster
+fallback. `config.memory.principle_similarity_threshold` (default 0.5, was
+hardcoded 0.8) and `config.memory.principle_min_occurrences` (default 2, was
+hardcoded 3) expose the Jaccard parameters. When primary extraction yields
+nothing but the lesson corpus is large (≥ 10 total lessons across episodes),
+a cluster fallback groups lessons by their first 3 significant tokens and
+emits top-3 cluster representatives as `confidence: 0.15, kind: "candidate"`
+for human review. Operators may also manually seed principles by direct
+JSON edit with `kind: "manual"`.
+
+**Season modes wire-up** (`config.season_modes`). The v1.1.0 scaffold is now
+read by evolve Step 1-A (apply `weight_overrides` to domain weights in-memory,
+filter out `disabled_domains`) and Step 3-B (merge `signal_bonuses` into this
+cycle's signal table). Step 6-C3 CHANGELOG records `**Season**: {current_mode}`.
+`weight_multiplier` as a separate field is **not** introduced — the "default"
+mode IS the static-multiplier case. Formalizes the Lynceus `weight_presets`
+pattern.
+
+**Active context** (`config.active_context`). New top-level optional config
+key `{path, refresh_skill, refresh_interval_hours}`. evolve Step 1 loads the
+blob and passes it to every invoked skill in Step 4-B as a context var. Blob
+is opaque — each skill interprets domain-specifically. If `refresh_skill` is
+set and the file is older than `refresh_interval_hours`, evolve queues a
+refresh cycle via memos. Formalizes the Lynceus `contexts/` + `/observe-lawmaker`
+pattern.
+
+**Rotation primitive** (`config.domains.{name}.rotation`). Per-domain list
+of focus items. When the domain wins a cycle, evolve Step 4-B reads
+`agent/state/{domain}/rotation_cursor.json`, passes `focus_item = list[cursor]`
+to the skill, increments the cursor (wraps at `len(list)`). Round-robin only
+in v1.2.0. Formalizes the fwd `focus_rotation` pattern.
+
+**config.schema_version** bumped `1.1.0 → 1.2.0`. Additive only; no
+existing fields change shape.
 
 ### New in v1.1.0
 
@@ -410,9 +482,20 @@ one-shot: they are consumed (zeroed out) after being applied in the next Orient 
 
 ```json
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "last_memo": null,
   "score_adjustments": {},
+  "interventions": [
+    {
+      "domain": "test_coverage",
+      "delta": 1.0,
+      "type": "starvation",
+      "reason": "No executions in last 10 cycles",
+      "created_at_cycle": 42,
+      "expires_after_cycles": 3,
+      "applied_count": 0
+    }
+  ],
   "history": [
     {
       "cycle": 5,
@@ -431,7 +514,8 @@ one-shot: they are consumed (zeroed out) after being applied in the next Orient 
 | Field | Type | Description |
 |-------|------|-------------|
 | last_memo | string/null | The most recent memo text. Quick access without scanning history. |
-| score_adjustments | object | Active adjustments to apply in the next Orient phase. Keys are domain names, values are score deltas (positive or negative floats). Consumed after application: the engine zeros out this object after applying adjustments. |
+| score_adjustments | object | One-shot adjustments applied in the next Orient phase. Keys are domain names, values are score deltas (positive or negative floats). Consumed after application: the engine zeros out this object. |
+| interventions | array | v1.1.0. Multi-cycle score deltas. Each entry has `{domain, delta, type, reason, created_at_cycle, expires_after_cycles, applied_count}`. Applied every cycle until `expires_after_cycles` reaches 0, then removed. `type` values: `"starvation"`, `"monopoly_breaker"`, `"contrarian"`, or operator-supplied. |
 | history | array | Rolling window of past memos. |
 
 ### History entry fields

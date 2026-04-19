@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0.0",
+  "episodes": [
+    {
+      "id": "EP-2026-W15",
+      "week_start": "2026-04-06",
+      "week_end": "2026-04-12",
+      "cycle_range": [1, 7],
+      "total_cycles": 7,
+      "summary": "Service health dominated due to logarithmic staleness weighting.",
+      "domains_selected": { "service_health": 5, "ux_evolution": 1, "backlog": 1 },
+      "confidence_snapshot": { "service_health": 0.9, "ux_evolution": 0.6, "backlog": 0.5 },
+      "prs_created": 0,
+      "prs_merged": 0,
+      "prs_rejected": 0,
+      "key_decisions": ["Boosted ux_evolution once after 5 consecutive health cycles"],
+      "lessons": [
+        "service_health dominated scoring under logarithmic",
+        "ux_evolution neglected for 5 cycles"
+      ],
+      "skill_gaps_found": 0,
+      "contrarian_checks": 1,
+      "patterns_detected": ["service_health monopoly"],
+      "created_at": "2026-04-12T23:59:00Z"
+    },
+    {
+      "id": "EP-2026-W16",
+      "week_start": "2026-04-13",
+      "week_end": "2026-04-19",
+      "cycle_range": [8, 14],
+      "total_cycles": 7,
+      "summary": "Similar service_health dominance; backlog quiet.",
+      "domains_selected": { "service_health": 4, "test_coverage": 2, "backlog": 1 },
+      "confidence_snapshot": { "service_health": 0.9, "test_coverage": 0.7, "backlog": 0.5 },
+      "prs_created": 0,
+      "prs_merged": 0,
+      "prs_rejected": 0,
+      "key_decisions": ["Monopoly breaker applied to service_health once"],
+      "lessons": [
+        "service_health dominated under logarithmic staleness",
+        "backlog was neglected"
+      ],
+      "skill_gaps_found": 0,
+      "contrarian_checks": 0,
+      "patterns_detected": ["service_health monopoly repeated"],
+      "created_at": "2026-04-19T23:59:00Z"
+    },
+    {
+      "id": "EP-2026-W17",
+      "week_start": "2026-04-20",
+      "week_end": "2026-04-26",
+      "cycle_range": [15, 21],
+      "total_cycles": 7,
+      "summary": "Diverse signals; no single lesson recurred twice.",
+      "domains_selected": { "service_health": 2, "test_coverage": 2, "ux_evolution": 1, "backlog": 1, "competitors": 1 },
+      "confidence_snapshot": { "service_health": 0.85, "test_coverage": 0.8, "ux_evolution": 0.65 },
+      "prs_created": 0,
+      "prs_merged": 0,
+      "prs_rejected": 0,
+      "key_decisions": ["Introduced balance bonus on competitors"],
+      "lessons": [
+        "cors origin mismatch broke deploy preview",
+        "sqlite locking caused flaky test",
+        "oauth scope missing for fine-grained token",
+        "timezone drift on docker host surprised us",
+        "npm audit noise crowded plan-backlog",
+        "python 3.12 broke pyarrow wheel",
+        "env var leaked into CI artifact",
+        "cypress retries masked regression",
+        "dns cname changed for staging silently",
+        "logrotate race produced empty rollover"
+      ],
+      "skill_gaps_found": 2,
+      "contrarian_checks": 0,
+      "patterns_detected": [],
+      "created_at": "2026-04-26T23:59:00Z"
+    }
+  ]
+}

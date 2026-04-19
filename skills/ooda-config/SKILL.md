@@ -231,9 +231,12 @@ Move action to top of queue by setting effective_rice above current highest.
 
 ---
 
-### Step O — mode {name}
+### Step O — mode {name}  (alias: `season {name}`)
 
-Switch season/phase mode. Mode overrides domain weights and settings.
+Switch season/phase mode. Mode overrides domain weights, disables selected
+domains for the season, and may bump signal bonuses. Changes take effect on
+the NEXT cycle (they are read in-memory at Step 1-A; disk config.json is
+updated so /ooda-status shows the current mode).
 
 ```
 1. Read config.season_modes.modes
@@ -241,9 +244,77 @@ Switch season/phase mode. Mode overrides domain weights and settings.
 3. If {name} not in modes: "Unknown mode: {name}. Available: {list}" — exit
 4. Back up config.json
 5. Set config.season_modes.current_mode = {name}
-6. Print applied overrides (weight changes, disabled domains)
-7. Write + validate JSON
-8. Print "Mode changed: {old} → {name}"
+6. Set config.season_modes.enabled = true (in case it was false)
+7. Print applied overrides:
+   - weight_overrides: {domain: multiplier}
+   - disabled_domains: [...]
+   - signal_bonuses: {signal: value}
+8. Write + validate JSON
+9. Print "Season mode changed: {old} → {name}"
+```
+
+### Step O1 — season list
+
+List all defined modes with a one-line summary.
+
+```
+1. Read config.season_modes.modes
+2. For each mode: print "- {name}: {len(weight_overrides)} weights, {len(disabled_domains)} disabled, {len(signal_bonuses)} signal bonuses"
+3. Print: "Current: {current_mode}" (or "(season_modes disabled)" if enabled=false)
+```
+
+### Step O2 — season show
+
+Print the full active-mode overrides applied to the current scoring table.
+
+```
+1. Read config.season_modes
+2. If not enabled: print "Season modes disabled." — exit
+3. For the current_mode:
+   - Print "Mode: {current_mode}"
+   - Print weight_overrides with the previous weights for comparison:
+     "  service_health: config=2.0 -> mode=1.0 (effective)"
+   - Print disabled_domains: "  disabled: [competitors]"
+   - Print signal_bonuses: "  signal bonuses: {health_alert_bonus: +5.0}"
+```
+
+### Step P — rotation show {domain}
+
+Show the rotation list and current cursor for a domain.
+
+```
+1. Look up domain in config.domains
+2. If no `rotation` field: "Domain '{name}' has no rotation list." — exit
+3. Read cursor from agent/state/{domain}/rotation_cursor.json (missing = cursor 0)
+4. Print the rotation list with an arrow at the current cursor position:
+     [thumbnail-editor, dashboard -> stats, billing]
+5. Print: "Next focus_item: {list[cursor]}"
+```
+
+### Step P1 — rotation reset {domain}
+
+Reset the rotation cursor to 0 for a domain.
+
+```
+1. Look up domain in config.domains
+2. If no `rotation` field: "Domain '{name}' has no rotation list." — exit
+3. Back up agent/state/{domain}/rotation_cursor.json to .bak (if present)
+4. Write {"cursor": 0, "last_updated": now, "focus_item": rotation_list[0]}
+5. Print: "Rotation cursor reset: {domain} -> 0 ({first_focus_item})"
+```
+
+### Step Q — context show
+
+Print the current `active_context` config + the loaded blob contents.
+
+```
+1. Read config.active_context
+2. If no active_context.path: "No active_context configured." — exit
+3. Try to read the file at that path:
+   - If missing: "active_context file missing: {path}"
+   - If malformed JSON: "active_context file is not valid JSON"
+   - If OK: print path, mtime age, refresh_skill (if any), refresh_interval_hours,
+            and the blob contents (pretty-printed, cap at 80 lines)
 ```
 
 ---
@@ -300,5 +371,10 @@ On any failure append: `Run /ooda-config show to review your settings.`
 /ooda-config action defer {id} [N] Defer action for N days (default 7)
 /ooda-config action reject {id}    Reject action with optional reason
 /ooda-config action prioritize {id} Move action to top of queue
-/ooda-config mode {name}           Switch season/phase mode
+/ooda-config mode {name}           Switch season/phase mode (alias: `season {name}`)
+/ooda-config season list           List available season modes
+/ooda-config season show           Show current mode overrides in detail
+/ooda-config rotation show {d}     Show rotation list + cursor for a domain
+/ooda-config rotation reset {d}    Reset rotation cursor to 0
+/ooda-config context show          Show active_context path + blob contents
 ```
