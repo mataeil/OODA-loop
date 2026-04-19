@@ -11,11 +11,29 @@ the expected behavior.
 
 ## How to use
 
-```bash
-# From the fixture's seed/ directory, run /evolve --dry-run and compare
-# the printed score table, memo operations, and proposed state diff against
-# the fixture's README.md "Expected dry-run output" section.
-```
+Two levels of verification:
+
+1. **Static walkthrough** (runs in seconds, no Claude Code required):
+
+   ```bash
+   python3 tests/verify.py
+   ```
+
+   Asserts each fixture's seed is internally consistent with the SKILL.md
+   logic the README claims to exercise (threshold math, cycle positions,
+   schema versions, config shape). Exit code 0 iff everything passes.
+
+2. **Runtime dry-run** (per fixture, requires Claude Code):
+
+   ```bash
+   # From the fixture's seed/ directory, run /evolve --dry-run and compare
+   # the printed score table, memo operations, and proposed state diff
+   # against the fixture's README.md "Expected dry-run output" section.
+   ```
+
+   Runtime verification is the ultimate proof. The static walkthrough catches
+   fixture drift (someone edits a seed without updating expectations) but
+   can't prove the engine itself behaves as specified.
 
 Fixtures are seed-state snapshots, not full projects. They exist purely to
 exercise evolve logic paths that require specific preconditions (empty
