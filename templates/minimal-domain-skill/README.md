@@ -19,7 +19,7 @@ skills/scan-disk/SKILL.md      # copy templates/minimal-domain-skill/SKILL.md he
     "disk_usage": {
       "weight": 1.0,
       "status": "active",
-      "skill": "/scan-disk",
+      "primary_skill": "/scan-disk",
       "state_file": "agent/state/disk_usage/state.json"
     }
   }
