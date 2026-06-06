@@ -23,7 +23,12 @@ scoring path that now sums `score_adjustments[domain] + interventions[domain].de
 
 `memos.json` starts empty (no prior interventions).
 
-## Expected dry-run output
+## Expected output (full cycle)
+
+> `/evolve --dry-run` prints only the Decide score table and **exits at Step 3-H**
+> (zero writes). The `[Reflect]` interventions below (Step 5-C) are written in a
+> **full** `/evolve` cycle. The *next* cycle's scoring (Step 3-A) — where the
+> winner flips — IS visible under `--dry-run` once the interventions exist.
 
 Two `[Reflect]` lines should print:
 

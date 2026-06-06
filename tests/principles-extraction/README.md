@@ -25,7 +25,11 @@ with two cases:
 - Expected: cluster fallback fires, emits top-3 `kind: "candidate"` principles
   at confidence 0.15.
 
-## Expected dry-run output
+## Expected output (full cycle)
+
+> `/evolve --dry-run` prints only the Decide score table and **exits at Step 3-H**
+> (zero writes). The `[Reflect]` effects below (Step 5-C principle extraction)
+> occur in a **full** `/evolve` cycle, not in `--dry-run`.
 
 ```
 [Reflect] New principle extracted: 'service_health dominated ...' (confidence 0.3, from 2 episodes)

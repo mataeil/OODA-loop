@@ -16,7 +16,11 @@ Seed state:
 - `cost_ledger.json` → last entry is `cycle_id: 39` (3 cycles behind).
 - `skill_gaps.json` → empty.
 
-## Expected dry-run output
+## Expected output (full cycle)
+
+> `/evolve --dry-run` prints only the Decide score table and **exits at Step 3-H**
+> (zero writes). The Step 6-C8 integrity gate below runs in a **full** `/evolve`
+> cycle, not in `--dry-run`.
 
 ```
 [Reflect] ⚠ cost_ledger missing entry for cycle #42. Auto-patching.
