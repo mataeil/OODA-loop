@@ -18,7 +18,13 @@ pattern (fwd `agent/state/ux/state.json:6-46`).
 `seed/agent/state/ux_evolution/rotation_cursor.json` initially points to
 cursor 0.
 
-## Expected dry-run output (4 consecutive cycles where ux_evolution wins)
+## Expected output — full cycle (4 consecutive cycles where ux_evolution wins)
+
+> The `[Act] Rotation` lines are Step 4-B (Act), which `--dry-run` does **not**
+> execute (it exits at Step 3-H). In `--dry-run` the engine may print what it
+> *would* rotate to, but the cursor is never written. The behavior below is for
+> full `/evolve` cycles.
+
 
 ```
 Cycle N   [Act] Rotation: ux_evolution focus='thumbnail-editor' (cursor 0 -> 1)

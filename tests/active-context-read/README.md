@@ -22,7 +22,11 @@ pattern (Lynceus config.json:8).
 `seed/contexts/persona-demo.json` is a minimal persona blob used by the
 fixture to prove the loader works (content is opaque to evolve).
 
-## Expected dry-run output
+## Expected output
+
+> The `[Observe]` load line IS visible under `/evolve --dry-run` (Step 1, before
+> the Step 3-H exit). The `[Act]` context-var injection is Step 4-B and only runs
+> in a **full** cycle.
 
 ```
 [Observe] active_context loaded: contexts/persona-demo.json (age: 0m)
