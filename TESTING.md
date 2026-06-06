@@ -62,19 +62,49 @@ Beyond the unit fixtures, the engine has run across a 9-stack sandbox (60 cycles
 projects (fwd.page 152 cycles / 86% merge; Lynceus 119 observe-only). These are
 *author-measured*, not third-party audited — see the README "On the numbers" note.
 
+### 5. Controlled live engine run
+
+Beyond static checks, the engine's core loop has been exercised **live on a real
+project** — a throwaway Python package whose unittest suite was genuinely run each
+cycle, with state read/written per `SKILL.md` (explicit paths; Level 1, no PRs):
+
+| Cycle | Real test result | Engine reaction | Cycle Card |
+|------|------------------|-----------------|------------|
+| 1 | 2/2 pass | confidence 0.70 init; lens initialized | observe-only |
+| 2 | **1/2 fail** (real regression) | status → degraded; confidence **+0.03 → 0.73**; lens learns a regression signal | alert + LEARN: lens re-aimed |
+| 3 | fix → 2/2 pass | confidence **+0.02 → 0.75**; lens signal **decays 0.30→0.10**; cycle-2 lesson recalled + applied | recovery + LEARN: lens re-aimed 0.3→0.1 |
+
+This verified, end-to-end, that Observe → Orient → Decide → Reflect → Cycle Card
+react to **real, changing** outcomes: the confidence trajectory, the Adaptive Lens
+learning-then-decaying a signal, the Reflexion loop closing (a prior lesson
+recalled and marked `applied`), and the cost ledger accumulating ($0.02→$0.06).
+
+**Method caveat (honest):** this run was *driven by Claude executing the spec
+with explicit file paths* (the normal way `/evolve` runs, but pointed at a
+sandbox instead of relying on the session CWD). It exercised Levels 0–1
+(observe/test). It did **not** exercise the Level-3 Act path (autonomous PR
+creation / auto-merge / rollback), which needs a GitHub remote.
+
 ## What is NOT yet covered (the honest gap)
 
-The remaining gate before tagging a **stable `1.2.0`** (it is currently
-`v1.2.0-beta`) is a clean, **independent, live multi-cycle `/evolve` run** on the
-corrected fixtures — i.e. actually invoking `/evolve` in a real Claude Code
-session (`cd` into a sandbox project), over several cycles, and diffing the
-console output + written state against the fixture expectations. This exercises
-the full Observe→Orient→Decide→Act→Reflect→Cycle-Card path end-to-end, including
-the Reflect/Act steps that `--dry-run` and the static walkthrough do not run.
+After the controlled live run above, two gaps remain before a **stable `1.2.0`**
+(currently `v1.2.0-beta`):
 
-That run is deliberately deferred to a dedicated session: invoking `/evolve` from
-the framework repo itself would mutate OODA-loop's *own* `agent/state/`, so it
-must be done with the working directory set to a throwaway sandbox project.
+1. **Fully-independent invocation.** The live run was Claude executing the spec
+   with explicit paths. The gold standard is a *fresh* Claude Code session whose
+   working directory IS a sandbox project, running the `/evolve` **slash command**
+   itself over several cycles. (It can't be done from this framework repo: the
+   skill resolves `config.json` from the session CWD, and Step 6-D would commit +
+   push OODA-loop's *own* state — so it needs a separate session in a throwaway
+   project. ~2 minutes for a human.)
+2. **The Level-3 Act path.** Autonomous PR creation, auto-merge of low-risk
+   tiers, and the rollback protocol need a GitHub remote and have **not** been
+   battle-tested end-to-end (the maintainer runs production at Level 2 — draft
+   PRs merged by hand). Treat Level 3 as experimental until this is exercised.
+
+Levels 0–2 (observe / test / draft-PR + the full Orient/Reflect learning loop)
+are verified by the static suite + the controlled live run. Level 3 is the part
+to prove before calling it stable without caveats.
 
 ## Adding a fixture
 
