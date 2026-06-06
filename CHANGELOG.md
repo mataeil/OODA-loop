@@ -8,7 +8,7 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
-## [Unreleased]
+## [v1.2.0-beta] — 2026-06-06
 
 ### Added — Visible engine (Week-1)
 
@@ -36,6 +36,16 @@ The goal of this milestone is to make the (already production-validated) engine
   verbal self-correction (text re-read), not weight updates. Surfaced in
   `/ooda-status` Orient Health as a `Reflections` count + latest lesson, and as
   a Cycle Card LEARN fallback when no higher-signal delta exists.
+- **README hero demo** — `docs/demo.gif`, a dark-terminal animation of one cycle
+  ending on the LEARN line (reject PR #28 → confidence 0.74→0.54, lens re-aims
+  0.30→0.25; caption "You rejected it. It re-aimed."), embedded above the fold
+  in both READMEs (static ASCII card kept in `<details>`). Reproducible via
+  `scripts/gen_demo_gif.py`.
+- **`tests/cycle-card/` fixture + reference renderer** — a full v1.2.0 seed
+  (fwd.page #152) with the expected Cycle Card / `--share` output, plus
+  `scripts/render_cycle_card.py`, a deterministic Step-7 renderer used to
+  runtime-verify the card end-to-end from real on-disk state. `tests/verify.py`
+  is now **28 PASS / 0 FAIL** (incl. runtime render checks).
 
 ### Changed
 
@@ -45,9 +55,11 @@ The goal of this milestone is to make the (already production-validated) engine
   section (heuristic proto-evolution, not ML) and corrected the Boyd/Orient
   framing (real five-component Orient diagram; Implicit Guidance arrows run
   *from* Orient; theory formulated in the 1970s–90s, not the 1950s).
-- **Versions** — plugin/marketplace `version` → `1.2.0-alpha` (was `1.0.0`);
+- **Versions** — plugin/marketplace `version` → `1.2.0-beta` (was `1.0.0`);
   `evolve` and `ooda-status` skill `version` → `1.1.0` (gained Cycle Card /
-  `--share`).
+  `--share`). Promoted alpha → **beta** (pre-release): the new Cycle Card render
+  is runtime-verified, but full-engine `/evolve` runtime verification across all
+  fixtures remains the gate for a stable `1.2.0` — so this stays a pre-release.
 
 ---
 
