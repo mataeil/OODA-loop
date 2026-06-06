@@ -192,6 +192,25 @@ def check_season_mode_toggle(r: Runner) -> None:
         bool(sb),
         f"signal_bonuses = {sb}",
     )
+    # Objective Decide-scoring check: the weight_overrides must flip the winner.
+    import importlib.util
+
+    ds_path = ROOT.parent / "scripts" / "dryrun_score.py"
+    spec = importlib.util.spec_from_file_location("ds", ds_path)
+    ds = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ds)
+    drank = ds.score_domains(base / "config.default.json")
+    prank = ds.score_domains(base / "config.preparation.json")
+    r.check(
+        "season-mode-toggle: default mode → service_health wins (Decide scoring)",
+        bool(drank) and drank[0][0] == "service_health",
+        f"default ranking = {[x[0] for x in drank]}",
+    )
+    r.check(
+        "season-mode-toggle: preparation overrides flip winner → backlog",
+        bool(prank) and prank[0][0] == "backlog",
+        f"preparation ranking = {[x[0] for x in prank]}",
+    )
 
 
 def check_rotation_cursor(r: Runner) -> None:
