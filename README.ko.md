@@ -215,7 +215,7 @@ OODA-loop은 특정 스택에 묶인 코드 생성기가 아니라 사고 프레
 | [fwd.page](https://fwd.page) | URL 단축 | 152+ | 28 (24 머지, 86%) |
 | Lynceus | 국정감사 | 119+ | 0 (Level 2 — 관찰만) |
 
-이 프로젝트들은 **프레임워크가 수정하지 않는 참조 데이터 소스**입니다. 그들이 드러낸 모든 개선은 상류로 반영되어 다음 다운스트림 프로젝트가 공짜로 누립니다. v1.2.0-alpha는 271 프로덕션 사이클에서 증류했습니다: Orient 레이어가 실제로 학습(principles 추출, lens 사전 초기화), cost-ledger 무결성 게이팅, 프로덕션에서 승격된 primitive(season modes, active context, rotation). [CHANGELOG.md](CHANGELOG.md) 참고.
+이 프로젝트들은 **프레임워크가 수정하지 않는 참조 데이터 소스**입니다. 그들이 드러낸 모든 개선은 상류로 반영되어 다음 다운스트림 프로젝트가 공짜로 누립니다. v1.2.0 라인은 271 프로덕션 사이클에서 증류했습니다: Orient 레이어가 실제로 학습(principles 추출, lens 사전 초기화), cost-ledger 무결성 게이팅, 프로덕션에서 승격된 primitive(season modes, active context, rotation). [CHANGELOG.md](CHANGELOG.md) 참고.
 
 > **숫자에 대하여.** "86% 머지"와 샌드박스 결과는 저자가 측정한 값이고, 프로덕션 사이클 데이터는 메인테이너 본인의 배포에서 나온 것입니다. Level 1–2로 일주일 직접 파일럿 해보세요 — 그게 정직한 검증이고, 당신의 숫자를 듣고 싶습니다.
 

@@ -54,8 +54,9 @@ def load_font(size: int) -> ImageFont.FreeTypeFont:
 
 
 FS = 24
+FS_SM = 17
 F = load_font(FS)
-FB = load_font(FS)  # SF Mono single weight; reuse
+FW = load_font(FS_SM)  # small watermark font
 LH = 38                       # line height
 CW = F.getlength("M")         # monospace char width
 PAD = 34
@@ -121,6 +122,10 @@ def render(reveal: int, cursor: bool, show_caption: bool) -> Image.Image:
         cx = 26 + i * 26
         d.ellipse((cx, BAR_H // 2 - 7, cx + 14, BAR_H // 2 + 7), fill=c)
     d.text((118, BAR_H // 2 - FS // 2 - 2), "fwd.page · OODA-loop", font=F, fill=DIM)
+    # repo handle watermark (right-aligned) — so a shared GIF self-advertises
+    wm = "github.com/mataeil/OODA-loop"
+    ww = FW.getlength(wm)
+    d.text((W - PAD - ww, BAR_H // 2 - FS_SM // 2 - 1), wm, font=FW, fill=(88, 96, 105))
 
     # prompt
     py = BAR_H + PAD - 6
@@ -137,6 +142,15 @@ def render(reveal: int, cursor: bool, show_caption: bool) -> Image.Image:
     ix = PAD + 26
     iy = card_top + 22
     shown = min(reveal, N)
+    # faint highlight band behind the LEARN block (rows 6-8) — draws the eye to
+    # the differentiator. Drawn before text so labels/values sit on top.
+    LEARN_ROWS = [i for i, (lbl, _, _) in enumerate(CARD_LINES) if lbl == "LEARN"]
+    if LEARN_ROWS and shown > LEARN_ROWS[0]:
+        l0 = LEARN_ROWS[0]
+        l1 = min(shown - 1, l0 + 2)  # LEARN label + up to 2 continuation rows
+        by0 = iy + l0 * LH - 6
+        by1 = iy + l1 * LH + FS + 4
+        d.rounded_rectangle((PAD + 14, by0, W - PAD - 14, by1), radius=8, fill=(19, 33, 39))
     for i in range(shown):
         label, lcol, segs = CARD_LINES[i]
         y = iy + i * LH

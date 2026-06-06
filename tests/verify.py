@@ -276,6 +276,41 @@ def check_cycle_card(r: Runner) -> None:
     )
 
 
+def check_cycle_card_render(r: Runner) -> None:
+    """Runtime check: execute the reference Cycle Card renderer on the fixture
+    and assert the rendered output carries the differentiating LEARN content."""
+    import importlib.util
+
+    rcc_path = ROOT.parent / "scripts" / "render_cycle_card.py"
+    spec = importlib.util.spec_from_file_location("rcc", rcc_path)
+    rcc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rcc)
+    card, share = rcc.render(ROOT / "cycle-card" / "seed")
+    must = [
+        "fwd.page · OODA-loop cycle #152",
+        "you rejected PR #28",
+        "0.74 → 0.54",
+        "PR #29",
+        "Full observation",
+    ]
+    missing = [m for m in must if m not in card]
+    r.check(
+        "cycle-card render: card contains reject→re-aim LEARN + PR #29 + level name",
+        not missing,
+        f"missing={missing}" if missing else "all key fields present",
+    )
+    r.check(
+        "cycle-card render: LEARN did NOT fall back to 'no new orientation'",
+        "no new orientation" not in card,
+        "real LEARN line fired (priority 1 human-reject)",
+    )
+    r.check(
+        "cycle-card render: share line carries the repo handle",
+        "github.com/mataeil/OODA-loop" in share,
+        "share line present",
+    )
+
+
 def main() -> int:
     r = Runner()
     r.section("principles-extraction", lambda: check_principles_extraction(r))
@@ -286,6 +321,7 @@ def main() -> int:
     r.section("rotation-cursor", lambda: check_rotation_cursor(r))
     r.section("active-context-read", lambda: check_active_context_read(r))
     r.section("cycle-card", lambda: check_cycle_card(r))
+    r.section("cycle-card-render", lambda: check_cycle_card_render(r))
     return r.report()
 
 
