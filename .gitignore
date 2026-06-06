@@ -29,6 +29,7 @@ agent/safety/HALT
 
 # Internal strategy / working docs (not for the public repo)
 .claude/viral-strategy.md
+.claude/launch-assets.md
 
 # OS
 .DS_Store
