@@ -16,11 +16,23 @@ Seed state:
 - `cost_ledger.json` → last entry is `cycle_id: 39` (3 cycles behind).
 - `skill_gaps.json` → empty.
 
-## Expected output (full cycle)
+## Expected output (Step 6-C8 unit fixture)
 
-> `/evolve --dry-run` prints only the Decide score table and **exits at Step 3-H**
-> (zero writes). The Step 6-C8 integrity gate below runs in a **full** `/evolve`
-> cycle, not in `--dry-run`.
+> **Fixture type: Step 6-C8 unit (state-only seed, no config.json).** It asserts
+> the integrity gate *in isolation*: given a ledger whose last entry (cycle 39)
+> is behind `state.cycle_count` (42), 6-C8 detects the mismatch and patches.
+>
+> **Important full-cycle caveats** (so a live run isn't surprising):
+> 1. 6-C8 is a **same-cycle backstop**. In a normal full cycle, Step 6-C5b writes
+>    the current cycle's entry *before* 6-C8, so the gate is a no-op unless 6-C5b
+>    was skipped (the production failure mode it guards). It patches the *current*
+>    `cycle_count`; it does **not** backfill a multi-cycle historical gap (see
+>    issue: 6-C8 gap-backfill enhancement).
+> 2. After Step 6-A increments `cycle_count`, the gate references the incremented
+>    number — so on a live run from this seed the message is cycle #43, not #42.
+> 3. `cost_ledger.date` here is `2026-04-19`; Step 1-A's daily reset wipes the
+>    ledger if run on a different UTC date. For a faithful live trace, set the
+>    date to the run date. (The static `verify.py` check is date-independent.)
 
 ```
 [Reflect] ⚠ cost_ledger missing entry for cycle #42. Auto-patching.

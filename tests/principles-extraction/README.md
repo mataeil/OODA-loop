@@ -25,11 +25,12 @@ with two cases:
 - Expected: cluster fallback fires, emits top-3 `kind: "candidate"` principles
   at confidence 0.15.
 
-## Expected output (full cycle)
+## Expected output (Step 5-C unit fixture)
 
-> `/evolve --dry-run` prints only the Decide score table and **exits at Step 3-H**
-> (zero writes). The `[Reflect]` effects below (Step 5-C principle extraction)
-> occur in a **full** `/evolve` cycle, not in `--dry-run`.
+> **Fixture type: Step 5-C unit (state-only seed, no config.json).** It asserts
+> Tier-2b principle extraction given the seeded `episodes.json` — not a full-cycle
+> run. These `[Reflect]` effects occur in the Reflect phase of a full cycle;
+> `--dry-run` (Step 0→3-H) never reaches them.
 
 ```
 [Reflect] New principle extracted: 'service_health dominated ...' (confidence 0.3, from 2 episodes)
