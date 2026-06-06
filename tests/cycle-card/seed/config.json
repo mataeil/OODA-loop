@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.2.0",
+  "project": { "name": "fwd.page", "locale": "en", "timezone": "UTC" },
+  "domains": {
+    "service_health": { "weight": 2.0, "status": "active", "skill": "/scan-health", "state_file": "agent/state/service_health/state.json" },
+    "test_coverage": { "weight": 1.0, "status": "active", "skill": "/check-tests", "state_file": "agent/state/test_coverage/state.json" },
+    "backlog": { "weight": 0.5, "status": "active", "skill": "/plan-backlog", "state_file": "agent/state/backlog/state.json" },
+    "uptime": { "weight": 1.5, "status": "active", "skill": "/scan-health", "state_file": "agent/state/uptime/state.json" }
+  },
+  "progressive_complexity": {
+    "current_level": 2,
+    "levels": {
+      "0": { "name": "Just watching", "domains": 1, "implementation": false, "auto_merge": false },
+      "1": { "name": "Watching + testing", "domains": 2, "implementation": false, "auto_merge": false },
+      "2": { "name": "Full observation", "domains": "all", "implementation": false, "auto_merge": false },
+      "3": { "name": "Autonomous", "domains": "all", "implementation": true, "auto_merge": true }
+    }
+  },
+  "output": { "cycle_card": true },
+  "cost": { "daily_limit_usd": 10.0, "warning_threshold_pct": 80 }
+}

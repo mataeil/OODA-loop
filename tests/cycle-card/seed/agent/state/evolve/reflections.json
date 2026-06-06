@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "reflections": [
+    {
+      "cycle": 152,
+      "timestamp": "2026-04-14T03:14:00Z",
+      "domain": "test_coverage",
+      "skill": "/check-tests",
+      "result": "pr_created",
+      "verdict": "hit",
+      "critique": "Chose test_coverage after the flaky-retry pattern recurred a third time; the outcome matched the orient expectation.",
+      "lesson": "When a flaky pattern recurs 3x, prioritize a retry wrapper before more coverage work.",
+      "status": "open"
+    }
+  ]
+}

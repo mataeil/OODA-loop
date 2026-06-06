@@ -5,7 +5,14 @@
 
 매 사이클 끝에 출력되는 화면입니다 — cron 작업·라운드로빈 루프·스킬 팩 그 무엇도 만들 수 없는 단 하나의 아티팩트. 이유는 **LEARN** 라인, *당신의* 머지/리젝트 결정으로부터 재조준하는 그 줄입니다:
 
-<!-- TODO(demo): 공개 런칭 전 이 정적 카드를 docs/demo.gif (asciinema → agg)로 교체: /evolve → PR 오픈 → 리젝트 → lens.json이 눈앞에서 변형. 캡션 "You rejected it. It re-aimed." 그 전까지는 아래 정적 카드가 정상 렌더됩니다. -->
+<p align="center">
+  <img src="docs/demo.gif" alt="OODA-loop 한 사이클: PR을 열고, 당신이 리젝트하면, Adaptive Lens가 임계값을 재조준 — 'You rejected it. It re-aimed.'" width="820">
+</p>
+
+`/ooda-status --share`로 언제든 최신 카드를 다시 렌더할 수 있습니다.
+
+<details>
+<summary>텍스트가 편하신가요? 같은 Cycle Card입니다.</summary>
 
 ```
 ┌─ fwd.page · OODA-loop cycle #152 ────────────── 2026-04-14 03:14 UTC ─┐
@@ -25,8 +32,7 @@
 │  HALT: inactive · Level 2 (Full observation)                          │
 └────────────────────────────────────────────────────────────────────────┘
 ```
-
-`/ooda-status --share`로 언제든 최신 카드를 다시 렌더할 수 있습니다.
+</details>
 
 당신의 *살아있는* 사이드 프로젝트를 위한 자율 **운영(operations)** 레이어 — 무엇이 중요한지 판단하고 당신이 승인하는 작은 PR을 제안합니다. **지휘권은 당신에게:** 제안하고, 당신이 머지하거나 리젝트하고, 모든 변경은 한 번에 되돌릴 수 있는 독립 PR이며, 당신의 결정에서 재조준합니다. *(auto-merge는 opt-in이고 저위험 티어만, Level 3에서만 — 켜기 전엔 꺼져 있습니다. 나쁜 배포 시 auto-revert도 opt-in.)*
 

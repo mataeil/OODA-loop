@@ -1,0 +1,9 @@
+{
+  "schema_version": "1.0.0",
+  "date": "2026-04-14",
+  "total_estimated_usd": 0.38,
+  "entries": [
+    { "cycle_id": 151, "timestamp": "2026-04-13T15:00:00Z", "skill": "/scan-health", "chain": [], "estimated_usd": 0.02 },
+    { "cycle_id": 152, "timestamp": "2026-04-14T03:14:00Z", "skill": "/check-tests", "chain": [], "estimated_usd": 0.04 }
+  ]
+}

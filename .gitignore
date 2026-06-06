@@ -31,6 +31,9 @@ agent/safety/HALT
 .claude/viral-strategy.md
 .claude/launch-assets.md
 
+# Build artifact — regenerate with scripts/gen_demo_gif.py --preview
+docs/demo_preview.png
+
 # OS
 .DS_Store
 Thumbs.db

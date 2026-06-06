@@ -220,6 +220,62 @@ def check_active_context_read(r: Runner) -> None:
     )
 
 
+def check_cycle_card(r: Runner) -> None:
+    base = ROOT / "cycle-card" / "seed"
+    ev = base / "agent" / "state" / "evolve"
+    conf = load_json(ev / "confidence.json")
+    r.check(
+        "cycle-card: service_health confidence 0.54 (= 0.74 - 0.2 reject)",
+        abs(conf["service_health"] - 0.54) < 1e-9,
+        f"service_health = {conf['service_health']}",
+    )
+    lcl = load_json(base / "agent" / "state" / "service_health" / "lens_changelog.json")
+    last = lcl["entries"][-1]
+    r.check(
+        "cycle-card: lens_changelog flaky-alert threshold 0.30 -> 0.25 (LEARN #2)",
+        last["before"] == 0.30 and last["after"] == 0.25,
+        f"before={last['before']}, after={last['after']}",
+    )
+    cl = load_json(ev / "cost_ledger.json")
+    e152 = [e for e in cl["entries"] if e["cycle_id"] == 152]
+    r.check(
+        "cycle-card: cost_ledger has cycle 152 entry @ $0.04, total $0.38",
+        len(e152) == 1 and e152[0]["estimated_usd"] == 0.04
+        and cl["total_estimated_usd"] == 0.38,
+        f"entry={e152}, total={cl['total_estimated_usd']}",
+    )
+    refl = load_json(ev / "reflections.json")
+    r.check(
+        "cycle-card: reflections non-empty with verdict hit (Step 5-F ran)",
+        len(refl["reflections"]) >= 1 and refl["reflections"][-1]["verdict"] == "hit",
+        f"count={len(refl['reflections'])}",
+    )
+    cfg = load_json(base / "config.json")
+    lvl2 = cfg["progressive_complexity"]["levels"]["2"]["name"]
+    active = [n for n, d in cfg["domains"].items() if d.get("status") == "active"]
+    r.check(
+        "cycle-card: level 2 name 'Full observation' (footer reads from config)",
+        lvl2 == "Full observation",
+        f"levels[2].name = {lvl2}",
+    )
+    r.check(
+        "cycle-card: 4 active domains (OBSERVE count)",
+        len(active) == 4,
+        f"active = {active}",
+    )
+    st = load_json(ev / "state.json")
+    last_dec = st["decision_log"][-1]
+    outcomes = last_dec.get("pr_outcomes", [])
+    rejected28 = any(
+        o.get("pr") == 28 and o.get("outcome") == "rejected" for o in outcomes
+    )
+    r.check(
+        "cycle-card: cycle 152 logged PR #28 rejection + opened PR #29 (LEARN #1)",
+        last_dec["cycle"] == 152 and rejected28 and last_dec.get("pr_number") == 29,
+        f"cycle={last_dec['cycle']}, pr={last_dec.get('pr_number')}, outcomes={outcomes}",
+    )
+
+
 def main() -> int:
     r = Runner()
     r.section("principles-extraction", lambda: check_principles_extraction(r))
@@ -229,6 +285,7 @@ def main() -> int:
     r.section("season-mode-toggle", lambda: check_season_mode_toggle(r))
     r.section("rotation-cursor", lambda: check_rotation_cursor(r))
     r.section("active-context-read", lambda: check_active_context_read(r))
+    r.section("cycle-card", lambda: check_cycle_card(r))
     return r.report()
 
 

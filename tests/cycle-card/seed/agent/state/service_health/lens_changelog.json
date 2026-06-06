@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "domain": "service_health",
+  "entries": [
+    {
+      "cycle": 152,
+      "timestamp": "2026-04-14T03:14:00Z",
+      "domain": "service_health",
+      "item": "flaky-alert threshold",
+      "change_type": "decayed",
+      "before": 0.30,
+      "after": 0.25,
+      "delta": -0.05,
+      "reason": "3 confirmations of a false-positive alert"
+    }
+  ]
+}

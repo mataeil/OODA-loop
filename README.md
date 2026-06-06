@@ -5,7 +5,14 @@
 
 Here's what it prints at the end of every cycle — the one artifact no cron job, round-robin loop, or skills pack can produce, because of the **LEARN** line, where it re-orients from *your* merge/reject calls:
 
-<!-- TODO(demo): before public launch, replace this static card with docs/demo.gif (asciinema → agg): /evolve → opens PR → you reject → lens.json visibly mutates. Caption: "You rejected it. It re-aimed." The static card below renders fine in the meantime. -->
+<p align="center">
+  <img src="docs/demo.gif" alt="One OODA-loop cycle: it opens a PR, you reject it, and the Adaptive Lens re-aims a threshold — 'You rejected it. It re-aimed.'" width="820">
+</p>
+
+Re-render the latest card any time with `/ooda-status --share`.
+
+<details>
+<summary>Prefer plain text? The same Cycle Card.</summary>
 
 ```
 ┌─ fwd.page · OODA-loop cycle #152 ────────────── 2026-04-14 03:14 UTC ─┐
@@ -25,8 +32,7 @@ Here's what it prints at the end of every cycle — the one artifact no cron job
 │  HALT: inactive · Level 2 (Full observation)                          │
 └────────────────────────────────────────────────────────────────────────┘
 ```
-
-Re-render the latest card any time with `/ooda-status --share`.
+</details>
 
 An autonomous **operations** layer for your live side project — it watches, decides what matters, and proposes small PRs you approve. **You stay in command:** it proposes, you merge or reject, every change is an isolated one-click-revertible PR, and it re-aims from your calls. *(Auto-merge is opt-in, low-risk-tier-only, and lives at Level 3 — off until you turn it on. Auto-revert on a bad deploy is also opt-in.)*
 
