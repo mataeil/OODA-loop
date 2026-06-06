@@ -1179,7 +1179,13 @@ dominant domain *down* directly so the next cycle has no pull toward it.
 
 ```
 consecutive = same-domain run length from 2-A pattern analysis
-if consecutive >= 2:
+active_domain_count = count of config.domains where status in ("active","degraded")
+-- Single-domain guard: with only one scoreable domain there is nothing to
+-- rotate TO, so penalizing the sole domain -10.0 would just starve the cycle
+-- (no winner -> wasted cycle). Skip the monopoly-breaker entirely. (The 2-A
+-- futile-loop penalty still guards an *unproductive* single domain, since it
+-- only fires when the domain produces no output.)
+if consecutive >= 2 AND active_domain_count >= 2:
   dominant = decision_log[-1].selected_domain
   -- Skip if an active monopoly_breaker for this domain already exists
   if interventions contains iv where iv.domain == dominant AND iv.type == "monopoly_breaker":
@@ -1920,6 +1926,9 @@ Then print one plain-text line below the box for frictionless copy-paste sharing
 ```
 {project.name} ran OODA-loop cycle #{N}: {winner} → {act_summary}. Learned: {learn_line_1}. Cost +${cycle_cost}/cycle (${daily_total} today). — github.com/mataeil/OODA-loop
 ```
+
+Strip any trailing `.` from `{learn_line_1}` before substituting it so the
+sentence doesn't end in `..`.
 
 **Honesty rule (non-negotiable).** The LEARN line describes *outcome-driven
 re-orientation* — heuristic confidence/lens updates with asymmetric decay — NOT
