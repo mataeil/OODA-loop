@@ -141,6 +141,15 @@ def check_cost_ledger_autopatch(r: Runner) -> None:
         sg["gaps"] == [],
         f"gap count = {len(sg['gaps'])}",
     )
+    # 6-C8 sequence-gap detection: the holes 6-C8 would backfill.
+    recorded = sorted({e["cycle_id"] for e in cl["entries"]})
+    expected = st["cycle_count"]
+    missing = [c for c in range(recorded[0], expected + 1) if c not in recorded]
+    r.check(
+        "cost-ledger-autopatch: 6-C8 would backfill the 3-cycle gap [40,41,42]",
+        missing == [40, 41, 42],
+        f"recorded={recorded}, missing={missing}",
+    )
 
 
 def check_lens_pre_init(r: Runner) -> None:

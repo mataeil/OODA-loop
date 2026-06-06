@@ -218,6 +218,8 @@
   },
   "cost": {
     "daily_limit_usd": 10.0,
-    "warning_threshold_pct": 80
+    "warning_threshold_pct": 80,
+    "max_backfill_cycles": 100,
+    "__doc__": "daily_limit_usd: crossing it auto-creates a HALT (hard stop). warning_threshold_pct: warn at this % of the cap. max_backfill_cycles: Step 6-C8 caps how many missing ledger entries it will synthesize in one cycle so a corrupt cycle counter can't write thousands of entries (default 100)."
   }
 }

@@ -1723,33 +1723,50 @@ continued to complete — the optional Step 6-C5b write was being silently skipp
 The integrity gate ensures the ledger is always in sync with state.cycle_count.
 
 ```
--- Load cost_ledger.json
-last_entry = cost_ledger.entries[-1] if cost_ledger.entries else null
+-- Load cost_ledger.json. Detect SEQUENCE gaps, not just a missing last entry:
+-- Step 6-C5b appends the current cycle's entry, which would mask an earlier
+-- hole if we only compared last_entry.cycle_id to cycle_count. So scan the whole
+-- recorded range and backfill every missing cycle_id up to state.cycle_count.
+recorded = sorted(set(e.cycle_id for e in cost_ledger.entries if e.cycle_id is an int))
+expected = state.cycle_count
+MAX_BACKFILL = config.cost.max_backfill_cycles (default 100)
 
-if last_entry is null OR last_entry.cycle_id != state.cycle_count:
-  Print "[Reflect] ⚠ cost_ledger missing entry for cycle #{state.cycle_count}. Auto-patching."
+if recorded is empty:
+  missing = [expected]                                   -- nothing recorded yet
+else:
+  lo = recorded[0]
+  missing = [c for c in range(lo, expected + 1) if c not in recorded]
 
-  -- Append synthetic entry (use 0.02 as safe minimum)
-  cost_ledger.entries.append({
-    cycle_id: state.cycle_count,
-    timestamp: now (ISO 8601),
-    skill: selected_skill or "unknown",
-    chain: chain_executed or [],
-    estimated_usd: 0.02,
-    synthetic: true,
-    reason: "6-C8 auto-patch: cycle completed without 6-C5b write"
-  })
-  cost_ledger.total_estimated_usd += 0.02
+if missing is non-empty:
+  truncated = len(missing) > MAX_BACKFILL
+  if truncated:
+    missing = missing[-MAX_BACKFILL:]                    -- keep the most recent; never write thousands
 
-  -- Emit skill_gaps signal so the operator can diagnose why 6-C5b skipped
+  Print "[Reflect] ⚠ cost_ledger gap: missing entr(ies) for cycle(s) {missing[0]}..{missing[-1]} ({len(missing)}). Backfilling."
+
+  for c in missing:
+    is_current = (c == expected)
+    cost_ledger.entries.append({
+      cycle_id: c,
+      timestamp: now (ISO 8601),
+      skill: (selected_skill or "unknown") if is_current else "unknown",
+      chain: (chain_executed or []) if is_current else [],
+      estimated_usd: 0.02,                                -- safe minimum
+      synthetic: true,
+      reason: "6-C8 gap backfill: cycle had no 6-C5b write"
+    })
+    cost_ledger.total_estimated_usd += 0.02
+  Re-sort cost_ledger.entries by cycle_id ascending.
+
+  -- Emit ONE skill_gaps signal summarizing the whole gap span (not one per cycle)
   skill_gaps.gaps.append({
-    id: "gap-cost-ledger-autopatch-{cycle_count}",
-    description: "cost_ledger.json missing entry for cycle {cycle_count} — auto-patched with synthetic entry",
+    id: "gap-cost-ledger-autopatch-{expected}",
+    description: "cost_ledger missing {len(missing)} entr(y/ies) in range {missing[0]}..{missing[-1]} — backfilled with synthetic entries" + (truncated ? "; older cycles beyond max_backfill_cycles were not backfilled" : ""),
     detected_at: now,
-    detected_in_cycle: state.cycle_count,
+    detected_in_cycle: expected,
     ooda_phase: "meta",
-    frequency: 1,
-    last_seen_cycle: state.cycle_count,
+    frequency: len(missing),
+    last_seen_cycle: expected,
     related_domain: null,
     proposed_skill: null,
     resolved: false,
@@ -1757,12 +1774,23 @@ if last_entry is null OR last_entry.cycle_id != state.cycle_count:
     type: "learning_loop_break"
   })
 
-Print "[Reflect] Cost ledger gate: cycle #{state.cycle_count} recorded (total ${cost_ledger.total_estimated_usd})."
+  Print "[Reflect] Cost ledger gate: backfilled {len(missing)} cycle(s) {missing[0]}..{missing[-1]} (total ${cost_ledger.total_estimated_usd})."
+else:
+  -- Ledger in sync with state.cycle_count. No action.
 ```
 
-Rationale: fails loud, not silent. If Step 6-C5b ever misses a cycle, the
-operator sees a warning AND a skill_gaps entry — visible in `/ooda-status` —
-so the root cause can be investigated instead of accumulating silent drift.
+Rationale: fails loud, not silent, and now *self-heals multi-cycle drift*. If
+Step 6-C5b silently skips for several cycles (the 13-day production drop), 6-C8
+detects every hole in the recorded sequence and backfills it, emitting one
+`learning_loop_break` skill_gap (visible in `/ooda-status`) so the root cause is
+still investigated. The `max_backfill_cycles` cap prevents a corrupt counter
+from writing an unbounded number of synthetic entries.
+
+> **Interaction with the Step 1-A daily reset.** The reset clears the ledger when
+> `cost_ledger.date` differs from today (UTC). 6-C8 backfills only *within the
+> current day's* recorded range — it does not (and should not) resurrect entries
+> the daily reset intentionally cleared. Its job is to stop the bleed going
+> forward, not to reconstruct prior days.
 
 ### 6-D: Git Commit
 
