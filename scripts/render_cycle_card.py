@@ -115,6 +115,28 @@ def render(project: Path) -> tuple[str, str]:
             f"lens re-aimed → {newest.get('item')} "
             f"{fmt_num(newest.get('before'))} → {fmt_num(newest.get('after'))}"
         )
+    # 3) a new intervention written this cycle (memos.json)
+    if not learn:
+        memos = load(ev / "memos.json")
+        for iv in (memos.get("interventions", []) or []):
+            if iv.get("created_at_cycle") == cyc:
+                learn.append(
+                    f"{iv.get('type')} → {iv.get('domain')} {fmt_num(iv.get('delta'))} "
+                    f"for {iv.get('expires_after_cycles')} cycle(s)"
+                )
+                break
+    # 4) observation micro-adjustment (confidence delta vs previous cycle, same domain)
+    if not learn and len(log) >= 2:
+        prev = log[-2]
+        if (prev.get("domain") == dom and prev.get("confidence") is not None
+                and d.get("confidence") is not None):
+            delta = round(d["confidence"] - prev["confidence"], 3)
+            if abs(delta) >= 0.001:
+                sign = "+" if delta > 0 else ""
+                learn.append(
+                    f"{dom} confidence {fmt_num(prev['confidence'])} → "
+                    f"{fmt_num(d['confidence'])} ({sign}{delta})"
+                )
     # 5) re-applied reflection lesson (fallback)
     if not learn and reflections:
         learn.append(f"recalled lesson: {reflections[-1].get('lesson', '')}")
@@ -161,7 +183,7 @@ def render(project: Path) -> tuple[str, str]:
 
     share = (
         f"{name} ran OODA-loop cycle #{cyc}: {dom} → {act}. "
-        f"Learned: {learn[0]}. Cost +${fmt_num(cyc_cost)}/cycle (${fmt_num(total)} today). "
+        f"Learned: {learn[0].rstrip('.')}. Cost +${fmt_num(cyc_cost)}/cycle (${fmt_num(total)} today). "
         f"— github.com/mataeil/OODA-loop"
     )
     return card, share
