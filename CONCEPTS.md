@@ -197,6 +197,59 @@ documents the distinction and leaves implementation for later.
 
 ---
 
+## State File Schemas (selected)
+
+These Orient-layer files are written by evolve and read back to drive learning.
+All live under `agent/state/` and are gitignored (runtime state, per-project).
+
+### `agent/state/evolve/reflections.json` (Reflexion loop)
+
+Written by Step 5-F (one entry per decision cycle), read by Step 2-F. Capped at
+`config.memory.reflections_buffer_size` (default 20, oldest dropped).
+
+```json
+{
+  "schema_version": "1.0.0",
+  "reflections": [
+    {
+      "cycle": 152,
+      "timestamp": "2026-04-14T03:14:00Z",
+      "domain": "test_coverage",
+      "skill": "/check-tests",
+      "result": "pr_created",
+      "verdict": "hit",                       // hit | miss | too_early | unclear
+      "critique": "Chose test_coverage after the flaky pattern recurred; matched the orient expectation.",
+      "lesson": "When a flaky pattern recurs 3x, prioritize a retry wrapper before more coverage work.",
+      "status": "open"                        // becomes "applied" when Step 2-F re-injects it
+    }
+  ]
+}
+```
+
+Step 2-F selects up to `config.memory.reflection_recall_count` (default 3) recent
+reflections matching the current candidate domains and folds their `lesson` lines
+into the next Orient (and tie-breaks in Decide). This is verbal self-correction
+stored as language — not weight updates.
+
+### `agent/state/{domain}/lens_changelog.json` (auditable LEARN trail)
+
+Written by Step 5-E whenever a lens item is added/promoted/decayed/deprecated;
+the Cycle Card LEARN line and `/ooda-status --share` source from it.
+
+```json
+{
+  "schema_version": "1.0.0",
+  "domain": "service_health",
+  "entries": [
+    { "cycle": 152, "timestamp": "...", "domain": "service_health",
+      "item": "flaky-alert threshold", "change_type": "decayed",
+      "before": 0.30, "after": 0.25, "delta": -0.05, "reason": "3 confirmations of a false-positive alert" }
+  ]
+}
+```
+
+---
+
 ## Further Reading
 
 - **README.md** — Quick start guide: installation, first cycle, configuration basics
