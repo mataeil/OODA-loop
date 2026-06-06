@@ -95,6 +95,15 @@ Use dry-run mode to test the orchestrator without executing actions:
 /evolve --dry-run
 ```
 
+Run the verification suite before opening a PR (it must stay green):
+
+```bash
+python3 tests/verify.py     # static fixture walkthrough; see TESTING.md
+```
+
+See **[TESTING.md](TESTING.md)** for how the engine is verified and how to add a
+fixture for your change.
+
 ---
 
 ## Pull Request Guidelines
@@ -140,6 +149,10 @@ Generator templates are in `templates/skill-generators/`.
 ```bash
 cp templates/SKILL_TEMPLATE.md skills/<skill-name>/SKILL.md
 ```
+
+> For the *smallest* working example, copy `templates/minimal-domain-skill/`
+> instead — a ~30-line Observe skill plus a README showing the full wire-up
+> (skill file → `config.json` domain → `skill_allowlist` → run).
 
 Add the required YAML contract front-matter at the top of the file (see
 `agent/contracts/schema.md` for the full field list including `contract_version`,
