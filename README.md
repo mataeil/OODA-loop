@@ -217,7 +217,7 @@ Two production deployments continuously feed real-world data back into the frame
 
 These projects are **reference data sources, not modified by the framework**. Every improvement they surface lands upstream so the next downstream project gets it for free. The v1.2.0 line distilled 271 production cycles: the Orient layer now actually learns (principles extraction, lens pre-init), cost-ledger integrity gating, and primitives promoted from production (season modes, active context, rotation). See [CHANGELOG.md](CHANGELOG.md).
 
-> **On the numbers.** "86% merged" and the sandbox results are author-measured; the production cycle data is from the maintainer's own deployments. Run your own pilot at Level 1–2 for a week — that's the honest test, and we'd love your numbers.
+> **On the numbers.** "86% merged" and the sandbox results are author-measured; the production cycle data is from the maintainer's own deployments. Run your own pilot at Level 1–2 for a week — that's the honest test, and we'd love your numbers. See **[TESTING.md](TESTING.md)** for exactly how the engine is verified (and what isn't yet).
 
 ---
 

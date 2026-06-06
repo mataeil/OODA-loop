@@ -8,6 +8,34 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
+## [Unreleased]
+
+Post-beta quality work toward a stable `1.2.0` (surfaced by the stable-gate
+verification — see TESTING.md).
+
+### Added
+- **TESTING.md** — documents the verification stack (static walkthrough,
+  deterministic reference renderers, fixture taxonomy) and the honest remaining
+  gate for stable (a live multi-cycle `/evolve` run).
+- **`scripts/dryrun_score.py`** — deterministic Step 3-A scoring reference;
+  `verify.py` uses it to assert season-mode `weight_overrides` flip the winner.
+- **State-file schemas** in CONCEPTS.md (`reflections.json`, `lens_changelog.json`).
+- **`templates/minimal-domain-skill/`** — a ~30-line custom-domain starting point.
+
+### Changed
+- **Step 6-C8** now backfills multi-cycle ledger gaps (sequence-gap detection,
+  capped by `config.cost.max_backfill_cycles`) instead of only the current cycle
+  (#17). `cost.max_backfill_cycles` added (default 100).
+- Reframed the three state-only fixtures (`memo-intervention`,
+  `principles-extraction`, `cost-ledger-autopatch`) as **step-unit** fixtures and
+  documented the 6-C8 daily-reset interaction.
+
+### Tests
+- `tests/verify.py`: 31 PASS / 0 FAIL (added gap-detection, season-mode winner,
+  and Cycle Card runtime-render checks).
+
+---
+
 ## [v1.2.0-beta] — 2026-06-06
 
 ### Added — Visible engine (Week-1)
