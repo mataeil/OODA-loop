@@ -1,8 +1,8 @@
 {
   "name": "ooda-loop",
   "displayName": "OODA-loop",
-  "version": "1.0.0",
-  "description": "Autonomous operations agent for side projects. Watches your codebase, learns from outcomes, and acts — health checks, test tracking, backlog scoring, and implementation. Built on Boyd's OODA loop.",
+  "version": "1.2.0-alpha",
+  "description": "An autonomous operations layer for your live side project. It watches, re-orients from which PRs you merge and reject, and opens small revertible PRs — bounded by a HALT file, protected paths, and a hard cost cap. Built on Boyd's OODA loop. You stay in command.",
   "author": {
     "name": "Taeil Ma",
     "url": "https://github.com/mataeil"

@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "domain": "service_health",
+  "last_updated": "2026-04-14T03:14:00Z",
+  "focus_items": [
+    { "item": "/api/expand latency", "confidence": 0.6 }
+  ],
+  "learned_thresholds": [
+    { "item": "flaky-alert threshold", "value": 0.25, "confidence": 0.7 }
+  ],
+  "discovered_signals": [],
+  "evidence": [
+    { "timestamp": "2026-04-14T03:14:00Z", "cycle": 152, "source": "evolve Step 5-E", "observation": "flaky-alert fired on a transient timeout for the 3rd time", "items_added": 0, "confidence_changes": 1 }
+  ],
+  "deprecated_items": []
+}

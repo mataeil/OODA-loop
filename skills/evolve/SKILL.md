@@ -2,7 +2,7 @@
 name: evolve
 description: OODA Meta-Orchestrator. Observes all domain states, orients by learning from past outcomes, decides the highest-priority action, and executes it. Run with /evolve or /loop 4h /evolve.
 ooda_phase: meta
-version: "1.0.0"
+version: "1.1.0"
 input:
   files:
     - config.json
@@ -16,6 +16,7 @@ input:
     - agent/state/evolve/episodes.json
     - agent/state/evolve/principles.json
     - agent/state/evolve/cost_ledger.json
+    - agent/state/evolve/reflections.json
   apis:
     - "GitHub CLI (gh pr list, gh issue list, gh pr merge, gh pr view)"
     - "Health endpoints (config.health_endpoints)"
@@ -47,6 +48,9 @@ output:
     - agent/state/evolve/principles.json
     - agent/state/evolve/cost_ledger.json
     - agent/state/evolve/CHANGELOG.md
+    - agent/state/evolve/reflections.json
+    - "agent/state/*/lens.json"
+    - "agent/state/*/lens_changelog.json"
   prs: none
 safety:
   halt_check: true
@@ -525,7 +529,7 @@ for each goal in goals.json where status == "active":
 Read memos.json. The canonical format (v1.1.0, bumped in v1.2.0) is:
 `{"schema_version":"1.1.0", "score_adjustments":{}, "interventions":[], "history":[], "last_memo":null}`
 
-If the file has `schema_version: "1.0.0"` and no `interventions` key, treat
+If the file has `schema_version: "1.1.0"` and no `interventions` key, treat
 `interventions` as an empty list and leave the file's schema_version at 1.0.0
 until the next write (6-C) promotes it to 1.1.0 automatically.
 If the file has a `memos` array but no `score_adjustments` key (pre-v1.1.0 legacy),
@@ -569,6 +573,32 @@ Truncate orient_summary to 500 characters max. If the previous cycle's summary
 exceeds 500 chars when read, truncate it before using as prior context.
 Store as orient_summary in the decision_log entry being built.
 Print: `[Orient] {orient_summary}`
+
+### 2-F: Reflection Recall (Reflexion loop, closes 5-F)
+
+Re-inject recent verbal self-critiques so the loop acts on its own past lessons
+instead of relearning them. This is the read side of the Reflexion loop written
+in Step 5-F.
+
+```
+-- Read agent/state/evolve/reflections.json (skip silently if missing/empty).
+-- Select up to config.memory.reflection_recall_count (default 3) reflections,
+-- most recent first, preferring those whose `domain` matches a current
+-- candidate domain or the dominant recent pattern.
+relevant = recent reflections matching candidate domains (cap N)
+
+if relevant is non-empty:
+  -- Fold their `lesson` lines into the world model as prior guidance. They
+  -- inform the orient_summary (2-E) and break ties in Decide (Step 3): when two
+  -- domains score within ~0.5, a matching lesson nudges the choice.
+  Print "[Orient] Recalling {len(relevant)} past lesson(s): {lesson_1}; ..."
+  for each reflection applied this way:
+    set its status = "applied"   -- persisted in Step 6 alongside reflections.json
+```
+
+A reflection whose `verdict` was `miss` and whose lesson was applied and then
+held (no repeat miss) is the clearest signal the verbal loop is working — surface
+it in the Cycle Card LEARN line (Step 7) when no higher-priority delta exists.
 
 ---
 
@@ -1268,6 +1298,28 @@ for each observe-phase skill that ran this cycle:
     confidence_changes: count of items with confidence updates
   })
 
+  -- Append a human-readable changelog entry for EACH concrete change this
+  -- cycle, so the Cycle Card (Step 7) and `/ooda-status --share` have a real,
+  -- auditable source for the LEARN line. This file MUST exist whenever a lens
+  -- item is added, promoted, decayed, or deprecated — never leave it phantom.
+  -- Path: agent/state/{domain_name}/lens_changelog.json
+  --   { "schema_version": "1.0.0", "domain": "{domain_name}", "entries": [] }
+  -- For each change, append (cap entries at 50, drop oldest):
+  for each lens item added / promoted / decayed / deprecated this cycle:
+    lens_changelog.entries.append({
+      cycle: cycle_count,
+      timestamp: now (ISO 8601),
+      domain: domain_name,
+      item: the focus_item / threshold / signal label,
+      change_type: "added" | "promoted" | "decayed" | "deprecated",
+      before: prior confidence or threshold value (null if newly added),
+      after: new confidence or threshold value,
+      delta: after - before (e.g. +0.1 confirm, -0.2 disconfirm),
+      reason: one short phrase (e.g. "3 confirmations", "false positive")
+    })
+  if no lens item changed this cycle: do not write (leave file as-is).
+  Write updated lens_changelog to its path.
+
 if cycle_count % config.memory.contrarian_check_interval == 0:
   Compare current observation quality against baseline (first 3 cycles)
   If quality degraded: flag lens for human review in memos
@@ -1280,6 +1332,48 @@ Print: `[Reflect] Lens updated for {N} domains.` or "Lens unchanged."
 Update goal.last_activity for relevant goals. Update progress if measurable.
 If patterns suggest recurring unaddressed area, propose new goal with status
 "proposed" (requires human approval).
+
+### 5-F: Verbal Self-Critique (Reflexion loop)
+
+A short, honest natural-language critique of THIS cycle's decision — the
+[Reflexion](https://arxiv.org/abs/2303.11366) / Self-Refine mechanism. This is
+verbal self-correction stored in language and re-injected next cycle (Step 2-F),
+NOT weight updates or training. It is the honest mechanism behind the claim that
+the loop "learns from its own cycles."
+
+Skip this step on `--dry-run` and on observe-only cycles that made no decision.
+
+```
+-- Compare the outcome to what Orient expected this cycle.
+expectation = decision_log[-1].orient_summary   -- what we predicted/intended
+outcome     = decision_log[-1].result + any PR merge/reject + lens/conf deltas
+
+Generate (≤ 3 short sentences total):
+  - decided: what was chosen and the one-line why.
+  - verdict: did the outcome match expectation? one of {hit, miss, too_early, unclear}.
+  - lesson: a single concrete guidance for next time, ≤ 20 words, imperative
+            (e.g. "When backlog returns no_remote 2× running, skip it for 3 cycles.").
+
+-- Persist to agent/state/evolve/reflections.json (create if missing):
+--   { "schema_version": "1.0.0", "reflections": [] }
+reflections.reflections.append({
+  cycle: cycle_count,
+  timestamp: now (ISO 8601),
+  domain: selected_domain,
+  skill: selected_skill,
+  result: decision_log[-1].result,
+  verdict: <hit|miss|too_early|unclear>,
+  critique: <decided + verdict sentences>,
+  lesson: <the lesson>,
+  status: "open"           -- becomes "applied" when 2-F re-injects it
+})
+-- Cap at config.memory.reflections_buffer_size (default 20); drop oldest.
+Write reflections.json.
+Print "[Reflect] Self-critique recorded ({verdict}): {lesson}"
+```
+
+Honesty rule: this is verbal self-reflection (text the model re-reads), not
+learned parameters. Frame it that way in any user-facing surface.
 
 ---
 
@@ -1684,6 +1778,7 @@ git add agent/state/evolve/goals.json
 git add agent/state/evolve/CHANGELOG.md
 git add agent/state/evolve/episodes.json    # if updated
 git add agent/state/evolve/principles.json  # if updated
+git add agent/state/evolve/reflections.json # if updated
 git add agent/state/deploy.json             # if updated by run-deploy
 git add agent/state/*/lens.json             # if updated
 git add agent/state/*/lens_changelog.json   # if updated
@@ -1711,12 +1806,108 @@ Next cycle available in {min_interval} minutes.
 
 ---
 
+## Step 7: Cycle Card (shareable summary)
+
+After the cycle completes, render a single screenshottable **Cycle Card** — the
+one artifact a user can paste into X / Reddit / Slack to show what the agent did
+and, crucially, what it **learned** this cycle. No competitor that lacks an
+Orient phase (cron loops, round-robin bash agents, config packs) can produce the
+LEARN line. This renders at the end of every full `/evolve` cycle — but **not** in
+`--dry-run`, which exits at Step 3-H before Act/Reflect — unless
+`config.output.cycle_card` is `false`. It is re-rendered on demand by
+`/ooda-status --share`.
+
+Every field comes from data already produced this cycle — no new computation:
+
+| Line | Source |
+|------|--------|
+| header | `state.cycle_count`, `config.project.name`, `decision_log[-1].timestamp` |
+| OBSERVE | observation (Step 1-D): domains scanned + the single most notable change |
+| ORIENT | `decision_log[-1].orient_summary` (Step 2-E), truncated to ~70 chars |
+| DECIDE | winner domain, score (Step 3-D), confidence + gate result (Step 3-F) |
+| ACT | result + `pr_number` + `risk_tier` (Step 4-D); `observe-only` / `skip` if no action |
+| LEARN | the single highest-signal Orient delta this cycle (see priority below) |
+| COST | `cycle_cost`, daily total, `config.cost.daily_limit_usd` (Step 6-C5b) |
+| footer | HALT state, `progressive_complexity.current_level` + its human label |
+
+**The LEARN line is the differentiator.** Pick the highest-signal change in this
+priority order and render exactly one (or two — see below):
+
+1. **A confidence change driven by a HUMAN decision** (PR merged/rejected this
+   cycle, Step 2-B) — the most shareable moment:
+   `You rejected PR #28 → service_health confidence 0.74→0.54 ↓ (reject −0.2, 2× faster than a merge's +0.1)`
+2. **A lens change** from Step 5-E (a `learned_threshold` / `focus_item` /
+   `discovered_signal` added, promoted, or decayed):
+   `lens re-aimed → flaky-alert threshold 0.30→0.25 after 3 confirmations (+0.1)`
+3. **A new intervention** written in Step 5-C (`starvation` / `monopoly_breaker`
+   / `contrarian`): `monopoly_breaker → service_health −10.0 for 1 cycle`
+4. **An observation micro-adjustment** (Step 2-B1):
+   `test_coverage produced findings → confidence +0.02`
+5. **A re-applied lesson** (Step 2-F) — a past verbal self-critique whose lesson
+   informed this cycle: `recalled lesson: skip backlog after 2× no_remote (held)`
+6. **Nothing changed:** `no new orientation this cycle (observing)`
+
+If BOTH a human-decision confidence change (1) and a lens change (2) occurred,
+render both as two LEARN lines — together they are the clearest proof the loop
+re-orients from real outcomes.
+
+Render with box-drawing characters (fall back to the plain layout below on narrow
+terminals, same rule as `/ooda-status`):
+
+```
+┌─ {project.name} · OODA-loop cycle #{N} ────────── {YYYY-MM-DD HH:MM UTC} ─┐
+│                                                                           │
+│  OBSERVE   {domains_scanned} domains · {most_notable_change}              │
+│  ORIENT    {orient_summary}                                               │
+│  DECIDE    {winner} won (score {score}) · confidence {conf} {gate ✓/✗}    │
+│  ACT       {act_summary}                                                  │
+│            └ {pr_detail_or_blank}                                         │
+│  LEARN  🔭 {learn_line_1}                                                 │
+│            {learn_line_2_if_any}                                          │
+│  COST      +${cycle_cost} · ${daily_total} today · hard cap ${limit}      │
+│            (agent auto-HALTs if the daily cap is breached)                │
+│                                                                           │
+│  HALT: {inactive/ACTIVE} · Level {N} ({level_label})                      │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+`{level_label}` is read **verbatim** from
+`config.progressive_complexity.levels[{N}].name` (e.g. 0 = `Just watching`,
+2 = `Full observation`, 3 = `Autonomous`) — never a hardcoded label, so the card
+always agrees with `/ooda-config` and the README level table.
+
+**Missing-field handling (graceful degradation).** The card must NEVER error on
+incomplete or legacy state. For any field whose source is absent — e.g. a
+pre-v1.2.0 `decision_log` entry without `orient_summary` / `confidence` /
+`risk_tier`, an empty `cost_ledger.json`, or no lens files yet — render `—` for
+that field and continue. The LEARN line falls through its priority order to
+`no new orientation recorded for cycle #{N}` when no delta is recoverable. If
+`decision_log` is empty, skip the card and print
+`No cycle to card yet. Run /evolve first.` The richest LEARN lines require
+v1.2.0+ state (a populated `lens_changelog.json` and recorded confidence
+deltas); older projects still get a valid card, just with more `—`.
+
+Then print one plain-text line below the box for frictionless copy-paste sharing:
+
+```
+{project.name} ran OODA-loop cycle #{N}: {winner} → {act_summary}. Learned: {learn_line_1}. Cost +${cycle_cost}/cycle (${daily_total} today). — github.com/mataeil/OODA-loop
+```
+
+**Honesty rule (non-negotiable).** The LEARN line describes *outcome-driven
+re-orientation* — heuristic confidence/lens updates with asymmetric decay — NOT
+machine learning. Never render "trained", "model updated", or "learned weights".
+The correct verbs are "re-aimed", "adjusted", "deprioritized", "confidence
++/−". This honest framing is itself a credibility signal; see the README
+section **How the "learning" actually works**.
+
+---
+
 ## I/O Contract
 
 ```yaml
 name: evolve
 ooda_phase: meta
-version: "1.0.0"
+version: "1.1.0"
 
 input:
   files:
@@ -1731,6 +1922,7 @@ input:
     - agent/state/evolve/cost_ledger.json
     - agent/state/evolve/episodes.json
     - agent/state/evolve/principles.json
+    - agent/state/evolve/reflections.json
     - "config.domains.*.state_file (all domain state files)"
     - "agent/state/external/*.json (if present)"
   apis:
@@ -1765,6 +1957,9 @@ output:
     - agent/state/evolve/CHANGELOG.md
     - agent/state/evolve/episodes.json (weekly)
     - agent/state/evolve/principles.json (rare)
+    - agent/state/evolve/reflections.json (Step 5-F, per decision cycle)
+    - "agent/state/*/lens.json (Step 5-E)"
+    - "agent/state/*/lens_changelog.json (Step 5-E, when a lens item changes)"
   prs: "Determined by executed skill (evolve itself creates no PRs)"
 
 safety:
