@@ -2,7 +2,7 @@
 name: ooda-status
 description: Display OODA-loop status dashboard. Shows cycle count, domain states, confidence scores, action queue, and alerts in a single view.
 ooda_phase: support
-version: "1.0.0"
+version: "1.1.0"
 input:
   files:
     - config.json
@@ -15,7 +15,10 @@ input:
     - agent/state/evolve/episodes.json
     - agent/state/evolve/principles.json
     - agent/state/evolve/skill_gaps.json
+    - agent/state/evolve/CHANGELOG.md
+    - agent/state/evolve/reflections.json
     - "agent/state/*/lens.json"
+    - "agent/state/*/lens_changelog.json"
   config_keys: []
 output:
   files: []
@@ -125,6 +128,10 @@ Show `none` if count is 0, otherwise show the count.
 - `skill_gaps_unaddressed` — `count(gap.resolved != true)` in `skill_gaps.json.gaps[]`.
   Break out `learning_loop_break` count separately since those flag internal
   evolve invariants (e.g., cost_ledger auto-patches).
+- `reflections_count` and `last_lesson` — from `reflections.json.reflections[]`:
+  total count and the most recent entry's `lesson` (truncate to ~32 chars).
+  Show `0` / `—` if the file is empty or missing. This shows whether the
+  Reflexion self-critique loop (evolve Step 5-F / 2-F) is actually running.
 
 **Season + Focus (v1.2.0)** — from `config.json`:
 
@@ -163,6 +170,7 @@ Replace `{placeholders}` with the computed values from Step 2.
 ║ Chain exec: {chain_count_last_10}/10 cycles          ║
 ║ Interventions: {active_interventions} active         ║
 ║ Gaps: {skill_gaps_unaddressed} ({loop_break} break)  ║
+║ Reflections: {reflections_count} (last: {last_lesson})║
 ╠══ Season + Context (v1.2.0) ════════════════════════╣
 ║ Season: {season_mode} ({overrides_count} overrides)  ║
 ║ Context: {context_path_or_none}                      ║
@@ -178,6 +186,39 @@ debugging whether the learning loop is actually running):
 
 Output focuses on Episodes / Principles / Lens / Chain / Interventions /
 Skill gaps and omits the domain/cost/saturation rows.
+
+### `--share` — render the latest Cycle Card
+
+`/ooda-status --share` re-renders the most recent cycle's **Cycle Card** — the
+same shareable artifact evolve prints at the end of its Step 7 — so it can be
+screenshotted or pasted into X / Reddit / Slack without re-running a cycle. It is
+read-only.
+
+```
+/ooda-status --share
+```
+
+Reconstruct the card from existing state — no recomputation:
+
+- **header / DECIDE / ACT** — `state.json.decision_log[-1]` (cycle, timestamp,
+  domain, skill, score, confidence, result, pr_number, risk_tier, orient_summary).
+- **OBSERVE / ORIENT** — `decision_log[-1].orient_summary` and, if present, the
+  `**Orient**` line of the latest entry in `agent/state/evolve/CHANGELOG.md`.
+- **LEARN** — pick the highest-signal change using the SAME priority order as
+  evolve Step 7 (human-decision confidence change > lens change > new
+  intervention > micro-adjustment). Source it, in order, from the latest
+  `agent/state/*/lens_changelog.json` entry, `memos.json.interventions[]` created
+  this cycle, and the `**Confidence**` (trend / micro-adj) line of the latest
+  CHANGELOG.md entry. If none is recoverable, render
+  `no new orientation recorded for cycle #{N}`.
+- **COST** — latest `cost_ledger.json` entry + `config.cost.daily_limit_usd`.
+
+Render byte-for-byte the same box and the plain-text share line as evolve
+Step 7, including the honesty rule on verbs (re-aimed / adjusted /
+deprioritized — never "trained" or "learned weights") and the same
+missing-field graceful degradation (render `—` for any absent field; on legacy
+pre-v1.2.0 state expect more `—`). If no cycle has run yet (`decision_log`
+empty), print: `No cycle to share yet. Run /evolve first.`
 
 **New columns and rows explained:**
 

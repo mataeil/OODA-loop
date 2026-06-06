@@ -1,12 +1,40 @@
 # OODA-loop
+[한국어](README.ko.md) | English
 
-**Your side project just got an operations team.**
+**It watches your side project at 3am, opens a small PR for your morning review, and re-aims itself from which ones you merge.**
 
-It watches your project and gets smarter over time. Start at Level 0. Move up when you trust it.
+Here's what it prints at the end of every cycle — the one artifact no cron job, round-robin loop, or skills pack can produce, because of the **LEARN** line, where it re-orients from *your* merge/reject calls:
+
+<!-- TODO(demo): before public launch, replace this static card with docs/demo.gif (asciinema → agg): /evolve → opens PR → you reject → lens.json visibly mutates. Caption: "You rejected it. It re-aimed." The static card below renders fine in the meantime. -->
+
+```
+┌─ fwd.page · OODA-loop cycle #152 ────────────── 2026-04-14 03:14 UTC ─┐
+│                                                                        │
+│  OBSERVE   4 domains · test_coverage dropped 91% → 84% overnight       │
+│  ORIENT    flaky-retry pattern confirmed (3rd time); coverage now      │
+│            the most stale + highest-signal domain                      │
+│  DECIDE    test_coverage won (score 11.3) · confidence 0.74 · gate ✓   │
+│  ACT       opened PR #29 — "wrap flaky network suite in retry"         │
+│            └ Risk Tier 1 · 2 files · draft — you merge                 │
+│  LEARN  🔭 you rejected PR #28 yesterday →                             │
+│            service_health confidence 0.74 → 0.54 ↓                     │
+│            (reject −0.2, 2× faster than a merge's +0.1)                │
+│         🔭 lens re-aimed → flaky-alert threshold 0.30 → 0.25           │
+│  COST      +$0.04 · $0.38 today · hard cap $10 (auto-HALTs on breach)  │
+│                                                                        │
+│  HALT: inactive · Level 2 (Full observation)                          │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+Re-render the latest card any time with `/ooda-status --share`.
+
+An autonomous **operations** layer for your live side project — it watches, decides what matters, and proposes small PRs you approve. **You stay in command:** it proposes, you merge or reject, every change is an isolated one-click-revertible PR, and it re-aims from your calls. *(Auto-merge is opt-in, low-risk-tier-only, and lives at Level 3 — off until you turn it on. Auto-revert on a bad deploy is also opt-in.)*
+
+**The receipts** *(author-measured — run your own pilot)*: two real projects have run it continuously — **[fwd.page](https://fwd.page)** (a live URL shortener) for **152 cycles → 28 PRs, 24 merged (86%)**, and **Lynceus** (parliamentary-audit automation) for **119 cycles at observe level (no PRs yet)**. It also ran clean across **9 language/framework stacks** in sandbox (60 cycles, 36 PRs, no compile or test failures observed).
+
+**It can't give you a $6,000 surprise.** `touch agent/safety/HALT` stops everything instantly. Every change is a small PR (max 20 files / 500 lines) you can revert in one click. It can't touch its own safety rules. Typical cost is ~$1–2/day, and a **hard daily cap (default $10) auto-creates a HALT** the moment it's crossed. The first cycle, and Level 0, only watch.
 
 > **Requires [Claude Code](https://claude.ai/code).** All commands (`/ooda-setup`, `/evolve`, etc.) are Claude Code slash commands.
-
-[한국어](README.ko.md) | English
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude-Code-blue)](https://claude.ai/code)
@@ -35,185 +63,68 @@ cd your-project/
 /ooda-setup           # auto-detects your stack, writes config
 /evolve               # first cycle (observe-only — just watches)
 /ooda-status          # check what it found
+/ooda-status --share  # the shareable Cycle Card
 ```
 
-`/ooda-setup` creates `config.json` and `agent/state/` in your project. Your source code is never modified during observation.
-
-**Nothing changes until you say so.** Level 0 just watches. Level 3 opens PRs.
+`/ooda-setup` creates `config.json` and `agent/state/` in your project. Your source code is never modified during observation. **Nothing changes until you say so.** Level 0 just watches. Level 3 opens PRs.
 
 ---
 
-## The OODA Loop
+## How is this different?
 
-In the 1950s, fighter pilot John Boyd studied why some pilots won dogfights and
-others did not. His answer was not faster planes or better weapons. It was a
-decision cycle: **Observe, Orient, Decide, Act.**
+You've seen a lot of "autonomous agent" projects. Here's the honest map.
 
-The pilot who cycled through OODA faster gained the advantage. But Boyd's deeper
-insight was not about speed alone -- it was about the **Orient** phase. Orient is
-where you build your mental model of the world. Every past engagement, every
-lesson learned, every pattern recognized -- all of it converges in Orient. The
-pilot with the better world model makes the better call, even under pressure.
+| | What it does | The difference |
+|---|---|---|
+| **Code-gen agents** (Aider, Cline, OpenHands, Devin) | Write code on command, stop at the PR | OODA-loop decides *what* to work on and keeps your **live** project running — operations, not one-shot code-gen |
+| **Round-robin loops** (continuous-claude / "Ralph" loops) | Re-run the same prompt forever | OODA-loop **re-orients**: per-domain confidence updated by your merge/reject calls, RICE-prioritized backlog, learned thresholds — it doesn't reinitialize every loop |
+| **Self-rewriting agents** (ouroboros-class) | Rewrite their own source for spectacle | OODA-loop is the deliberate opposite: a **HALT file, protected paths, cost ledger, and observe-only first cycle** — plus 271 real production cycles those projects don't have |
+| **Config / skills packs** | Configure the agent for coding | OODA-loop **operates** a deployed project with progressive Levels 0→3 and a learning loop |
 
-OODA is not a flowchart you walk through once. It is a continuous feedback loop:
-
-```
-            +----------+        +-----------+
-    +------>| OBSERVE  |------->|  ORIENT   |------+
-    |       +----------+        +-----------+      |
-    |            ^               |        |        |
-    |            |       implicit|        |        v
-    |            |       guidance|        |   +-----------+
-    |            |               |        +-->|  DECIDE   |
-    |       +----------+        |            +-----------+
-    +-------+   ACT    |<------+-------------|
-            +----------+
-```
-
-Orient does not just feed Decide. It reshapes how you Observe next time. It builds
-implicit guidance that can bypass deliberate decision-making entirely -- the way an
-experienced pilot reacts before consciously thinking. Each cycle sharpens the model.
-Each outcome updates your beliefs.
-
-This is what separates OODA from a state machine or a scheduled script.
-A cron job runs the same logic forever. An OODA loop evolves.
+The one thing none of them shows is the **LEARN** line above. That's the wedge.
 
 ---
 
-## Why OODA for AI Agents?
+## How the "learning" actually works
 
-Most automation is lobotomized. It runs the same script on day 100 as on day 1.
-It does not know what worked last week. It does not adjust when the environment
-changes. It has no memory, no judgment, no model of the world it operates in.
+We're going to be straight with you, because you read code.
 
-OODA-loop is different because of **Orient** -- the phase where the agent builds
-and updates its world model. After each cycle, the agent knows which domains need
-attention (confidence scores), what patterns are emerging across observations
-(cross-domain correlation), and what its past decisions led to (outcome tracking).
+OODA-loop's learning is **heuristic outcome-driven re-orientation**, *not* machine learning. There is no gradient, no fitness function, no trained model. What actually happens:
 
-**The Adaptive Lens.** Observe skills are not static. Each cycle, the engine
-analyzes observation results and proposes refinements to a per-domain `lens.json`
--- learned thresholds, focus items, discovered signals. New learning starts
-tentative (confidence 0.3) and only activates after repeated validation (0.6).
-Disconfirming evidence kills bad learning twice as fast as confirming evidence
-builds it (+0.1 vs -0.2). By cycle 50, the agent catches patterns that cycle 1
-had no idea to look for. Anti-fragile by design.
+- **Confidence** per domain moves with your decisions: **+0.1 when you merge** a PR, **−0.2 when you reject** one. Bad bets are punished twice as hard as good bets are rewarded.
+- **The Adaptive Lens** (`agent/state/{domain}/lens.json`) accumulates learned thresholds, focus items, and discovered signals. New learning starts tentative (confidence 0.3) and only activates after repeated confirmation (0.6). **Disconfirming evidence decays it 2× faster than confirming evidence builds it** — so wrong lessons die fast. Each change is appended to a `lens_changelog.json` so the LEARN line is always auditable.
+- **3-tier memory**: the last 20 decisions cascade into weekly episode summaries, which distill into permanent principles.
+- **Verbal self-critique** ([Reflexion](https://arxiv.org/abs/2303.11366)-style): each decision cycle the agent writes a one-line lesson — what it did, and whether the outcome matched what it expected — stores it in `reflections.json`, and re-injects relevant past lessons into the next Orient. It's text the model re-reads, not training.
 
-**3-tier memory.** Working memory (last 20 decisions) flows into weekly episode
-summaries (52 weeks), which distill into permanent principles. The agent does not
-just remember what happened -- it learns what matters.
-
-Cron gives you a heartbeat. OODA-loop gives you a brain.
+Think of it as **proto-evolution**: an explicit, inspectable control loop that adjusts from real outcomes via verbal self-correction — not RL, not gradient updates. We say "re-aimed," "adjusted," "deprioritized" — never "trained" or "learned weights." Every number is in plain JSON you can read and audit. That honesty *is* the point: a loop you can trust is a loop you can inspect.
 
 ---
 
-## Language & Framework Agnostic
+## The OODA Loop (and why Orient matters)
 
-OODA-loop is not a code generator tied to a specific stack. It is a **thinking
-framework for AI** -- a structured way for the agent to observe, learn, and act.
-The skills read your test output, check your endpoints, and score your issues.
-The language you write in does not matter.
+A Korean-War F-86 pilot, John Boyd spent the next two decades working out why some pilots won dogfights. His answer — refined through the 1970s–90s, long after the cockpit — wasn't faster planes. It was a decision cycle, run continuously, each outcome updating the next: **Observe, Orient, Decide, Act**.
 
-Any project with a test command, a git repo, or an HTTP endpoint can use it.
-Web servers, CLI tools, libraries, monorepos -- the loop adapts to what you have.
+Boyd's real insight was **Orient** — and his actual diagram (in *The Essence of Winning and Losing*, 1995) is *not* four boxes in a circle. It's one large Orient block — genetic heritage, cultural traditions, previous experience, new information, analysis & synthesis — with **Implicit Guidance & Control arrows running *from* Orient *to* both Observe and Act**, so a well-oriented actor can observe and act almost simultaneously, bypassing explicit Decide. Orient is the loop's center of gravity: it shapes how you observe, decide, and act, and is reshaped by every outcome.
 
-**Verified across 9 environments:**
+Most AI agents (ReAct / tool-calling loops) are structurally **Decide→Act with bolted-on memory** — they barely Orient and mostly don't learn between runs. OODA-loop puts the Orient phase first: each cycle it reviews PR outcomes, updates confidence, applies cross-cycle memos, detects patterns, and adjusts its world model.
 
-| Stack | Project Type | Test Framework |
-|-------|-------------|---------------|
-| Python + FastAPI | REST API | pytest + pytest-cov |
-| Python (no framework) | Library / package | pytest + pytest-cov |
-| Go + net/http | HTTP server | go test |
-| Node.js + Express | REST API | Jest + supertest |
-| Node.js | CLI tool (no server) | Jest |
-| TypeScript | CLI tool | ts-jest |
-| React + Vite | SPA | Vitest |
-| Rust | CLI tool | cargo test |
-| Bun + Hono | HTTP server | bun:test |
+> We implement the *spirit* of Boyd's Orient phase — outcome-driven re-orientation and an implicit fast-path (critical alerts bypass scoring). We do **not** claim to implement his full epistemology (Boyd's destruction-and-creation synthesis, the implicit cultural repertoire, a genetic-heritage analogue). For the real thing, read [Osinga, *Science, Strategy and War*](http://www.projectwhitehorse.com/pdfs/ScienceStrategyWar_Osinga.pdf) and [Richards' deconstruction](https://slightlyeastofnew.com/wp-content/uploads/2010/03/essence_of_winning_losing.pdf).
 
----
-
-## Who is this for?
-
-You are running a side project. Maybe it is a SaaS with a handful of paying
-users, maybe it is an API you launched last month and forgot to check on. You
-have a day job, or three other projects, or both. The health endpoint has been
-returning 503 for six hours and you have no idea because you were asleep.
-
-You do not have a DevOps team. You do not have on-call rotations or a PagerDuty
-subscription. You have a git repo, a CI pipeline you set up once, and a vague
-sense that things are probably fine.
-
-OODA-loop is for you.
-
-It is for the indie hacker shipping a product in a competitive market who needs
-to move faster than their monitoring setup allows. It is for the two-person
-startup where one founder writes code and the other writes copy, and neither has
-time to review the backlog every morning. It is for the developer who wants their
-project to grow and improve even when they are not looking at it.
-
-This is not an enterprise platform. There is no dashboard SaaS, no seat-based
-pricing, no sales call. It is not a CI/CD pipeline, not a monitoring service,
-and not an auto-coding agent that writes your app for you. It is a framework
-that lives in your repo, runs inside Claude Code, and earns trust one cycle
-at a time.
-
----
-
-## What this is NOT
-
-- **Not a code generation agent** (Devin, Cursor Agent) -- those write code on command. This watches, learns, and operates autonomously.
-- **Not a CI/CD pipeline** -- this decides *what* to do, not just *how* to run it.
-- **Not a monitoring SaaS** (Datadog, PagerDuty) -- this lives in your repo, costs ~$1-2/day, no subscription.
-- **Not a cron job** -- cron repeats the same script forever. OODA-loop evolves with every cycle.
+A cron job runs the same logic on day 100 as day 1. An OODA loop re-orients.
 
 ---
 
 ## What happens when you run it
 
-**Day 1.** Install the plugin and run `/ooda-setup` in your project. It detects
-your stack, suggests domains to monitor, and writes your config. The first
-`/evolve` is observe-only -- it looks, writes down what it found, and moves on.
+**Day 1.** `/ooda-setup` detects your stack and writes your config. The first `/evolve` is observe-only — it looks, writes down what it found, prints a Cycle Card, and moves on.
 
-```
-/ooda-status
+**Day 3.** A few cycles in. Confidence scores climb as observations confirm each other. Bump to Level 1 — coverage tracking added, still no code changes.
 
-Cycle: #1  |  Level: 0 (Just watching)
-Domains scanned: 3
-  service_health    —        confidence 0.70
-  test_coverage     87.2%    confidence 0.70
-  backlog           12 open  confidence 0.70
-Actions: 0 pending  |  PRs: 0
-HALT: inactive
-```
+**Day 7.** Level 2. Full backlog tracking, RICE scoring, reports, draft PRs you merge. The Adaptive Lens has started learning — health checks that always pass get deprioritized, flaky patterns get flagged sooner.
 
-That is all. It looked. It learned nothing yet. You read it and move on.
+**Day 30.** Level 3 (deliberate opt-in). It picks the highest-scoring backlog item, writes code, runs your tests, and leaves a PR + Cycle Card waiting for your morning — small by design (20 files / 500 lines max). Auto-merge fires only for low-risk tiers you've explicitly enabled; protected paths never auto-merge. It watches at 3am, notices what you'd notice at 9am, and re-aims from what you merge.
 
-**Day 3.** Three cycles in. Confidence scores are climbing as observations confirm
-each other. You bump the level to 1. The loop now watches two domains and tells
-you when coverage drops. Still no code changes -- just sharper observations.
-
-**Day 7.** Level 2. Full backlog tracking, issue scoring, reports. The Adaptive
-Lens has started learning -- health checks that always pass get deprioritized,
-flaky test patterns get flagged sooner. OODA-loop suggests you set up market
-analysis: `/ooda-skill create scan-market`.
-
-**Day 30.** Level 3. The loop is designed to pick the highest-scoring backlog
-item, write code, run your tests, and open a draft PR. PRs are small -- 20
-files max, 500 lines max, enforced by config. You review it over coffee. The
-loop runs at 3am, notices what you would notice at 9am, and acts on it before
-you wake up.
-
-**Self-development in action.** Across 60 sandbox cycles spanning 9 stacks
-(Python, Go, Node, React, Rust, Bun), the agent created 36 PRs with zero
-compile or test failures. In one run, a Python library grew from 15 tests to
-91, hit 100% coverage, and gained 25 features -- including functions the agent
-proposed on its own by recognizing mathematical patterns in the existing code.
-When its own implementation caused a coverage regression, it detected the drop,
-generated a corrective action ranked higher than any existing task, and fixed
-it in the next cycle. 65% of actions in the final phase were self-discovered,
-not from the original backlog. The loop does not just execute a checklist. It
-observes the consequences of its own actions and adapts.
+**Self-correction in the wild.** Across 60 sandbox cycles spanning 9 stacks, the agent opened 36 PRs with no compile or test failures observed. When one of its own changes caused a coverage regression, it *detected the drop, generated a corrective action ranked above every existing task, and fixed it the next cycle.* It observes the consequences of its own actions and adapts.
 
 ---
 
@@ -221,26 +132,19 @@ observes the consequences of its own actions and adapts.
 
 Every `/evolve` run executes one complete OODA cycle:
 
-1. **Safety** -- Check HALT file. Check cycle interval. Acquire lock (auto-expires after `lock_timeout_minutes`).
-2. **Observe** -- Read all domain states, GitHub PR/issue status, external signals. Load the Adaptive Lens.
-3. **Orient** -- Detect patterns, update confidence scores, sync action queue with PR outcomes, build a world model summary.
-4. **Decide** -- Score every domain. Apply urgent signals and goal contributions. Pick the winner. Gate on confidence threshold. **Implicit Guidance**: critical alerts or stable high-confidence patterns bypass scoring and feed Orient directly into Act (Boyd's Orient-to-Act shortcut).
-5. **Act** -- Execute the winning skill. Run chain if confidence is high enough. Re-check HALT before each chain step. Handle PR risk tiers (auto-merge / manual deploy / human review).
-6. **Reflect** -- Update skill gaps, write memos, extract actions, update the Adaptive Lens, cascade memory.
+1. **Safety** — Check HALT file. Check cycle interval. Acquire lock (auto-expires).
+2. **Observe** — Read all domain states, GitHub PR/issue status, external signals. Load the Adaptive Lens.
+3. **Orient** — Detect patterns, update confidence from PR outcomes, sync the action queue, apply memos/interventions, build a world-model summary.
+4. **Decide** — Score every domain. Apply urgent signals and goals. Gate on confidence. **Implicit Guidance**: critical alerts or stable high-confidence patterns bypass scoring (Boyd's Orient→Act shortcut).
+5. **Act** — Execute the winning skill. Handle PR risk tiers (auto-merge / manual / human review). Re-check HALT before every destructive step.
+6. **Reflect** — Update skill gaps, write memos, extract actions, update the Adaptive Lens, cascade memory.
+7. **Cycle Card** — Render the shareable summary, including the one thing it learned. (Skipped in `--dry-run`.)
 
-Domain scoring (v1.2.0): `score = staleness + dampened_alert + (goals × 0.3) + (confidence × 0.2) + memo + balance_penalty`
-
-where `memo = score_adjustments[domain] + Σ interventions[].delta for domain`.
-
-Staleness uses a logarithmic curve by default. Alert dampener prevents domain monopoly. Entropy balance penalty ensures healthy rotation. `memo` now aggregates one-shot `score_adjustments` with persistent multi-cycle `interventions` (v1.2.0 — see [CONCEPTS.md](CONCEPTS.md#memo-interventions-v120)).
-
-See [CONCEPTS.md](CONCEPTS.md) for the full glossary, architecture diagram, and formula details. For the v1.2.0 release notes, see [CHANGELOG.md](CHANGELOG.md).
+Domain scoring: `score = staleness + dampened_alert + (goals × 0.3) + (confidence × 0.2) + memo + balance_penalty`. Logarithmic staleness, an alert dampener, and an entropy balance penalty keep any one domain from monopolizing cycles. See [CONCEPTS.md](CONCEPTS.md) for the full glossary and formula details, and [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ---
 
 ## Built-in Skills
-
-Five domain skills, four wizards, and the orchestrator:
 
 | Command | Phase | What it does |
 |---------|-------|-------------|
@@ -251,18 +155,11 @@ Five domain skills, four wizards, and the orchestrator:
 | `/dev-cycle` | Support | Full implementation pipeline |
 | `/ooda-setup` | Wizard | 3-step project configuration |
 | `/ooda-config` | Wizard | View and modify settings |
-| `/ooda-status` | Wizard | Status dashboard |
+| `/ooda-status` | Wizard | Status dashboard (`--orient`, `--share`) |
 | `/ooda-skill` | Wizard | Create, disable, enable domain skills |
 | `/evolve` | Meta | Run one full OODA cycle (or `/loop 4h /evolve`) |
 
-**Domain status.** Each domain in config is `active` (runs every cycle), `available`
-(configured but skill not yet created), or `disabled` (opted out). Available skills
-are skipped silently -- no errors, no interruptions.
-
-**Skill generation.** Run `/ooda-skill create scan-market` and answer 3-5 questions
-about your project. The wizard generates a complete, project-specific SKILL.md with
-Adaptive Lens integration. Templates for market research, UX auditing, and competitor
-monitoring are included in `templates/skill-generators/`.
+**Skill generation.** Run `/ooda-skill create scan-market`, answer 3–5 questions, and the wizard generates a complete, project-specific SKILL.md with Adaptive Lens integration. Templates for market research, UX auditing, and competitor monitoring ship in `templates/skill-generators/`.
 
 ---
 
@@ -274,51 +171,55 @@ Start at Level 0. Move up when you trust the observations.
 |-------|------|-------------|
 | 0 | Just watching | 1 domain. Observe only. No PRs. |
 | 1 | Watching + testing | 2 domains. Coverage tracking added. |
-| 2 | Full observation | All domains. Draft PRs (human merges). Reports, scoring, lens learning. |
-| 3 | Autonomous | Implementation enabled. Full PRs. Auto-merge for low-risk changes. |
+| 2 | Full observation | All domains. Draft PRs (you merge). Reports, scoring, lens learning. |
+| 3 | Autonomous | Implementation enabled. Auto-merge for low-risk changes only (opt-in). |
 
-Skipping levels (e.g. 0 to 3) enforces a 3-cycle observe-only cooldown at the new level before any action.
-
-```
-/ooda-config level 2
-```
+Skipping levels (e.g. 0 → 3) enforces a 3-cycle observe-only cooldown at the new level. `/ooda-config level 2`.
 
 ---
 
 ## Safety
 
-OODA-loop is safe by default. Level 0 cannot create PRs. Level 3 requires deliberate opt-in.
+Safe by default. Level 0 cannot create PRs. Level 3 requires deliberate opt-in.
 
-- **HALT file** -- `touch agent/safety/HALT` stops everything instantly. Delete to resume. Re-checked before every destructive action (push, merge, deploy) during a cycle.
-- **Protected paths** -- `agent/safety/*`, `skills/evolve/*`, `agent/contracts/*` cannot be modified by the agent. It cannot rewrite its own rules.
-- **Confidence gate** -- Actions below 0.6 confidence are skipped or downgraded.
-- **PR limits** -- Max 20 files, 500 lines per PR. Enforced in config.
-- **First cycle observe-only** -- No action on the first run. Just observation.
-- **Skill allowlist** -- Only registered skills can be invoked.
-- **Lock timeout** -- Concurrent execution lock auto-expires after 30 minutes (configurable via `lock_timeout_minutes`). Stale locks from crashes are cleaned up automatically.
-- **Cost ledger** -- Daily API cost tracked in `cost_ledger.json`. Hard stop at `cost.daily_limit_usd` ($10 default), warning at 80%. Resets daily at 00:00 UTC. Missing ledger = fail-closed.
-- **Adaptive Lens safety** -- Bad learning decays 2x faster than good learning grows. Lens corruption falls back to base behavior.
+- **HALT file** — `touch agent/safety/HALT` stops everything instantly. Re-checked before every destructive action (push, merge, deploy).
+- **Protected paths** — `agent/safety/*`, `skills/evolve/*`, `agent/contracts/*` can never be modified or auto-merged. The agent cannot rewrite its own rules.
+- **Confidence gate** — Actions below 0.6 confidence are skipped or downgraded.
+- **PR limits** — Max 20 files, 500 lines per PR. Enforced in config.
+- **Hard cost cap** — Daily API cost is tracked in `cost_ledger.json`. Crossing `cost.daily_limit_usd` ($10 default) **auto-creates a HALT**; warning at 80%. Resets 00:00 UTC. Missing ledger fails closed.
+- **Rollback** — Optional pre-action checkpoints; auto-revert on health failure after an auto-merge (opt-in, `enable_rollback`, off by default).
+- **Adaptive Lens safety** — Bad learning decays 2× faster than good learning grows; lens corruption falls back to base behavior.
 
-See [SECURITY.md](SECURITY.md) for the full threat model and safety architecture.
+See [SECURITY.md](SECURITY.md) for the full threat model.
 
 ---
 
-## Configuration
+## Language & Framework Agnostic
 
-`/ooda-setup` generates `config.json` automatically. To edit manually, use `/ooda-config`
-or edit the file directly. Key sections: `project` (name, locale, timezone), `domains`
-(what to monitor, weights, skills, status), `safety` (HALT path, PR limits, allowlist,
-`lock_timeout_minutes`), `confidence` (initial value, merge boost, reject penalty),
-`scoring` (formula parameters), `progressive_complexity` (current level), `signals`
-(urgent signal thresholds), `memory` (retention, decay, action queue decay),
-`notifications` (Telegram via `$ENV_VAR`), `cost` (daily limit, warning threshold).
+OODA-loop is a thinking framework, not a code generator tied to a stack. The skills read your test output, check your endpoints, and score your issues — the language doesn't matter. **Verified across 9 environments:** Python + FastAPI, Python library, Go + net/http, Node + Express, Node CLI, TypeScript CLI, React + Vite, Rust, Bun + Hono.
 
-**Cost estimate.** Each observe cycle costs ~$0.02-0.05 in Claude API usage.
-Implementation cycles (Level 3) cost ~$0.05-0.10. At 30-minute intervals, that
-is roughly $1-2/day for continuous Level 2 operation. The default daily cap is
-$10 (`cost.daily_limit_usd`).
+---
 
-See [config.example.json](config.example.json) for the complete annotated schema.
+## Production Validation
+
+Two production deployments continuously feed real-world data back into the framework:
+
+| Deployment | Domain | Cycles | PRs |
+|------------|--------|--------|-----|
+| [fwd.page](https://fwd.page) | URL shortener | 152+ | 28 (24 merged, 86%) |
+| Lynceus | Parliamentary audit (국정감사) | 119+ | 0 (Level 2 — observe only) |
+
+These projects are **reference data sources, not modified by the framework**. Every improvement they surface lands upstream so the next downstream project gets it for free. v1.2.0-alpha distilled from 271 production cycles: the Orient layer now actually learns (principles extraction, lens pre-init), cost-ledger integrity gating, and primitives promoted from production (season modes, active context, rotation). See [CHANGELOG.md](CHANGELOG.md).
+
+> **On the numbers.** "86% merged" and the sandbox results are author-measured; the production cycle data is from the maintainer's own deployments. Run your own pilot at Level 1–2 for a week — that's the honest test, and we'd love your numbers.
+
+---
+
+## Configuration & Cost
+
+`/ooda-setup` generates `config.json` automatically; edit via `/ooda-config` or directly. Key sections: `project`, `domains`, `safety`, `confidence`, `scoring`, `progressive_complexity`, `signals`, `memory`, `output` (Cycle Card on/off), `notifications` ($ENV_VAR only), `cost`.
+
+**Cost.** Each observe cycle costs ~$0.02–0.05 in Claude API usage; implementation cycles ~$0.05–0.10. At 30-minute intervals that's roughly $1–2/day for continuous Level 2 — and the hard daily cap ($10 default) auto-HALTs if exceeded. See [config.example.json](config.example.json) for the annotated schema.
 
 ---
 
@@ -327,48 +228,17 @@ See [config.example.json](config.example.json) for the complete annotated schema
 | Problem | Fix |
 |---------|-----|
 | `[SKIP] Another evolve cycle is running` | Stale lock. Remove `agent/state/evolve/.lock` (auto-cleaned after 30 min). |
-| `[SKIP] Too soon` | Wait for `min_cycle_interval_minutes` (default 30) to elapse, or add a critical alert to bypass. |
+| `[SKIP] Too soon` | Wait for `min_cycle_interval_minutes` (default 30), or add a critical alert to bypass. |
 | `All scores below 0.5` | No domain needs attention yet. Normal on early cycles. |
-| Confidence stuck at 0.7 | At Level < 3, observation micro-adjustments (+0.02/-0.01) now apply automatically. At Level 3, merge or reject a PR. |
-| `/evolve` skips a domain | Check its `status` in config -- `available` means the skill has not been created yet. Run `/ooda-skill create <name>`. |
-| Cost limit hit | Check `agent/state/evolve/cost_ledger.json`. Resets at 00:00 UTC, or raise `cost.daily_limit_usd`. |
-
----
-
-## Production Validation
-
-Two production deployments have continuously provided real-world data that shape upstream improvements:
-
-| Deployment | Domain | Cycles | PRs | Success |
-|------------|--------|--------|-----|---------|
-| [fwd.page](https://fwd.page) | URL shortener | 152+ | 28 (24 merged, 86%) | 100% |
-| Lynceus | Parliamentary audit (국정감사) | 119+ | 0 (Level 2) | 100% |
-
-**What v1.1.0 fixed based on early production data** (209 cycles):
-- **7 features designed but not working** — episode generation, principles extraction, adaptive lens, contrarian check, cost ledger, chain execution, skill gaps detection
-- **Scoring monopoly** — one domain took 36% of all cycles. Logarithmic staleness + entropy penalty + alert dampener fixed this
-- **41-cycle observation saturation** — circuit breaker now warns at 5, boosts at 10, halts at 15
-- **Confidence stagnation** — observation micro-adjustments prevent frozen confidence at Level < 3
-
-**What v1.2.0 distills from continued production** (152 + 119 cycles):
-- **Orient layer actually learns** — principles threshold relaxed (0.8 → 0.5 Jaccard, 3 → 2 occurrences) with cluster fallback; Lynceus's 2 valid episodes now produce principles.
-- **Memos-as-interventions** — `memos.json.interventions[]` formalizes the Lynceus +1.0 / −10.0 manual pattern as auto-written `starvation` and `monopoly_breaker` entries that span multiple cycles.
-- **Cost ledger integrity gate** — a 13-day silent drop in fwd's cost tracking is now impossible: Step 6-C8 auto-patches missing entries and emits a `learning_loop_break` skill_gap.
-- **Lens pre-init** — fwd's 152 cycles with zero lens files are caused by initialization living inside an observe-skill loop custom skills never trigger; init now happens in Step 1-A for every active domain.
-- **Primitives extracted upstream** — Lynceus's `weight_presets` becomes `season_modes` wire-up; Lynceus's `active_context` becomes a first-class config key; fwd's `focus_rotation` becomes `config.domains.{name}.rotation`. fwd's hardcoded `service_health × 2.0` collapses into `season_modes.modes.default.weight_overrides`.
-- **Orient Health dashboard** — `/ooda-status --orient` shows episodes, principles, lens coverage, chain execution, active interventions, and skill gaps at a glance.
-
-fwd.page and Lynceus themselves are **not modified** by v1.2.0; they are reference data sources. All changes land in the framework so the next downstream project gets these improvements for free.
+| Confidence stuck at 0.7 | At Level < 3, observation micro-adjustments apply automatically. At Level 3, merge or reject a PR. |
+| `/evolve` skips a domain | Check its `status` in config — `available` means the skill isn't created yet (`/ooda-skill create <name>`). |
+| Cost limit hit | Check `cost_ledger.json`. Resets 00:00 UTC, or raise `cost.daily_limit_usd`. |
 
 ---
 
 ## Contributing
 
-Contributions welcome: new domain skills, scoring improvements, integrations, and
-documentation. See [CONTRIBUTING.md](CONTRIBUTING.md) for the skill authoring guide,
-3-tier contribution model (Skills / Docs / Core), and code style rules.
-
----
+Contributions welcome: new domain skills, scoring improvements, integrations, docs. See [CONTRIBUTING.md](CONTRIBUTING.md) for the skill authoring guide and 3-tier contribution model.
 
 ## Try it
 
@@ -378,10 +248,8 @@ documentation. See [CONTRIBUTING.md](CONTRIBUTING.md) for the skill authoring gu
 cd your-project && /ooda-setup
 ```
 
-Give your side project a brain. Start at Level 0. It just watches.
-
----
+Give your side project an operator you stay in command of. Start at Level 0. It just watches.
 
 ## License
 
-MIT -- see [LICENSE](LICENSE)
+MIT — see [LICENSE](LICENSE)

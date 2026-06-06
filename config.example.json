@@ -175,7 +175,9 @@
     "action_queue_decay_days": 14,
     "action_queue_decay_amount": 0.05,
     "principle_similarity_threshold": 0.5,
-    "principle_min_occurrences": 2
+    "principle_min_occurrences": 2,
+    "reflection_recall_count": 3,
+    "reflections_buffer_size": 20
   },
   "season_modes": {
     "enabled": false,
@@ -194,6 +196,10 @@
     "refresh_skill": null,
     "refresh_interval_hours": 168,
     "__doc__": "Optional stakeholder context blob loaded by evolve Step 1 and exposed to every invoked skill as a context variable. The blob is opaque; each skill interprets it domain-specifically. If refresh_skill is set and the file is older than refresh_interval_hours, evolve queues a refresh cycle. Read-only by default."
+  },
+  "output": {
+    "cycle_card": true,
+    "__doc__": "When true (default), evolve renders a shareable Cycle Card at the end of every cycle (Step 7) summarizing Observe/Orient/Decide/Act, the single thing it Learned (re-aimed) this cycle, and the cost. Re-render the latest card any time with /ooda-status --share. Set false to suppress."
   },
   "test_command": "npm test",
   "test_timeout_seconds": 300,

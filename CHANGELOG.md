@@ -8,7 +8,50 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
-## [v1.2.0] — Unreleased
+## [Unreleased]
+
+### Added — Visible engine (Week-1)
+
+The goal of this milestone is to make the (already production-validated) engine
+**visible and shareable**, and to reposition honestly around control + safety.
+
+- **Cycle Card** (`skills/evolve/SKILL.md` Step 7) — a screenshottable
+  end-of-cycle summary (Observe → Orient → Decide → Act → **Learn** → Cost)
+  rendered at the end of every full cycle (not in `--dry-run`), gated by the new
+  `config.output.cycle_card` key (default `true`). The LEARN line surfaces the
+  single highest-signal re-orientation: a confidence change from a human
+  merge/reject > a lens re-aim > a new intervention > a micro-adjustment.
+- **`/ooda-status --share`** re-renders the latest Cycle Card read-only from
+  state (`skills/ooda-status/SKILL.md`).
+- **`lens_changelog.json`** is now written by evolve Step 5-E whenever a lens
+  item is added/promoted/decayed/deprecated, giving the Cycle Card and
+  `--share` LEARN line an auditable source (previously referenced but never
+  written).
+- **`config.output.cycle_card`** top-level config key (`config.example.json`).
+- **Reflexion verbal self-critique loop** — evolve Step 5-F writes a one-line
+  self-critique + lesson per decision cycle to `reflections.json`; Step 2-F
+  re-injects the most relevant recent lessons into the next Orient (config:
+  `memory.reflection_recall_count`, `memory.reflections_buffer_size`). This is
+  the honest, SOTA-adjacent mechanism behind "it learns from its own cycles" —
+  verbal self-correction (text re-read), not weight updates. Surfaced in
+  `/ooda-status` Orient Health as a `Reflections` count + latest lesson, and as
+  a Cycle Card LEARN fallback when no higher-signal delta exists.
+
+### Changed
+
+- **Repositioning** — plugin/marketplace descriptions and both READMEs reframed
+  from "operations team while you sleep" to "an autonomous operations layer you
+  stay in command of." Added an honest **"How the learning actually works"**
+  section (heuristic proto-evolution, not ML) and corrected the Boyd/Orient
+  framing (real five-component Orient diagram; Implicit Guidance arrows run
+  *from* Orient; theory formulated in the 1970s–90s, not the 1950s).
+- **Versions** — plugin/marketplace `version` → `1.2.0-alpha` (was `1.0.0`);
+  `evolve` and `ooda-status` skill `version` → `1.1.0` (gained Cycle Card /
+  `--share`).
+
+---
+
+## [v1.2.0-alpha] — 2026-04-19
 
 v1.2.0 distills lessons from two production deployments (fwd.page 152 cycles,
 Lynceus 119 cycles) into the upstream framework. None of the downstream
