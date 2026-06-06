@@ -23,12 +23,15 @@ scoring path that now sums `score_adjustments[domain] + interventions[domain].de
 
 `memos.json` starts empty (no prior interventions).
 
-## Expected output (full cycle)
+## Expected output (Step 5-C unit fixture)
 
-> `/evolve --dry-run` prints only the Decide score table and **exits at Step 3-H**
-> (zero writes). The `[Reflect]` interventions below (Step 5-C) are written in a
-> **full** `/evolve` cycle. The *next* cycle's scoring (Step 3-A) — where the
-> winner flips — IS visible under `--dry-run` once the interventions exist.
+> **Fixture type: Step 5-C unit (state-only seed, no config.json).** It asserts
+> what Step 5-C (memo writing) produces *given the seed's decision history* — it
+> is not a full-cycle run, so don't trace Observe/Decide scoring against it.
+> Step 5-C's starvation scan treats `ux_evolution` as a tracked domain that has
+> been starved (0 executions in the last 10 cycles); `service_health` is the
+> monopoly candidate (selected in cycles 15-16). These `[Reflect]` effects occur
+> in the Reflect phase of a full cycle; `--dry-run` (Step 0→3-H) never reaches them.
 
 Two `[Reflect]` lines should print:
 
