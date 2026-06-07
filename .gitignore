@@ -36,6 +36,7 @@ docs/demo_preview.png
 
 # Internal launch/blog drafts (not for the public repo)
 .claude/blog-flagship.md
+.claude/tier-b-review.md
 
 # OS
 .DS_Store

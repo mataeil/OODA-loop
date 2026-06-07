@@ -216,8 +216,16 @@ you are confident in the agent's behavior.
 | 3     | Autonomous         | All            | Yes            | Yes        |
 
 At Levels 0–2 the agent only observes and proposes. No PRs are merged without
-human approval. Level 3 enables auto-merge and is the only level where the agent
-can make changes to your codebase without a human click.
+human approval.
+
+> **Honest status (v1.2.0): with the bundled skills, NO level auto-merges.** The
+> only PR-producing skill, `dev-cycle`, always opens a **Draft** PR at Risk
+> Tier 3, so even at Level 3 every code change waits for a human merge. The Risk
+> Tier 1 auto-merge path (and the auto-revert that depends on it) is a
+> forward-looking contract for custom low-risk skills — **experimental and not
+> reachable in a standard install**. Verified live (throwaway repo, Level 3,
+> 2026-06). See README "Auto-merge status". The rows/claims below that mention
+> auto-merge describe that future contract, not shipped behavior.
 
 Protected paths always require human review, even at Level 3.
 

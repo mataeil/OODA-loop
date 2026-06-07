@@ -13,6 +13,27 @@ independently. Bump there signals migration work for downstream projects.
 Post-beta quality work toward a stable `1.2.0` (surfaced by the stable-gate
 verification — see TESTING.md).
 
+### Honesty relabel — auto-merge is experimental (Tier B finding)
+
+A live Tier B run (throwaway repo, Level 3) confirmed a doc-vs-implementation
+mismatch: the advertised **auto-merge** does not happen. The only PR-producing
+skill, `dev-cycle`, is hard-wired to open **Draft** PRs at **Risk Tier 3**, so
+`evolve`'s Risk Tier 1 `gh pr merge` path is never reached with the bundled
+skills (and the auto-revert + `/ooda-config rollback` that depend on it are
+likewise unreachable / unimplemented). The behavior is actually *safer* than
+advertised; the claims were ahead of the code. Relabeled accordingly:
+- `ooda-config` Level-3 DANGER prompt no longer claims "create PRs AND
+  auto-merge … without human review"; it states Draft-only + experimental
+  auto-merge.
+- `evolve` 4-C / 4-C2 marked EXPERIMENTAL with an explicit "not reachable with
+  bundled skills" note; manual rollback flagged NOT-YET-IMPLEMENTED.
+- `config.example.json` level 3 `auto_merge` set to `false` with a doc note
+  (evolve never read this flag anyway).
+- README: new **"Auto-merge status (honest)"** section; Day-30 / level-table /
+  rollback claims corrected.
+- **No engine behavior changed** — this is documentation/positioning only.
+  Level 3 = autonomous *Draft-PR* creation; merging stays human.
+
 ### Added
 - **TESTING.md** — documents the verification stack (static walkthrough,
   deterministic reference renderers, fixture taxonomy) and the honest remaining
