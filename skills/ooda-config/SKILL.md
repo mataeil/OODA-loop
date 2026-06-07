@@ -2,7 +2,7 @@
 name: ooda-config
 description: View, modify, and validate config.json settings via slash commands.
 ooda_phase: support
-version: "1.0.0"
+version: "1.1.0"
 input:
   files: [config.json]
   config_keys: []
@@ -31,7 +31,7 @@ If that path exists: `HALT: <reason>. ooda-config aborted.` — stop.
 If `config.json` is missing and subcommand is not `validate`:
 `config.json not found. Run /ooda-setup to create one.` — stop.
 
-Parse the user's invocation to one of: `show | level | domain add | domain remove | domain list | safety | validate`.
+Parse the user's invocation to one of: `show | level | domain add | domain remove | domain list | safety | validate | lens review | lens reset | action {list|approve|defer|reject|prioritize} | mode/season | rotation {show|reset} | context show | rollback {cycle} | auto-merge {on|off}`.
 Unknown subcommand → print the Usage block and exit.
 
 ---
@@ -50,12 +50,15 @@ and key safety values (halt_file presence, confidence_threshold, max_prs_per_cyc
 2. If N == 3, print explicit warning and require a typed confirmation phrase:
    ```
    [DANGER] Level 3 enables AUTONOMOUS mode:
-     - The agent will autonomously write code and open DRAFT PRs (no prompt)
-     - Those PRs ALWAYS require your review — dev-cycle never auto-merges.
-       (Auto-merge for low-risk tiers is EXPERIMENTAL and is NOT reachable with
-        the bundled skills; the only PR-producing skill, dev-cycle, is hard-wired
-        to Draft / Risk Tier 3. See README "Auto-merge status".)
-     - Only the HALT file or the daily cost cap can stop a running cycle
+     - The agent autonomously writes code and opens PRs (no prompt).
+     - By DEFAULT those are DRAFT PRs you review and merge — nothing reaches
+       main without your click. (You stay in command.)
+     - Auto-merge is a SEPARATE opt-in: only if you ALSO run
+       `/ooda-config auto-merge on` (safety.enable_auto_merge=true) will it merge
+       LOW-RISK PRs by itself — non-protected paths, <= auto_merge_max_files /
+       auto_merge_max_lines, tests green — with a post-merge health check that
+       auto-reverts + HALTs on failure. It stays OFF until you flip it.
+     - Only the HALT file or the daily cost cap can stop a running cycle.
    Type "enable autonomous" to confirm (anything else cancels):
    ```
    Only accept the exact phrase `enable autonomous`. Any other response: `Cancelled.`
@@ -320,6 +323,55 @@ Print the current `active_context` config + the loaded blob contents.
             and the blob contents (pretty-printed, cap at 80 lines)
 ```
 
+### Step R — rollback {cycle}
+
+Revert the repo + state to a recorded checkpoint. Checkpoints are written by
+evolve 4-C2 when `safety.enable_rollback` (or `safety.enable_auto_merge`) is on.
+
+```
+1. Read agent/state/evolve/checkpoints.json. If missing/empty:
+   "No checkpoints recorded. Set safety.enable_rollback=true to enable." — exit.
+2. Find the checkpoint where checkpoint.cycle == {cycle}.
+   If not found: "No checkpoint for cycle {cycle}. Available: {cycles}" — exit.
+3. Confirm (typed phrase): print
+   "Roll back to cycle {cycle} (commit {sha})? This reverts every commit since
+    then and restores state. Type 'rollback {cycle}' to confirm:"
+   Accept ONLY the exact phrase; anything else: "Cancelled." — exit.
+4. Re-check the HALT file.
+5. Revert the repo (non-destructive default):
+     git revert --no-edit {checkpoint.commit_sha}..HEAD
+     git push origin HEAD
+   (If the operator passed `--hard`, use `git reset --hard {sha}` + force-push
+    instead — destructive; warn first.)
+6. Restore confidence.json and action_queue.json pending items from
+   checkpoint.state_snapshot.
+7. Create the HALT file: "Manual rollback to cycle {cycle} ({sha}). Delete to resume."
+8. Print "Rolled back to cycle {cycle} ({sha}). HALT created — review, then
+   delete the HALT file to resume."
+```
+
+### Step S — auto-merge {on|off}
+
+Toggle the autonomous low-risk auto-merge opt-in (`config.safety.enable_auto_merge`,
+default off). This is the SINGLE switch that lets evolve merge PRs on its own.
+
+```
+1. Parse on|off. Unknown → print Usage and exit.
+2. Turning ON:
+   - Require progressive_complexity.current_level == 3, else:
+     "Auto-merge needs Level 3. Run /ooda-config level 3 first." — exit.
+   - Print the gates and require a typed phrase:
+     "[DANGER] Auto-merge will let the agent merge LOW-RISK PRs without your click:
+        non-protected paths, <= {auto_merge_max_files} files / {auto_merge_max_lines}
+        lines, tests green. A post-merge health check auto-reverts + HALTs on
+        failure. Larger/protected changes still wait for you.
+      Type 'enable auto-merge' to confirm:"  (accept only the exact phrase)
+3. Back up config.json. Set safety.enable_auto_merge = (on ? true : false).
+   Write + validate JSON.
+4. Print "Auto-merge: {enabled|disabled}."  When enabled, also print the active
+   low-risk thresholds so the operator sees the blast-radius bound.
+```
+
 ---
 
 ## Step G — validate (extended)
@@ -351,6 +403,8 @@ Run checks in order; print `[PASS]` or `[FAIL] <reason>` for each:
 23. If `implementation.enabled`, `progressive_complexity.current_level` must be 3
 24. `memory.working_memory_size` >= 5 (minimum for pattern detection)
 25. If `saturation` block present, `warn_threshold < boost_threshold < halt_threshold`
+26. If `safety.enable_auto_merge` is true, `progressive_complexity.current_level` must be 3
+27. If present, `safety.auto_merge_max_files` <= `safety.max_files_per_pr` and `safety.auto_merge_max_lines` <= `safety.max_lines_per_pr` (the low-risk bar must be tighter than the hard PR cap)
 
 Final: `Validation: <N> passed, <M> failed`
 On any failure append: `Run /ooda-config show to review your settings.`
@@ -380,4 +434,6 @@ On any failure append: `Run /ooda-config show to review your settings.`
 /ooda-config rotation show {d}     Show rotation list + cursor for a domain
 /ooda-config rotation reset {d}    Reset rotation cursor to 0
 /ooda-config context show          Show active_context path + blob contents
+/ooda-config auto-merge {on|off}   Toggle low-risk autonomous merge (Level 3, opt-in)
+/ooda-config rollback {cycle}      Revert repo + state to a recorded checkpoint
 ```

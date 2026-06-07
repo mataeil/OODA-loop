@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.2.0",
+  "project": { "name": "auto-merge-gating", "locale": "en", "timezone": "UTC" },
+  "domains": {
+    "implementation": { "weight": 1.0, "status": "active", "primary_skill": "/dev-cycle", "state_file": "agent/state/implementation/state.json", "enabled": true, "fallback": true }
+  },
+  "progressive_complexity": { "current_level": 3,
+    "levels": { "3": { "name": "Autonomous", "implementation": true, "auto_merge": false } } },
+  "implementation": { "enabled": true },
+  "safety": {
+    "halt_file": "agent/safety/HALT",
+    "max_files_per_pr": 20,
+    "max_lines_per_pr": 500,
+    "protected_paths": ["agent/safety/*", "skills/evolve/*", "agent/contracts/*"],
+    "enable_rollback": true,
+    "enable_auto_merge": true,
+    "auto_merge_max_files": 5,
+    "auto_merge_max_lines": 100
+  },
+  "cost": { "daily_limit_usd": 10.0, "warning_threshold_pct": 80, "max_backfill_cycles": 100 }
+}

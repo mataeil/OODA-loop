@@ -980,35 +980,38 @@ branch_prefix or skill output indicating PR creation).
 
 If PR created, determine risk tier (distinct from progressive complexity levels):
 
-> **⚠ Auto-merge status (EXPERIMENTAL — not reachable with the bundled skills).**
-> The only skill that creates PRs is `dev-cycle`, which is hard-wired to open
-> **Draft** PRs classified as **Risk Tier 3** (see `dev-cycle/SKILL.md`: "ALWAYS
-> creates Draft PRs … NEVER auto-merges"). No bundled skill emits a Risk Tier 1
-> PR, so the `gh pr merge --merge` action below does **not** fire in a standard
-> install — every code change waits for a human merge. Risk Tier 1 is retained as
-> a forward-looking contract for custom skills that explicitly opt into low-risk
-> auto-merge; it is unverified end-to-end and must not be advertised as a shipped
-> feature. Verified live (throwaway repo, Level 3, 2026-06): dev-cycle opened a
-> Draft PR and evolve left it unmerged.
+> **Auto-merge is opt-in and OFF by default.** It fires ONLY when
+> `config.safety.enable_auto_merge == true`. With the default (`false`), EVERY PR
+> — including dev-cycle's — is **Risk Tier 3 (human merge)**. That is the "you
+> stay in command" default. When enabled, evolve re-checks every gate below
+> ITSELF before merging — fetch the facts with
+> `gh pr view {n} --json isDraft,additions,deletions,changedFiles,files` and do
+> NOT trust dev-cycle's `auto_merge_eligible` marker. Re-check the HALT file
+> immediately before any `gh pr merge`.
 
-**Risk Tier 1 -- Auto-merge** (ALL must be true; EXPERIMENTAL — see note above):
-- progressive_complexity >= 3
-- no protected paths touched
-- files <= config.safety.max_files_per_pr
-- lines <= config.safety.max_lines_per_pr
+**Risk Tier 1 — Auto-merge** (auto-merges ONLY if ALL are true):
+- `config.safety.enable_auto_merge == true`                  (opt-in; default false)
+- `progressive_complexity.current_level >= 3`
+- PR is NOT a draft (`isDraft == false`)
+- no changed file matches `config.safety.protected_paths`
+- `changedFiles <= config.safety.auto_merge_max_files`        (default 5)
+- `additions + deletions <= config.safety.auto_merge_max_lines` (default 100)
+- the PR's tests are green (this cycle's check-tests/dev-cycle reported passing)
 
-Action: `gh pr merge {n} --merge`. If config.deploy_workflow configured, wait
-for deploy. If config.health_endpoints configured, run health check. If health
-fails: `git revert --no-edit HEAD && git push origin HEAD`, create HALT file,
-notify.
+Action: re-check HALT → take a pre-action checkpoint (4-C2) → `gh pr merge {n}
+--merge` → **post-merge health check** (`config.health_endpoints` if set, else
+re-run `config.test_command`). If the health check FAILS → 4-C2 auto-rollback
+(`git revert --no-edit HEAD && git push origin HEAD`, create HALT, notify).
+Print "[Act] Auto-merged PR #{n} (low-risk, opt-in). Health: {ok|reverted}."
 
-**Risk Tier 2 -- Merge, manual deploy** (progressive_complexity >= 3, no
-protected paths, but exceeds size limits):
-Action: `gh pr merge {n} --merge`. Print: "Deploy manually with /run-deploy."
+**Risk Tier 2 — Ready for human merge** (`enable_auto_merge` true, level >= 3,
+no protected paths, but EXCEEDS the auto_merge size limits — too large for the
+low-risk bar): leave the PR **ready (non-draft)** for a one-click human merge, but
+do NOT auto-merge. Print: "PR #{n} ready — review & merge, then /run-deploy if needed."
 
-**Risk Tier 3 -- Human review** (ANY: protected paths touched, complexity
-level < 3, implementation PR):
-Keep as draft. Print: "PR #{n} requires human review."
+**Risk Tier 3 — Human review** (the DEFAULT; ANY of: `enable_auto_merge` is
+false, protected paths touched, complexity level < 3, PR is a draft, or tests not
+green): keep as draft. Print: "PR #{n} requires human review."
 
 ### 4-C2: Rollback Protocol
 
@@ -1040,12 +1043,11 @@ if config.safety.enable_rollback:
   Write checkpoints.json
 ```
 
-**Automatic rollback trigger** (after Risk Tier 1 auto-merge — EXPERIMENTAL).
-Because Risk Tier 1 does not fire with the bundled skills (see the Auto-merge
-status note in 4-C), this auto-rollback path is currently unreachable too. The
-pre-action checkpoint above is real and useful on its own (it snapshots HEAD +
-state before every action); auto-revert below activates only once a real
-auto-merge path exists.
+**Automatic rollback trigger** (after a Risk Tier 1 auto-merge). Reachable only
+when `config.safety.enable_auto_merge` is on (otherwise nothing auto-merges and
+this never runs). The pre-action checkpoint above is taken on every action when
+`enable_rollback` is on; when `enable_auto_merge` is on, evolve forces a
+checkpoint before a Tier-1 merge regardless, so this revert always has a target.
 ```
 if PR was auto-merged AND health check fails:
   Print "[Rollback] Health check failed after auto-merge of PR #{n}."
@@ -1060,11 +1062,8 @@ if PR was auto-merged AND health check fails:
   Print "[Rollback] Reverted PR #{n}. HALT created. Human review required."
 ```
 
-**Manual rollback** (NOT YET IMPLEMENTED as a command — planned). The
-`/ooda-config rollback {cycle}` subcommand described below does not exist in
-`ooda-config/SKILL.md` yet. Until it ships, recover by hand: read
-`agent/state/evolve/checkpoints.json`, then `git revert` (or `git reset --hard`)
-to the recorded `commit_sha`. The intended command behavior is:
+**Manual rollback** via `/ooda-config rollback {cycle}` (implemented in
+`ooda-config/SKILL.md`). Behavior:
 ```
 1. Find checkpoint by cycle number in checkpoints.json
 2. If not found: "No checkpoint for cycle {cycle}" — exit

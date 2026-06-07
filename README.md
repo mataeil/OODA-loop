@@ -34,7 +34,7 @@ Re-render the latest card any time with `/ooda-status --share`.
 ```
 </details>
 
-An autonomous **operations** layer for your live side project — it watches, decides what matters, and proposes small PRs you approve. **You stay in command:** it proposes, you merge or reject, every change is an isolated one-click-revertible PR, and it re-aims from your calls. *(Auto-merge is **experimental** — with the bundled skills every change is a Draft PR you merge; the auto-merge path is not reachable yet. See "Auto-merge status" under Safety.)*
+An autonomous **operations** layer for your live side project — it watches, decides what matters, and proposes small PRs you approve. **You stay in command:** it proposes, you merge or reject, every change is an isolated one-click-revertible PR, and it re-aims from your calls. *(Auto-merge is **opt-in and off by default** — every change is a Draft PR you merge until you run `/ooda-config auto-merge on`, which lets it merge only low-risk PRs with a post-merge auto-revert. See "Auto-merge status".)*
 
 **The receipts** *(author-measured — run your own pilot)*: two real projects have run it continuously — **[fwd.page](https://fwd.page)** (a live URL shortener) for **152 cycles → 28 PRs, 24 merged (86%)**, and **Lynceus** (parliamentary-audit automation) for **119 cycles at observe level (no PRs yet)**. It also ran clean across **9 language/framework stacks** in sandbox (60 cycles, 36 PRs, no compile or test failures observed).
 
@@ -128,7 +128,7 @@ A cron job runs the same logic on day 100 as day 1. An OODA loop re-orients.
 
 **Day 7.** Level 2. Full backlog tracking, RICE scoring, reports, draft PRs you merge. The Adaptive Lens has started learning — health checks that always pass get deprioritized, flaky patterns get flagged sooner.
 
-**Day 30.** Level 3 (deliberate opt-in). It picks the highest-scoring backlog item, writes code, runs your tests, and leaves a PR + Cycle Card waiting for your morning — small by design (20 files / 500 lines max). Today every implementation change is a **Draft PR you review** — auto-merge is experimental and not reachable with the bundled skills (see "Auto-merge status"). It watches at 3am, notices what you'd notice at 9am, and re-aims from what you merge or reject.
+**Day 30.** Level 3 (deliberate opt-in). It picks the highest-scoring backlog item, writes code, runs your tests, and leaves a PR + Cycle Card waiting for your morning — small by design (20 files / 500 lines max). By default every implementation change is a **Draft PR you review**; opt into low-risk auto-merge with `/ooda-config auto-merge on` and it merges small, green, non-protected changes itself — with a post-merge health check that auto-reverts on failure (see "Auto-merge status"). It watches at 3am, notices what you'd notice at 9am, and re-aims from what you merge or reject.
 
 **Self-correction in the wild.** Across 60 sandbox cycles spanning 9 stacks, the agent opened 36 PRs with no compile or test failures observed. When one of its own changes caused a coverage regression, it *detected the drop, generated a corrective action ranked above every existing task, and fixed it the next cycle.* It observes the consequences of its own actions and adapts.
 
@@ -178,7 +178,7 @@ Start at Level 0. Move up when you trust the observations.
 | 0 | Just watching | 1 domain. Observe only. No PRs. |
 | 1 | Watching + testing | 2 domains. Coverage tracking added. |
 | 2 | Full observation | All domains. Draft PRs (you merge). Reports, scoring, lens learning. |
-| 3 | Autonomous | Implementation enabled — autonomous **Draft PRs you review**. (Auto-merge: experimental, not reachable with bundled skills — see below.) |
+| 3 | Autonomous | Implementation enabled — autonomous **Draft PRs you review** by default; low-risk auto-merge is opt-in (`/ooda-config auto-merge on`). |
 
 Skipping levels (e.g. 0 → 3) enforces a 3-cycle observe-only cooldown at the new level. `/ooda-config level 2`.
 
@@ -193,12 +193,14 @@ Safe by default. Level 0 cannot create PRs. Level 3 requires deliberate opt-in.
 - **Confidence gate** — Actions below 0.6 confidence are skipped or downgraded.
 - **PR limits** — Max 20 files, 500 lines per PR. Enforced in config.
 - **Hard cost cap** — Daily API cost is tracked in `cost_ledger.json`. Crossing `cost.daily_limit_usd` ($10 default) **auto-creates a HALT**; warning at 80%. Resets 00:00 UTC. Missing ledger fails closed.
-- **Rollback** — Optional pre-action checkpoints (`enable_rollback`, off by default) snapshot HEAD + state before every action and are real today. The *automatic* revert-on-health-failure depends on the (experimental) auto-merge path, so it does not trigger with the bundled skills; a `/ooda-config rollback` command is planned but not yet implemented. Manual recovery: read `checkpoints.json` and `git revert` to the recorded SHA.
+- **Rollback** — Pre-action checkpoints (`enable_rollback`, also forced when auto-merge is on) snapshot HEAD + state before every action. When auto-merge is on, a failed post-merge health check **auto-reverts + HALTs**. For manual recovery, `/ooda-config rollback {cycle}` reverts the repo + state to any recorded checkpoint.
 - **Adaptive Lens safety** — Bad learning decays 2× faster than good learning grows; lens corruption falls back to base behavior.
 
 ### Auto-merge status (honest)
 
-Level 3 is **autonomous Draft-PR creation**, not autonomous merging — which is exactly the "you stay in command" promise. The only PR-producing skill, `dev-cycle`, always opens a **Draft** PR at **Risk Tier 3** (human review); it never auto-merges, even at Level 3, even on green tests. The Risk Tier 1 "auto-merge" path exists in the `evolve` spec as a forward-looking contract, but **no bundled skill produces a Tier 1 PR, so it never fires** in a standard install. Treat auto-merge (and the auto-revert that follows it) as **experimental and unverified end-to-end**. Verified live in a throwaway repo at Level 3: the agent opened a Draft PR and left it unmerged for human review.
+Level 3 is **autonomous Draft-PR creation by default — you merge.** Auto-merge is a **separate opt-in** (`/ooda-config auto-merge on`; `safety.enable_auto_merge`, default `false`). When you turn it on, evolve merges **only low-risk PRs** on its own: non-protected paths, ≤ `auto_merge_max_files` (5) / `auto_merge_max_lines` (100), tests green — then runs a post-merge health check that **auto-reverts + HALTs** on failure. Anything larger or protected stays a Draft PR you merge. evolve re-checks every gate itself before merging (it doesn't trust dev-cycle's marker). Off by default because **you stay in command** unless you choose otherwise.
+
+> **Verification note (honest):** the autonomous Draft-PR + reject→re-aim path is verified live (throwaway repo, Level 3). The low-risk **auto-merge** path is **newly implemented** and not yet re-verified end-to-end against a live remote — run it in a throwaway repo with `enable_auto_merge: true` before relying on it in production. See [TESTING.md](TESTING.md).
 
 See [SECURITY.md](SECURITY.md) for the full threat model.
 

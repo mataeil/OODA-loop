@@ -218,14 +218,16 @@ you are confident in the agent's behavior.
 At Levels 0–2 the agent only observes and proposes. No PRs are merged without
 human approval.
 
-> **Honest status (v1.2.0): with the bundled skills, NO level auto-merges.** The
-> only PR-producing skill, `dev-cycle`, always opens a **Draft** PR at Risk
-> Tier 3, so even at Level 3 every code change waits for a human merge. The Risk
-> Tier 1 auto-merge path (and the auto-revert that depends on it) is a
-> forward-looking contract for custom low-risk skills — **experimental and not
-> reachable in a standard install**. Verified live (throwaway repo, Level 3,
-> 2026-06). See README "Auto-merge status". The rows/claims below that mention
-> auto-merge describe that future contract, not shipped behavior.
+> **Auto-merge status (v1.2.0): opt-in, OFF by default.** No level auto-merges
+> unless you explicitly set `safety.enable_auto_merge=true` (Level 3 only). With
+> the default, every code change — including dev-cycle's — is a **Draft PR you
+> merge by hand**. When you opt in, evolve auto-merges **only low-risk** PRs:
+> non-protected paths, ≤ `safety.auto_merge_max_files` (5) /
+> `safety.auto_merge_max_lines` (100), tests green — then runs a post-merge
+> health check that **auto-reverts + creates a HALT** on failure (evolve re-checks
+> every gate itself before merging). Larger or protected changes always wait for
+> you. The auto-merge path is newly implemented — verify in a throwaway repo
+> before relying on it in production. See README "Auto-merge status".
 
 Protected paths always require human review, even at Level 3.
 

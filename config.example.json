@@ -118,6 +118,10 @@
     "max_silent_failures": 3,
     "generated_file_patterns": [],
     "enable_rollback": false,
+    "enable_auto_merge": false,
+    "auto_merge_max_files": 5,
+    "auto_merge_max_lines": 100,
+    "__auto_merge_doc__": "enable_auto_merge (default false) is the SINGLE opt-in switch for autonomous merging. When true AND level>=3, evolve auto-merges ONLY low-risk PRs: no protected paths, files <= auto_merge_max_files, lines <= auto_merge_max_lines, and tests green. Everything else stays a Draft PR you merge by hand. Auto-merge takes a pre-action checkpoint and auto-reverts + HALTs on a failed post-merge health check (it forces enable_rollback behavior). Off by default: you stay in command unless you flip this.",
     "risk_rules": []
   },
   "progressive_complexity": {
@@ -146,7 +150,7 @@
         "domains": "all",
         "implementation": true,
         "auto_merge": false,
-        "__auto_merge_doc__": "EXPERIMENTAL / not reachable with bundled skills. dev-cycle always opens Draft PRs (Risk Tier 3) that require a human merge; no bundled skill emits a Risk Tier 1 auto-merge PR. This flag is reserved for custom low-risk skills that opt in. See README 'Auto-merge status'. (evolve does not read this flag; it gates on level + risk tier.)"
+        "__auto_merge_doc__": "Descriptive only — the engine reads config.safety.enable_auto_merge (NOT this field) to decide auto-merge. Level 3 enables autonomous implementation (Draft PRs by default); set safety.enable_auto_merge=true to also auto-merge low-risk PRs. See safety.__auto_merge_doc__ and README 'Auto-merge status'."
       }
     },
     "last_level_change": null
