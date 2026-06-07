@@ -197,8 +197,18 @@ read-only.
 ```
 /ooda-status --share
 ```
+#### `--share --plain` — emit only the text line
 
-Reconstruct the card from existing state — no recomputation:
+If the `--plain` flag is appended (`/ooda-status --share --plain`), this mode acts as a strict subset of 
+`--share` that omits the Cycle Card rendering output. It reuses identical state
+ reconstruction logic, LEARN-line selection priority, and all graceful degradation rules defined in `--share`.
+ It emits only the single-sentence plain-text share line (as defined in evolve Step 7).
+
+```
+/ooda-status --share --plain
+```
+
+Reconstruct the card (or plain text) from existing state — no recomputation:
 
 - **header / DECIDE / ACT** — `state.json.decision_log[-1]` (cycle, timestamp,
   domain, skill, score, confidence, result, pr_number, risk_tier, orient_summary).
