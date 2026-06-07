@@ -50,9 +50,12 @@ and key safety values (halt_file presence, confidence_threshold, max_prs_per_cyc
 2. If N == 3, print explicit warning and require a typed confirmation phrase:
    ```
    [DANGER] Level 3 enables AUTONOMOUS mode:
-     - The agent will create PRs AND auto-merge them without human review
-     - Implementation changes will be deployed automatically
-     - Only HALT file or cost limit can stop a running cycle
+     - The agent will autonomously write code and open DRAFT PRs (no prompt)
+     - Those PRs ALWAYS require your review — dev-cycle never auto-merges.
+       (Auto-merge for low-risk tiers is EXPERIMENTAL and is NOT reachable with
+        the bundled skills; the only PR-producing skill, dev-cycle, is hard-wired
+        to Draft / Risk Tier 3. See README "Auto-merge status".)
+     - Only the HALT file or the daily cost cap can stop a running cycle
    Type "enable autonomous" to confirm (anything else cancels):
    ```
    Only accept the exact phrase `enable autonomous`. Any other response: `Cancelled.`

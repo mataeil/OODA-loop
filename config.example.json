@@ -145,7 +145,8 @@
         "name": "Autonomous",
         "domains": "all",
         "implementation": true,
-        "auto_merge": true
+        "auto_merge": false,
+        "__auto_merge_doc__": "EXPERIMENTAL / not reachable with bundled skills. dev-cycle always opens Draft PRs (Risk Tier 3) that require a human merge; no bundled skill emits a Risk Tier 1 auto-merge PR. This flag is reserved for custom low-risk skills that opt in. See README 'Auto-merge status'. (evolve does not read this flag; it gates on level + risk tier.)"
       }
     },
     "last_level_change": null

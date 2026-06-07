@@ -980,7 +980,18 @@ branch_prefix or skill output indicating PR creation).
 
 If PR created, determine risk tier (distinct from progressive complexity levels):
 
-**Risk Tier 1 -- Auto-merge** (ALL must be true):
+> **⚠ Auto-merge status (EXPERIMENTAL — not reachable with the bundled skills).**
+> The only skill that creates PRs is `dev-cycle`, which is hard-wired to open
+> **Draft** PRs classified as **Risk Tier 3** (see `dev-cycle/SKILL.md`: "ALWAYS
+> creates Draft PRs … NEVER auto-merges"). No bundled skill emits a Risk Tier 1
+> PR, so the `gh pr merge --merge` action below does **not** fire in a standard
+> install — every code change waits for a human merge. Risk Tier 1 is retained as
+> a forward-looking contract for custom skills that explicitly opt into low-risk
+> auto-merge; it is unverified end-to-end and must not be advertised as a shipped
+> feature. Verified live (throwaway repo, Level 3, 2026-06): dev-cycle opened a
+> Draft PR and evolve left it unmerged.
+
+**Risk Tier 1 -- Auto-merge** (ALL must be true; EXPERIMENTAL — see note above):
 - progressive_complexity >= 3
 - no protected paths touched
 - files <= config.safety.max_files_per_pr
@@ -1029,7 +1040,12 @@ if config.safety.enable_rollback:
   Write checkpoints.json
 ```
 
-**Automatic rollback trigger** (after Risk Tier 1 auto-merge):
+**Automatic rollback trigger** (after Risk Tier 1 auto-merge — EXPERIMENTAL).
+Because Risk Tier 1 does not fire with the bundled skills (see the Auto-merge
+status note in 4-C), this auto-rollback path is currently unreachable too. The
+pre-action checkpoint above is real and useful on its own (it snapshots HEAD +
+state before every action); auto-revert below activates only once a real
+auto-merge path exists.
 ```
 if PR was auto-merged AND health check fails:
   Print "[Rollback] Health check failed after auto-merge of PR #{n}."
@@ -1044,7 +1060,11 @@ if PR was auto-merged AND health check fails:
   Print "[Rollback] Reverted PR #{n}. HALT created. Human review required."
 ```
 
-**Manual rollback** via `/ooda-config rollback {cycle}`:
+**Manual rollback** (NOT YET IMPLEMENTED as a command — planned). The
+`/ooda-config rollback {cycle}` subcommand described below does not exist in
+`ooda-config/SKILL.md` yet. Until it ships, recover by hand: read
+`agent/state/evolve/checkpoints.json`, then `git revert` (or `git reset --hard`)
+to the recorded `commit_sha`. The intended command behavior is:
 ```
 1. Find checkpoint by cycle number in checkpoints.json
 2. If not found: "No checkpoint for cycle {cycle}" — exit
