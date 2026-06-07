@@ -339,6 +339,46 @@ def check_cycle_card_render(r: Runner) -> None:
     )
 
 
+def check_auto_merge_gating(r: Runner) -> None:
+    """Objective check of the safety-critical auto-merge gate (evolve 4-C)."""
+    import importlib.util
+
+    amg_path = ROOT.parent / "scripts" / "auto_merge_gate.py"
+    spec = importlib.util.spec_from_file_location("amg", amg_path)
+    amg = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(amg)
+    cfg = load_json(ROOT / "auto-merge-gating" / "seed" / "config.json")
+
+    low_risk = {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1,
+                "additions": 3, "deletions": 1, "tests": "green"}
+    ok, _ = amg.eligible(cfg, low_risk)
+    r.check("auto-merge-gating: low-risk green PR is eligible", ok, "eligible")
+
+    holds = {
+        "protected path": {"isDraft": False, "files": ["skills/evolve/SKILL.md"], "changedFiles": 1, "additions": 2, "deletions": 0, "tests": "green"},
+        "too many files": {"isDraft": False, "files": list("abcdef"), "changedFiles": 6, "additions": 5, "deletions": 0, "tests": "green"},
+        "too many lines": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 200, "deletions": 0, "tests": "green"},
+        "draft": {"isDraft": True, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "green"},
+        "tests red": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "red"},
+    }
+    blocked = [name for name, pr in holds.items() if not amg.eligible(cfg, pr)[0]]
+    r.check(
+        "auto-merge-gating: protected/large/draft/red all held",
+        len(blocked) == len(holds),
+        f"held={blocked}",
+    )
+
+    # opt-out: with enable_auto_merge false, even a low-risk PR must hold
+    cfg_off = json.loads(json.dumps(cfg))
+    cfg_off["safety"]["enable_auto_merge"] = False
+    ok_off, why_off = amg.eligible(cfg_off, low_risk)
+    r.check(
+        "auto-merge-gating: default (enable_auto_merge off) holds everything",
+        not ok_off,
+        why_off,
+    )
+
+
 def main() -> int:
     r = Runner()
     r.section("principles-extraction", lambda: check_principles_extraction(r))
@@ -350,6 +390,7 @@ def main() -> int:
     r.section("active-context-read", lambda: check_active_context_read(r))
     r.section("cycle-card", lambda: check_cycle_card(r))
     r.section("cycle-card-render", lambda: check_cycle_card_render(r))
+    r.section("auto-merge-gating", lambda: check_auto_merge_gating(r))
     return r.report()
 
 

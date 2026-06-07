@@ -106,21 +106,38 @@ After the controlled live run above, two gaps remain before a **stable `1.2.0`**
      confidence 0.70 → 0.50 (reject −0.2, the asymmetric 2× of a merge's +0.1)
      and re-aimed the lens; the Cycle Card LEARN line reported it.
    - ✅ **Kill-switch / cost cap / protected paths / checkpoints** all behaved.
-   - ❌ **Auto-merge did NOT happen — and cannot, with the bundled skills.**
-     `dev-cycle` is hard-wired to **Draft / Risk Tier 3**, so `evolve`'s Risk
-     Tier 1 `gh pr merge` path never fires (ground truth: `gh pr view` →
-     `isDraft:true, mergedAt:null`; `main` had zero auto-merged commits). The
-     auto-revert that depends on it, and `/ooda-config rollback`, are likewise
-     unreachable / unimplemented.
+   - ⚠️ **Auto-merge did NOT happen in that run** — at the time it was unreachable
+     (dev-cycle hard-wired to Draft / Risk Tier 3; `gh pr view` →
+     `isDraft:true, mergedAt:null`; `main` had zero auto-merged commits). That
+     finding is what drove the **opt-in auto-merge implementation** below.
 
-   Conclusion: Level 3 is **autonomous Draft-PR creation**, which is verified;
-   **auto-merge is experimental and not reachable** with the bundled skills.
-   Relabeled across the docs/spec accordingly (see CHANGELOG "Honesty relabel").
+   Conclusion: Level 3 autonomous Draft-PR creation + reject→re-aim are **verified
+   live**. Auto-merge was then **implemented as a low-risk opt-in** (see next).
 
-Levels 0–2 (observe / test / draft-PR + the full Orient/Reflect learning loop)
-and Level 3's autonomous Draft-PR + reject→re-aim path are verified by the static
-suite + the controlled live runs. The only un-shipped piece is auto-merge itself,
-now labeled experimental rather than advertised as working.
+### The remaining gate — re-verify the new auto-merge path
+
+Auto-merge is now implemented (opt-in `safety.enable_auto_merge`, low-risk only,
+post-merge health check + auto-revert; `/ooda-config rollback` implemented). It
+has **not** yet been exercised end-to-end against a live remote. To close the
+last gap, run a fresh Tier-B in a throwaway repo with:
+
+```
+/ooda-config level 3
+/ooda-config auto-merge on
+# seed a TINY (≤5 files / ≤100 lines), non-protected, green change as the top action
+/evolve            # expect: ready (non-draft) PR → gh pr merge → post-merge health check
+# then break health and confirm auto-revert + HALT
+```
+
+Confirm: a low-risk PR actually merges, a large/protected one stays Draft, and a
+failing post-merge health check auto-reverts + HALTs. Until then, treat the
+auto-merge path as implemented-but-unverified (the default — off — is unaffected
+and fully verified).
+
+Levels 0–2 (observe / test / draft-PR + the Orient/Reflect learning loop) and
+Level 3's autonomous Draft-PR + reject→re-aim are verified by the static suite +
+the controlled live runs. The newly-added low-risk auto-merge path is the one
+piece awaiting a live throwaway run.
 
 ## Adding a fixture
 

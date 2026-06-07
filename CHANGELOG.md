@@ -13,7 +13,29 @@ independently. Bump there signals migration work for downstream projects.
 Post-beta quality work toward a stable `1.2.0` (surfaced by the stable-gate
 verification — see TESTING.md).
 
+### Added — auto-merge, implemented as a low-risk opt-in (supersedes the relabel below)
+
+The Tier B finding (auto-merge was unreachable dead code) is now resolved by
+*implementing* it conservatively rather than only relabeling:
+- **`config.safety.enable_auto_merge`** (default `false`) — the single opt-in
+  switch, plus `auto_merge_max_files` (5) / `auto_merge_max_lines` (100).
+- **`dev-cycle`** opens a **ready** (non-draft) PR only when a change is
+  auto-merge-eligible (opt-in + Level 3 + non-protected + within the low-risk
+  size bar + tests green); otherwise it stays a **Draft** (the default).
+- **`evolve` 4-C** Risk Tier 1 now fires *only* under those gates, which evolve
+  **re-checks itself** via `gh pr view` (defense in depth) — then merges, runs a
+  post-merge health check, and (4-C2) **auto-reverts + HALTs** on failure. Large
+  changes → Tier 2 (ready, human merges); everything else → Tier 3 (Draft).
+- **`/ooda-config auto-merge {on|off}`** toggle (typed-phrase confirm, Level-3
+  gated) and **`/ooda-config rollback {cycle}`** (now implemented — reverts repo
+  + state to a checkpoint). Level-3 DANGER prompt corrected to the opt-in reality.
+- Default behavior is unchanged: **you stay in command; nothing auto-merges
+  unless you flip the switch.** The new auto-merge path is implemented but awaits
+  a live throwaway re-verification (see TESTING.md "remaining gate").
+
 ### Honesty relabel — auto-merge is experimental (Tier B finding)
+
+> Superseded by the implementation above; kept for history.
 
 A live Tier B run (throwaway repo, Level 3) confirmed a doc-vs-implementation
 mismatch: the advertised **auto-merge** does not happen. The only PR-producing
