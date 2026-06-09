@@ -380,6 +380,45 @@ def check_auto_merge_gating(r: Runner) -> None:
     )
 
 
+def check_longhorizon(r: Runner) -> None:
+    """Long-horizon thresholds (saturation / contrarian / decay) fire where the
+    spec says — verified against the SHIPPED config.example.json values."""
+    import importlib.util
+
+    sim_path = ROOT.parent / "scripts" / "sim_longhorizon.py"
+    spec = importlib.util.spec_from_file_location("sim", sim_path)
+    sim = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sim)
+    cfg = load_json(ROOT.parent / "config.example.json")
+    c = sim._cfg(cfg)
+
+    evs = sim.saturation_events(20, c["warn"], c["boost"], c["halt"])
+    warn = [n for n, e in evs if e == "warn"]
+    boost = [n for n, e in evs if e == "boost"]
+    halt = [n for n, e in evs if e == "halt"]
+    r.check(
+        "long-horizon: saturation warn@5, boost@10, HALT@15+ (config.example)",
+        warn == [5] and boost == [10] and halt and halt[0] == 15,
+        f"warn={warn} boost={boost} first_halt={halt[0] if halt else None}",
+    )
+
+    contr = sim.contrarian_cycles(20, c["interval"])
+    r.check(
+        "long-horizon: contrarian check fires at cycles 10 and 20",
+        contr == [10, 20],
+        f"contrarian cycles = {contr}",
+    )
+
+    dd, da = c["decay_days"], c["decay_amount"]
+    cases = {13: 0.0, 14: 0.05, 27: 0.05, 28: 0.10, 280: 1.0}
+    got = {age: round(sim.decay_factor(age, dd, da), 2) for age in cases}
+    r.check(
+        "long-horizon: action-queue decay factor matches Step 6-C6 schedule",
+        got == cases,
+        f"expected={cases} got={got}",
+    )
+
+
 def main() -> int:
     r = Runner()
     r.section("principles-extraction", lambda: check_principles_extraction(r))
@@ -392,6 +431,7 @@ def main() -> int:
     r.section("cycle-card", lambda: check_cycle_card(r))
     r.section("cycle-card-render", lambda: check_cycle_card_render(r))
     r.section("auto-merge-gating", lambda: check_auto_merge_gating(r))
+    r.section("long-horizon", lambda: check_longhorizon(r))
     return r.report()
 
 
