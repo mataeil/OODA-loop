@@ -354,6 +354,21 @@ def check_auto_merge_gating(r: Runner) -> None:
     ok, _ = amg.eligible(cfg, low_risk)
     r.check("auto-merge-gating: low-risk green PR is eligible", ok, "eligible")
 
+    # stack-agnostic: the gate reads gh-pr facts (files/lines/draft/tests), never
+    # language — a low-risk green change is eligible regardless of stack.
+    stacks = {
+        "go": "pkg/calc.go", "rust": "src/lib.rs", "node": "src/index.ts",
+        "ruby": "lib/calc.rb", "java": "src/Main.java",
+    }
+    elig = [s for s, f in stacks.items()
+            if amg.eligible(cfg, {"isDraft": False, "files": [f], "changedFiles": 1,
+                                  "additions": 3, "deletions": 1, "tests": "green"})[0]]
+    r.check(
+        "auto-merge-gating: gate is stack-agnostic (go/rust/node/ruby/java eligible)",
+        len(elig) == len(stacks),
+        f"eligible={elig}",
+    )
+
     holds = {
         "protected path": {"isDraft": False, "files": ["skills/evolve/SKILL.md"], "changedFiles": 1, "additions": 2, "deletions": 0, "tests": "green"},
         "too many files": {"isDraft": False, "files": list("abcdef"), "changedFiles": 6, "additions": 5, "deletions": 0, "tests": "green"},
