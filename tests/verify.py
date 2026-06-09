@@ -360,10 +360,11 @@ def check_auto_merge_gating(r: Runner) -> None:
         "too many lines": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 200, "deletions": 0, "tests": "green"},
         "draft": {"isDraft": True, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "green"},
         "tests red": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "red"},
+        "protected skipped": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "green", "protected_blocked": True},
     }
     blocked = [name for name, pr in holds.items() if not amg.eligible(cfg, pr)[0]]
     r.check(
-        "auto-merge-gating: protected/large/draft/red all held",
+        "auto-merge-gating: protected/large/draft/red/partial-protected all held",
         len(blocked) == len(holds),
         f"held={blocked}",
     )

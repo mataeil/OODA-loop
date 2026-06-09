@@ -37,6 +37,8 @@ def eligible(config: dict, pr: dict):
         for pat in protected:
             if fnmatch.fnmatch(f, pat) or fnmatch.fnmatch(f, pat.rstrip("/*") + "/" + "*"):
                 return False, f"protected path touched: {f} (~ {pat})"
+    if pr.get("protected_blocked"):
+        return False, "a protected path was skipped during the action (partial change; #35)"
     max_files = safety.get("auto_merge_max_files", 5)
     max_lines = safety.get("auto_merge_max_lines", 100)
     changed = pr.get("changedFiles", len(pr.get("files", []) or []))
@@ -62,6 +64,7 @@ def main() -> int:
         "too many lines": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 200, "deletions": 0, "tests": "green"},
         "draft": {"isDraft": True, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "green"},
         "tests red": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "red"},
+        "protected skipped": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "green", "protected_blocked": True},
     }
     for name, pr in demos.items():
         ok, why = eligible(cfg, pr)

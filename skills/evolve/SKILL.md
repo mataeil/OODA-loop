@@ -994,6 +994,9 @@ If PR created, determine risk tier (distinct from progressive complexity levels)
 - `progressive_complexity.current_level >= 3`
 - PR is NOT a draft (`isDraft == false`)
 - no changed file matches `config.safety.protected_paths`
+- the action did NOT skip a protected path — the PR meta has no
+  `protected_blocked=true` (a partial change with protected files removed is NOT
+  eligible; it may be incomplete/incoherent — #35)
 - `changedFiles <= config.safety.auto_merge_max_files`        (default 5)
 - `additions + deletions <= config.safety.auto_merge_max_lines` (default 100)
 - the PR's tests are green (this cycle's check-tests/dev-cycle reported passing)
@@ -1010,14 +1013,16 @@ Print "[Act] Auto-merged PR #{n} (low-risk, opt-in). Health: {ok|reverted}."
 do NOT fall back to `--merge` (that breaks rollback) — leave the PR ready for a
 human merge and log `[Act] Auto-merge skipped: enable squash-merge on the repo.`
 
-**Risk Tier 2 — Ready for human merge** (`enable_auto_merge` true, level >= 3,
-no protected paths, but EXCEEDS the auto_merge size limits — too large for the
-low-risk bar): leave the PR **ready (non-draft)** for a one-click human merge, but
-do NOT auto-merge. Print: "PR #{n} ready — review & merge, then /run-deploy if needed."
+**Risk Tier 3 — Human review** (the DEFAULT — everything that is not Tier 1; ANY
+of: `enable_auto_merge` is false, protected paths touched OR a protected path was
+skipped during the action (`protected_blocked=true`), complexity level < 3, PR is
+a draft, tests not green, or the change EXCEEDS the auto_merge size limits — too
+large for the low-risk bar): keep as draft. Print: "PR #{n} requires human review."
 
-**Risk Tier 3 — Human review** (the DEFAULT; ANY of: `enable_auto_merge` is
-false, protected paths touched, complexity level < 3, PR is a draft, or tests not
-green): keep as draft. Print: "PR #{n} requires human review."
+> There is no separate "auto-merge but oversize" tier — anything past the
+> low-risk bar is simply Tier 3 (human review). The old Tier 2 was unreachable
+> via dev-cycle and is removed (#34): a PR is either auto-merged (Tier 1) or left
+> a Draft you merge (Tier 3).
 
 ### 4-C2: Rollback Protocol
 
