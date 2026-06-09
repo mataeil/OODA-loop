@@ -370,7 +370,7 @@ Read last 5 entries from state.json.decision_log. Detect:
 - **Consecutive same domain**: count recent consecutive selections of same domain.
 - **Execution-result correlation**: match decision_log PR numbers to merged/closed PRs.
 - **Repeated failures**: count entries with result "error"/"failed" for same domain. If >= 2, flag as infrastructure_issue.
-- **Futile loop**: count consecutive cycles where the selected domain produced result "success" but no actionable output (no actions extracted, no alerts generated, no PRs created — e.g., plan-backlog returning "no_remote" repeatedly). If >= 3 consecutive futile cycles for the same domain, add a memo penalty of -10.0 to that domain and log `[Orient] Futile loop detected: {domain} produced no output for {N} consecutive cycles. Penalizing.` This prevents the staleness score from endlessly selecting an unproductive domain.
+- **Futile loop**: derive the consecutive-futile count by scanning `decision_log` backwards from the newest entry (no separately persisted counter — the log IS the source of truth, so the count survives restarts): consecutive entries with the same `selected_domain`, result "success", and no actionable output recorded (no actions extracted, no alerts generated, no PR — e.g., plan-backlog returning "no_remote" repeatedly). If >= 3 consecutive futile cycles for the same domain, add a memo penalty of -10.0 to that domain and log `[Orient] Futile loop detected: {domain} produced no output for {N} consecutive cycles. Penalizing.` This prevents the staleness score from endlessly selecting an unproductive domain.
   - **Scope**: penalty applies only to the specific futile domain, not globally.
   - **Lifetime**: written as `score_adjustments[domain] = -10.0` in memos.json. Consumed (deleted) after one application in Step 3-A scoring. Does not persist across multiple cycles.
   - **Recovery**: domain recovers automatically by producing a non-empty observation in any subsequent cycle (the consecutive futile counter resets to 0).
@@ -511,11 +511,17 @@ if config.domain_dependencies exists:
           cascades.append(cascade)
           Print "[Orient] Cascade detected: {event_type} from {source} → affects {depends_on}"
 
-  -- Apply cascade scoring bonus to affected domains
+  -- Apply cascade scoring bonus to affected domains.
+  -- One-shot per (cascade, domain): score_adjustments are consumed by 2-D/3-A
+  -- the next time that domain is scored, so re-adding the bonus every cycle
+  -- while the cascade stays pending would compound +3.0 indefinitely. Track
+  -- which domains already received this cascade's bonus.
   for each pending cascade:
     for each affected_domain in cascade.affected_domains:
-      -- Add +3.0 bonus to affected domain's score (via memo)
+      if affected_domain in (cascade.bonus_applied_to or []):
+        continue  -- already boosted once for this cascade
       memos.score_adjustments[affected_domain] = (memos.score_adjustments[affected_domain] or 0) + 3.0
+      cascade.bonus_applied_to = (cascade.bonus_applied_to or []) + [affected_domain]
       Print "[Orient] Cascade bonus: {affected_domain} +3.0 (from {cascade.source_domain} {cascade.event_type})"
 
     -- Check if all affected domains have run since cascade was created
@@ -527,6 +533,12 @@ if config.domain_dependencies exists:
       cascade.status = "resolved"
       cascade.resolved_at = now
       Print "[Orient] Cascade resolved: {cascade.id}"
+
+  -- Persist: write cascades.json (new cascades, bonus_applied_to, resolutions)
+  -- and memos.json (the score_adjustments added above) back to disk. Without
+  -- this write, every cascade detected above is silently lost at cycle end.
+  Write cascades.json
+  Write memos.json
 ```
 
 ### 2-C: Goal Progress
@@ -628,6 +640,9 @@ level_config = config.progressive_complexity.levels[level]
 
 First, exclude non-active domains:
   Remove any domain where status == "disabled" or status == "available"
+  Also remove any domain listed in the active season mode's `disabled_domains`
+  (Step 1-A removes them from scoring in-memory; re-filter here so a
+  season-disabled domain can never re-enter via this filter's own list)
   Only status == "active" domains count toward the level-based domain limit
 
 Sort remaining (active) domains by weight descending.
@@ -867,11 +882,19 @@ if invoked with --dry-run:
 
 ### 3-J: Score Verification
 
-After selecting the winner, re-derive its score from raw components as a sanity check:
+After selecting the winner, re-derive its score by re-running the **exact 3-A
+pipeline** for that domain — same staleness curve (`config.scoring.staleness_curve`,
+logarithmic by default, NOT a hardcoded linear product), and the same terms:
 
 ```
-verify = (hours_since_last * weight) + urgent + (goal * goal_weight) + (conf * conf_weight) + memo
+verify = staleness(per 3-A curve) + signal_bonuses + (goal * goal_weight)
+       + (confidence * confidence_weight) + memo_adjustment + balance_penalty
 ```
+
+Do not re-derive with a simplified formula: a verify formula that differs from
+3-A (e.g. linear staleness when the config says logarithmic, or omitting
+balance_penalty) fires a false mismatch every cycle and then *replaces the
+correct score with the wrong one*, silently changing the winner.
 
 For implementation domain, use the implementation formula instead (3-A2 components).
 
@@ -1215,7 +1238,9 @@ manual memo editing.
 for each active domain D in config.domains where D.status == "active":
   executions_in_last_10 = count of decision_log entries where
                           entry.selected_domain == D
-                          AND cycle >= (cycle_count - 10)
+                          AND cycle > (cycle_count - 10)   -- strictly: the last
+                          -- 10 completed cycles [cycle_count-9 .. cycle_count];
+                          -- ">=" would make it an 11-cycle window
   if executions_in_last_10 == 0:
     -- Skip if an active starvation intervention for this domain already exists
     if interventions contains iv where iv.domain == D AND iv.type == "starvation":
@@ -1672,16 +1697,20 @@ if cycle_count % config.memory.contrarian_check_interval === 0:
     argument = "If {neglected} were chosen instead of {dominant}, it would
                 address: {neglected domain's staleness}, {pending actions for neglected},
                 {confidence trend for neglected}."
-    Store in memos.json: {
-      type: "contrarian",
+    -- Store as a STANDARD intervention (the shape 2-D/3-A actually consume —
+    -- an ad-hoc object with no delta would never affect scoring):
+    interventions.append({
       domain: neglected,
+      delta: +1.0,
+      type: "contrarian",
+      reason: argument,
       dominant_domain: dominant,
-      argument: argument,
-      created_at: now,
+      created_at_cycle: cycle_count,
       expires_after_cycles: 3,
-      applied: false
-    }
-    Print "[Reflect] Contrarian: {dominant} dominated (5/{last_7_count}). Counter-argument for {neglected} stored."
+      applied_count: 0
+    })
+    Write memos.json
+    Print "[Reflect] Contrarian: {dominant} dominated (5/{last_7_count}). {neglected} boosted +1.0 for 3 cycles."
   else:
     Print "[Reflect] Contrarian: no dominant strategy detected. No memo written."
 ```
