@@ -200,7 +200,7 @@ Safe by default. Level 0 cannot create PRs. Level 3 requires deliberate opt-in.
 
 Level 3 is **autonomous Draft-PR creation by default — you merge.** Auto-merge is a **separate opt-in** (`/ooda-config auto-merge on`; `safety.enable_auto_merge`, default `false`). When you turn it on, evolve merges **only low-risk PRs** on its own: non-protected paths, ≤ `auto_merge_max_files` (5) / `auto_merge_max_lines` (100), tests green — then runs a post-merge health check that **auto-reverts + HALTs** on failure. Anything larger or protected stays a Draft PR you merge. evolve re-checks every gate itself before merging (it doesn't trust dev-cycle's marker). Off by default because **you stay in command** unless you choose otherwise.
 
-> **Verification note (honest):** the autonomous Draft-PR + reject→re-aim path is verified live (throwaway repo, Level 3). The low-risk **auto-merge** path is **newly implemented** and not yet re-verified end-to-end against a live remote — run it in a throwaway repo with `enable_auto_merge: true` before relying on it in production. See [TESTING.md](TESTING.md).
+> **Verification note (honest):** the full Level-3 path is **verified live** in a throwaway repo — autonomous Draft-PR + reject→re-aim, and (with `enable_auto_merge: true`) a low-risk PR actually auto-merging while a large/protected one stays a Draft, plus a failed post-merge health check **auto-reverting + HALTing**. (The live run found and fixed a rollback bug: auto-merge uses `--squash` so the revert is a clean `git revert HEAD`.) See [TESTING.md](TESTING.md).
 
 See [SECURITY.md](SECURITY.md) for the full threat model.
 

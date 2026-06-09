@@ -114,30 +114,28 @@ After the controlled live run above, two gaps remain before a **stable `1.2.0`**
    Conclusion: Level 3 autonomous Draft-PR creation + reject→re-aim are **verified
    live**. Auto-merge was then **implemented as a low-risk opt-in** (see next).
 
-### The remaining gate — re-verify the new auto-merge path
+### Auto-merge — live-verified (Tier B+, throwaway repo, 2026-06)
 
-Auto-merge is now implemented (opt-in `safety.enable_auto_merge`, low-risk only,
-post-merge health check + auto-revert; `/ooda-config rollback` implemented). It
-has **not** yet been exercised end-to-end against a live remote. To close the
-last gap, run a fresh Tier-B in a throwaway repo with:
+The opt-in low-risk auto-merge path was exercised end-to-end against a real
+GitHub remote with `safety.enable_auto_merge: true` at Level 3:
 
-```
-/ooda-config level 3
-/ooda-config auto-merge on
-# seed a TINY (≤5 files / ≤100 lines), non-protected, green change as the top action
-/evolve            # expect: ready (non-draft) PR → gh pr merge → post-merge health check
-# then break health and confirm auto-revert + HALT
-```
+| Test | Result |
+|------|--------|
+| **A** low-risk green change | ✅ PR auto-merged (`isDraft:false → MERGED`, fix landed on `main`, no human click) |
+| **B1** oversize (6 files) | ✅ held — Draft, 4-C refused (changedFiles > 5) |
+| **B2** protected path | ✅ blocked — no file, no PR, `main` unchanged |
+| **C** failed post-merge health | ✅ (after fix) auto-reverts + HALTs |
+| **D** `/ooda-config rollback {cycle}` | ✅ (after fix) reverts repo + state |
 
-Confirm: a low-risk PR actually merges, a large/protected one stays Draft, and a
-failing post-merge health check auto-reverts + HALTs. Until then, treat the
-auto-merge path as implemented-but-unverified (the default — off — is unaffected
-and fully verified).
+**A rollback bug was found and fixed during this run:** auto-merge originally used
+`gh pr merge --merge` (a 2-parent merge commit), but 4-C2 / Step R reverted with
+`git revert` *without* `-m` → it errored on the merge commit and left `main`
+half-reverted. Fix: auto-merge now uses **`--squash`** (linear `main`), so
+`git revert HEAD` is a clean one-liner. C was re-verified green after the fix.
 
-Levels 0–2 (observe / test / draft-PR + the Orient/Reflect learning loop) and
-Level 3's autonomous Draft-PR + reject→re-aim are verified by the static suite +
-the controlled live runs. The newly-added low-risk auto-merge path is the one
-piece awaiting a live throwaway run.
+So Levels 0–3 — including opt-in low-risk auto-merge with working auto-revert and
+manual rollback — are now verified (static suite + controlled + live throwaway
+runs). The default (auto-merge off) is unchanged and fully verified.
 
 ## Adding a fixture
 

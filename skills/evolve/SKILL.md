@@ -999,10 +999,16 @@ If PR created, determine risk tier (distinct from progressive complexity levels)
 - the PR's tests are green (this cycle's check-tests/dev-cycle reported passing)
 
 Action: re-check HALT → take a pre-action checkpoint (4-C2) → `gh pr merge {n}
---merge` → **post-merge health check** (`config.health_endpoints` if set, else
+--squash` → **post-merge health check** (`config.health_endpoints` if set, else
 re-run `config.test_command`). If the health check FAILS → 4-C2 auto-rollback
 (`git revert --no-edit HEAD && git push origin HEAD`, create HALT, notify).
 Print "[Act] Auto-merged PR #{n} (low-risk, opt-in). Health: {ok|reverted}."
+
+`--squash` is deliberate: it keeps `main` linear so the 4-C2 revert is a simple
+`git revert HEAD` (no `-m`). It requires squash-merge to be enabled on the repo
+(GitHub's default). If `gh pr merge --squash` errors because squash is disabled,
+do NOT fall back to `--merge` (that breaks rollback) — leave the PR ready for a
+human merge and log `[Act] Auto-merge skipped: enable squash-merge on the repo.`
 
 **Risk Tier 2 — Ready for human merge** (`enable_auto_merge` true, level >= 3,
 no protected paths, but EXCEEDS the auto_merge size limits — too large for the
@@ -1051,7 +1057,12 @@ checkpoint before a Tier-1 merge regardless, so this revert always has a target.
 ```
 if PR was auto-merged AND health check fails:
   Print "[Rollback] Health check failed after auto-merge of PR #{n}."
-  -- Revert the merge commit
+  -- Revert the squash-merge commit. Auto-merge uses `gh pr merge --squash`, so
+  -- HEAD is a normal 1-parent commit and `git revert HEAD` needs no `-m`.
+  -- CRITICAL: if auto-merge is ever switched back to `--merge` (a 2-parent
+  -- merge commit), this line MUST become `git revert --no-edit -m 1 HEAD`,
+  -- otherwise git errors "is a merge but no -m option was given" and the bad
+  -- merge stays on the branch (verified: Tier-B+ live run, 2026-06).
   git revert --no-edit HEAD
   git push origin HEAD
   -- Restore state from checkpoint
