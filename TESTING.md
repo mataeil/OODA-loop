@@ -26,7 +26,7 @@ ordering. It does **not** invoke `/evolve`; it is a fast, semantic walkthrough.
 
 ### 2. Deterministic reference implementations — `scripts/`
 
-Two side-effect-free Python references re-derive engine outputs from real state so
+Four side-effect-free Python references re-derive engine outputs from real state so
 they can be checked objectively (not just by eye):
 
 - **`scripts/render_cycle_card.py`** — implements the Step 7 Cycle Card data
@@ -37,6 +37,16 @@ they can be checked objectively (not just by eye):
   (logarithmic staleness + season `weight_overrides` + confidence term).
   `verify.py` runs it on `season-mode-toggle` to assert the overrides actually
   flip the winner (default → `service_health`, preparation → `backlog`).
+- **`scripts/auto_merge_gate.py`** — implements the evolve 4-C auto-merge
+  eligibility gate. `verify.py` asserts a low-risk PR is eligible while
+  protected / oversize / draft / red-tests / partial-protected / opted-out PRs
+  all hold (the safety-critical "only low-risk, opted-in changes merge").
+- **`scripts/sim_longhorizon.py`** — mirrors the time/cycle-threshold arithmetic
+  a short live run can't reach: observation **saturation** (warn@5 / boost@10 /
+  HALT@15), the **contrarian** cadence (`cycle % 10`), and **action-queue decay**
+  (Step 6-C6 schedule over many days). `verify.py` asserts these fire where the
+  spec says, using the *shipped* `config.example.json` thresholds. (It verifies
+  the *logic*; real wall-clock accumulation still only happens in live use.)
 
 These references are *checks*, not the engine. The canonical executor is Claude
 running `SKILL.md`; the references exist to make the documented behavior falsifiable.
