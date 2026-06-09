@@ -8,6 +8,31 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
+## [v1.2.1] — 2026-06-09
+
+Auto-merge finishing touches + deeper verification, from the Tier B+ live-run
+side findings. Default behavior is unchanged (auto-merge stays off until opted in).
+
+### Fixed
+- **#34** — removed the unreachable Risk Tier 2 ("oversize → ready PR"). evolve
+  4-C is now two outcomes: **Tier 1** (auto-merge, all low-risk gates) or
+  **Tier 3** (Draft, human review). Oversize changes are simply Tier 3.
+- **#35** — a partial change that **skips a protected path** (`protected_blocked`)
+  is now forced to Draft / Tier 3 and is never auto-merge-eligible, even when the
+  remaining diff is small and green (it may be incomplete/incoherent).
+
+### Verified
+- **`scripts/sim_longhorizon.py`** — deterministic reference for the time/cycle
+  thresholds a short run can't reach: saturation (warn@5 / boost@10 / HALT@15),
+  contrarian cadence (`cycle % 10`), action-queue decay (Step 6-C6). Checked
+  against the shipped `config.example.json`.
+- **Stack-agnostic auto-merge gate** — `verify.py` asserts a low-risk green change
+  is eligible across Go / Rust / Node / Ruby / Java shapes; the gate never reads
+  the language. TESTING.md documents `check-tests`' stack coverage.
+- `verify.py` **34 → 38 PASS / 0 FAIL**.
+
+---
+
 ## [v1.2.0] — 2026-06-09
 
 Post-beta quality work toward a stable `1.2.0` (surfaced by the stable-gate
