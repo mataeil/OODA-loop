@@ -139,22 +139,26 @@ if file exists at config.safety.halt_file:
 ```
 lock_file = agent/state/evolve/.lock
 if lock_file exists:
-  Print "[SKIP] Another evolve cycle is running (lock file exists)."
-  Print "If stale, remove manually: rm {lock_file}"
-  EXIT.
+  age_minutes = now - lock_file.started_at
+  if age_minutes < config.safety.lock_timeout_minutes:   -- default 30: live lock
+    Print "[SKIP] Another evolve cycle is running (lock age {age_minutes}m)."
+    EXIT.  -- do NOT delete a live lock
+  -- Stale lock: the previous cycle crashed or was killed mid-run.
+  Print "[WARN] Stale lock detected (age {age_minutes}m >= {lock_timeout_minutes}m). Removing and recovering."
+  Delete lock_file.
+  -- Fall through to 0-C, which performs the crash recovery for the cycle
+  -- that left this lock behind.
 Create lock_file with content: {"pid": current, "started_at": "ISO 8601"}
 ```
 
-The lock file is deleted at the end of Step 6. **Every early-exit path (HALT
-during execution, dry-run, min-score skip, confidence gate with no fallback)
-MUST also delete the lock file before exiting.** If evolve crashes unexpectedly,
-the lock persists — the next invocation detects it and exits. To recover from a
-stale lock, the operator deletes the file manually.
-
-Stale lock detection: if `started_at` in the lock file is older than
-`config.safety.lock_timeout_minutes` (default 30), treat the lock as stale,
-log `[WARN] Stale lock detected (age: {minutes}m). Removing.`, delete it,
-and proceed.
+The lock file is deleted at the end of Step 6. **Every early-exit path
+(min-cycle-interval skip in 0-D, HALT re-check in 4-A, HALT during execution,
+dry-run, min-score skip, confidence gate with no fallback) MUST also delete the
+lock file before exiting.** If evolve crashes mid-run, the lock persists and
+blocks live invocations only until `lock_timeout_minutes` elapses — then the
+next invocation removes it, runs 0-C crash recovery, and proceeds. Unattended
+operation therefore self-heals from crashes; manual `rm` is never required
+(though always allowed).
 
 ### 0-C: Crash Recovery
 
@@ -179,6 +183,8 @@ if elapsed < config.safety.min_cycle_interval_minutes:
     Continue.
   Otherwise:
     Print "[SKIP] Too soon. {remaining} min until next cycle."
+    Delete lock_file.   -- 0-B created it; leaking it would block the next
+                        -- on-time invocation until the stale timeout
     EXIT.
 if last_cycle is null: first cycle, proceed.
 ```
@@ -375,12 +381,22 @@ Store patterns for Steps 2-E and 5-C.
 
 Track `consecutive_observe_only_cycles` in state.json. A cycle is "observe-only"
 if it produced result "success" but: no PRs created, no actions extracted, no
-new alerts generated, and no confidence changes occurred. Increment the counter
-each time; reset to 0 when any of those events occurs.
+new alerts generated, and no confidence changes occurred.
+
+This check runs in Orient, BEFORE the current cycle has acted — so it evaluates
+the **previous completed cycle** (the newest `decision_log` entry and what Step 6
+recorded for it), never the in-flight one. If the counter field is missing from
+state.json (fresh install, pre-v1.3 state), initialize it to 0 — a missing field
+must not silently disable the circuit breaker.
 
 ```
--- Check if this cycle produced actionable output
-has_output = (prs_created > 0 OR actions_extracted > 0 OR new_alerts > 0 OR confidence_changed)
+-- Evaluate the PREVIOUS completed cycle's actionable output (from its
+-- decision_log entry / recorded outcome — current cycle hasn't acted yet)
+if state.consecutive_observe_only_cycles is undefined:
+  state.consecutive_observe_only_cycles = 0
+prev = decision_log[-1]  (if none: skip 2-A2 entirely — nothing to evaluate)
+has_output = (prev created a PR OR extracted actions OR generated new alerts
+              OR changed confidence)
 
 if has_output:
   state.consecutive_observe_only_cycles = 0
@@ -882,7 +898,10 @@ if config.safety.skill_allowlist is non-empty
   Log { action: "blocked", reason: "skill_not_in_allowlist" }
   Skip to Step 5.
 
-Re-check HALT file. If appeared: EXIT immediately.
+Re-check HALT file. If appeared: delete the lock file, then EXIT immediately.
+(A HALT created mid-cycle — e.g. the 2-A2 saturation halt or an operator's
+manual `touch` — is caught here; without the lock deletion the next post-HALT
+invocation would stay blocked until the stale-lock timeout.)
 ```
 
 ### 4-B: Execution Rules
@@ -892,7 +911,14 @@ Re-check HALT file. If appeared: EXIT immediately.
 1. **confidence >= threshold**: execute primary skill, then chain[] sequentially (max 3). Re-check HALT before each chain skill.
 2. **confidence < threshold**: primary skill only, skip chain.
 3. **HALT during execution**: stop immediately, log partial execution.
-4. **Error during execution**: log to skill_gaps.json, continue to Reflect.
+4. **Error during execution**: log to skill_gaps.json, increment
+   `state.consecutive_silent_failures` (initialize to 0 if missing), continue to
+   Reflect. A successful execution resets the counter to 0. If the counter
+   reaches `config.safety.max_silent_failures` (default 3), create the HALT
+   file: "{N} consecutive skill executions failed. Unattended operation paused
+   for human review. Delete this file to resume." — the current cycle still
+   completes Reflect/Step 6 normally (so the failure is recorded and the lock
+   is released); the HALT stops the *next* invocation.
 5. **Chain failure tracking**: if chain skill failed 3+ times (skill_gaps.json), mark action as "blocked".
 6. **Chain depth cap**: max 3 skills. Truncate with warning if more.
 7. **Skill timeout**: if a skill runs longer than `config.safety.lock_timeout_minutes` (default 30 min), treat as error. Print `[Act] TIMEOUT: /{skill} exceeded {timeout}m. Treating as error.` Log to skill_gaps.json and continue to Reflect.
