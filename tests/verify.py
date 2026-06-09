@@ -350,7 +350,7 @@ def check_auto_merge_gating(r: Runner) -> None:
     cfg = load_json(ROOT / "auto-merge-gating" / "seed" / "config.json")
 
     low_risk = {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1,
-                "additions": 3, "deletions": 1, "tests": "green"}
+                "additions": 3, "deletions": 1, "tests": "passed"}
     ok, _ = amg.eligible(cfg, low_risk)
     r.check("auto-merge-gating: low-risk green PR is eligible", ok, "eligible")
 
@@ -362,7 +362,7 @@ def check_auto_merge_gating(r: Runner) -> None:
     }
     elig = [s for s, f in stacks.items()
             if amg.eligible(cfg, {"isDraft": False, "files": [f], "changedFiles": 1,
-                                  "additions": 3, "deletions": 1, "tests": "green"})[0]]
+                                  "additions": 3, "deletions": 1, "tests": "passed"})[0]]
     r.check(
         "auto-merge-gating: gate is stack-agnostic (go/rust/node/ruby/java eligible)",
         len(elig) == len(stacks),
@@ -370,12 +370,12 @@ def check_auto_merge_gating(r: Runner) -> None:
     )
 
     holds = {
-        "protected path": {"isDraft": False, "files": ["skills/evolve/SKILL.md"], "changedFiles": 1, "additions": 2, "deletions": 0, "tests": "green"},
-        "too many files": {"isDraft": False, "files": list("abcdef"), "changedFiles": 6, "additions": 5, "deletions": 0, "tests": "green"},
-        "too many lines": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 200, "deletions": 0, "tests": "green"},
-        "draft": {"isDraft": True, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "green"},
-        "tests red": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "red"},
-        "protected skipped": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "green", "protected_blocked": True},
+        "protected path": {"isDraft": False, "files": ["skills/evolve/SKILL.md"], "changedFiles": 1, "additions": 2, "deletions": 0, "tests": "passed"},
+        "too many files": {"isDraft": False, "files": list("abcdef"), "changedFiles": 6, "additions": 5, "deletions": 0, "tests": "passed"},
+        "too many lines": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 200, "deletions": 0, "tests": "passed"},
+        "draft": {"isDraft": True, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "passed"},
+        "tests red": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "failed"},
+        "protected skipped": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "passed", "protected_blocked": True},
     }
     blocked = [name for name, pr in holds.items() if not amg.eligible(cfg, pr)[0]]
     r.check(

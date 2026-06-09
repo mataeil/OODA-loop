@@ -10,7 +10,7 @@ A PR is auto-merge-eligible iff ALL hold:
   no changed file matches safety.protected_paths
   changedFiles <= safety.auto_merge_max_files   (default 5)
   additions + deletions <= safety.auto_merge_max_lines (default 100)
-  tests green
+  tests passed (canonical test_status)
 
 Usage: python3 scripts/auto_merge_gate.py <config.json>   (runs a self-demo)
 """
@@ -47,9 +47,9 @@ def eligible(config: dict, pr: dict):
     lines = pr.get("additions", 0) + pr.get("deletions", 0)
     if lines > max_lines:
         return False, f"lines {lines} > auto_merge_max_lines {max_lines}"
-    if pr.get("tests") != "green":
-        return False, f"tests not green (got {pr.get('tests')!r})"
-    return True, "eligible (opt-in, low-risk, non-protected, green)"
+    if pr.get("tests") != "passed":  # canonical dev-cycle Step-4 test_status
+        return False, f"tests not passed (got {pr.get('tests')!r})"
+    return True, "eligible (opt-in, low-risk, non-protected, tests passed)"
 
 
 def main() -> int:
@@ -58,13 +58,13 @@ def main() -> int:
         return 2
     cfg = json.loads(Path(sys.argv[1]).read_text())
     demos = {
-        "low-risk green PR": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 1, "tests": "green"},
-        "protected path": {"isDraft": False, "files": ["skills/evolve/SKILL.md"], "changedFiles": 1, "additions": 2, "deletions": 0, "tests": "green"},
-        "too many files": {"isDraft": False, "files": ["a", "b", "c", "d", "e", "f"], "changedFiles": 6, "additions": 10, "deletions": 0, "tests": "green"},
-        "too many lines": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 200, "deletions": 0, "tests": "green"},
-        "draft": {"isDraft": True, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "green"},
-        "tests red": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "red"},
-        "protected skipped": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "green", "protected_blocked": True},
+        "low-risk green PR": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 1, "tests": "passed"},
+        "protected path": {"isDraft": False, "files": ["skills/evolve/SKILL.md"], "changedFiles": 1, "additions": 2, "deletions": 0, "tests": "passed"},
+        "too many files": {"isDraft": False, "files": ["a", "b", "c", "d", "e", "f"], "changedFiles": 6, "additions": 10, "deletions": 0, "tests": "passed"},
+        "too many lines": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 200, "deletions": 0, "tests": "passed"},
+        "draft": {"isDraft": True, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "passed"},
+        "tests red": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "failed"},
+        "protected skipped": {"isDraft": False, "files": ["src/calc.py"], "changedFiles": 1, "additions": 3, "deletions": 0, "tests": "passed", "protected_blocked": True},
     }
     for name, pr in demos.items():
         ok, why = eligible(cfg, pr)

@@ -166,10 +166,10 @@ operation therefore self-heals from crashes; manual `rm` is never required
 if state.json.cycle_in_progress == true:
   last = state.json.decision_log[-1] (if exists)
   Print "[WARN] Previous cycle #{last.cycle} did not complete."
-  Print "  Last domain: {last.domain}, skill: {last.skill}, started: {last.timestamp}"
+  Print "  Last domain: {last.selected_domain}, skill: {last.selected_skill}, started: {last.timestamp}"
   Print "  Resetting cycle_in_progress. Starting fresh cycle."
   Set cycle_in_progress = false, write state.json.
-  Add memo: { type: "crash_recovery", cycle: last.cycle, domain: last.domain }
+  Add memo: { type: "crash_recovery", cycle: last.cycle, domain: last.selected_domain }
   Continue with fresh cycle (do NOT resume old one).
 ```
 
@@ -201,8 +201,9 @@ if state.json.cycle_count === 0 AND config.safety.first_cycle_observe_only:
 
   In Step 6, record decision_log entry as:
   { cycle: 1, timestamp, action: "observe_only", reason: "first_cycle",
-    domain: winner_domain, skill: winner_skill, score: winner_score,
-    orient_summary, result: "observe_only", score_verified: true }
+    selected_domain: winner_domain, selected_skill: winner_skill,
+    score: winner_score, orient_summary, result: "observe_only",
+    score_verified: true }
   cycle_count MUST increment to 1 so the next cycle proceeds normally.
 ```
 
@@ -727,7 +728,9 @@ if domain was selected by alert in last max_alert_cycles consecutive cycles:
 if config.scoring.balance_enabled (default true):
   B = config.scoring.balance_weight                   -- default 5.0
   N = count of active domains
-  domain_share = metrics.domain_executions[domain] / max(metrics.total_skill_executions, 1)
+  domain_share = metrics.counters.domain_executions[domain] / max(metrics.counters.total_skill_executions, 1)
+  -- (metrics.json nests these under `counters` — see Step 6-C7; reading the
+  --  flat path silently yields 0/1 and zeroes the balance penalty)
   expected_share = 1.0 / N
   balance_penalty = max(-B * (domain_share - expected_share), -10.0)
   -- Example: 5 domains, domain ran 50% of the time (expected 20%): penalty = -5.0 * 0.3 = -1.5
@@ -1069,7 +1072,8 @@ If PR created, determine risk tier (distinct from progressive complexity levels)
   eligible; it may be incomplete/incoherent — #35)
 - `changedFiles <= config.safety.auto_merge_max_files`        (default 5)
 - `additions + deletions <= config.safety.auto_merge_max_lines` (default 100)
-- the PR's tests are green (this cycle's check-tests/dev-cycle reported passing)
+- the PR's tests are green — canonical marker: dev-cycle Step 4 reported
+  `test_status == "passed"` this cycle ("skipped"/"failed" are NOT eligible)
 
 Action: re-check HALT → take a pre-action checkpoint (4-C2) → `gh pr merge {n}
 --squash` → **post-merge health check** (`config.health_endpoints` if set, else
@@ -1515,10 +1519,13 @@ cycle_count += 1
 last_cycle = now (ISO 8601)
 cycle_in_progress = false
 Append to decision_log: {
-  cycle, timestamp, domain, skill, score, confidence,
+  cycle, timestamp, selected_domain, selected_skill, score, confidence,
   result, pr_number, orient_summary, elapsed_seconds,
   score_verified, risk_tier
 }
+-- CANONICAL field names are `selected_domain` / `selected_skill` (every reader
+-- — 2-A patterns, 5-C starvation/monopoly, fixtures, live state — queries
+-- those). Never write bare `domain`/`skill` keys here.
 Cap decision_log at config.memory.working_memory_size (default 20).
 When cap is reached, remove the oldest entry (index 0) before appending.
 ```
@@ -1578,31 +1585,36 @@ must execute — do not skip even if the cycle was observe-only or no actions we
 taken. Production deployments showed 209 cycles with only 1 episode generated
 due to this step being skipped; the learning loop depends on it.
 
-**Tier 2 -- Episodes**: Compare current ISO week+year vs the most recent episode's
-`week_year` (read from `episodes.json`; treat missing file or empty array as "no
-episodes yet").
+**Tier 2 -- Episodes**: Compare the current ISO week+year vs the week of the most
+recent episode (treat missing file or empty array as "no episodes yet").
 
 ```
 current_week = ISO week+year (e.g., "2026-W15")
-last_episode_week = episodes[-1].week_year  OR  null if empty
+-- The episode id encodes its week: "EP-2026-W15". Parse the week from
+-- episodes[-1].id; accept a legacy `week_year` field for pre-v1.3 entries.
+-- NEVER compare against a field the entries don't have — that reads null,
+-- "current != null" is always true, and a new episode gets generated EVERY
+-- cycle after the first week boundary.
+last_episode_week = week parsed from episodes[-1].id  OR  episodes[-1].week_year
+                    OR null if empty
 
-if current_week != last_episode_week:
-  -- Generate weekly summary from decision_log entries since last episode
-  -- (or from the oldest decision_log entry if no prior episode exists)
+summarized_week = the most recently COMPLETED ISO week (current_week - 1)
+already_summarized = (last_episode_week == summarized_week)
+                     OR an episode with id "EP-{summarized_week}" exists
 
-  relevant_entries = decision_log entries where timestamp falls within last_episode_week
-                     (if last_episode_week is null, use ALL decision_log entries)
+if already_summarized OR decision_log has no entries in summarized_week:
+  Print "[Reflect] Episode for {summarized_week} already exists or no data — deferred."
+else:
+  relevant_entries = decision_log entries whose timestamp falls in summarized_week
 
-  episode = {
-    week_year: last_episode_week OR current_week (the week being summarized),
+  episode = {                       -- CANONICAL schema (= tests/ fixtures)
+    id: "EP-{summarized_week}",     -- e.g. "EP-2026-W15"
+    week_start: ISO date, week_end: ISO date,
     cycle_range: [first_cycle_number, last_cycle_number],
-    domain_distribution: { backlog: 3, test_coverage: 2, ... },
-    outcomes: {
-      prs_merged: count,
-      prs_rejected: count,
-      actions_completed: count,
-      actions_extracted: count
-    },
+    total_cycles: count,
+    summary: one-line week summary,
+    domains_selected: { backlog: 3, test_coverage: 2, ... },
+    prs_created: count, prs_merged: count, prs_rejected: count,
     key_decisions: [top 3 decisions by score, with domain and rationale],
     lessons: [
       -- Extract lessons from:
@@ -1612,7 +1624,9 @@ if current_week != last_episode_week:
       -- 4. Alert patterns (what triggered, how resolved)
       -- 5. Any memos written during the week
     ],
-    confidence_snapshot: { domain: score for each active domain }
+    confidence_snapshot: { domain: score for each active domain },
+    skill_gaps_found: count, contrarian_checks: count,
+    patterns_detected: [strings], created_at: now
   }
 
   -- Initialize episodes.json if file missing or malformed
@@ -1623,9 +1637,7 @@ if current_week != last_episode_week:
   Cap at config.memory.episode_retention_weeks (default 52).
   If cap exceeded: evict oldest episode and trigger Tier 2b (principle extraction).
 
-  Print "[Reflect] Episode {week_year} generated: {cycle_count} cycles, {prs_merged} PRs, {lessons_count} lessons."
-else:
-  Print "[Reflect] Same week ({current_week}) — episode generation deferred."
+  Print "[Reflect] Episode {episode.id} generated: {total_cycles} cycles, {prs_merged} PRs, {lessons count} lessons."
 ```
 
 **Tier 2b -- Principle Extraction**: Triggered when any of:
@@ -1754,8 +1766,10 @@ if cycle_count % config.memory.contrarian_check_interval === 0:
 ```
 counters.total_cycles += 1
 counters.total_skill_executions += (1 + chain_count)
-Update total_prs_created/merged/rejected as applicable.
-domain_executions[winner] += 1
+Update counters.total_prs_created/merged/rejected as applicable.
+counters.domain_executions[winner] += 1
+-- everything lives under metrics.json `counters` — the 3-A balance penalty
+-- reads metrics.counters.domain_executions / metrics.counters.total_skill_executions
 Update streaks (current_domain, current_streak, longest_streak).
 Set first_cycle_at if null. Set last_updated = now.
 ```
@@ -1831,6 +1845,19 @@ for each pending item in action_queue.pending:
   if item.effective_rice <= 0: move to completed as "superseded"
 
 Re-sort pending by effective_rice descending.
+
+-- Action lifecycle hygiene (sweep, every cycle) — prevents items orphaned by
+-- a crash or a blocked dev-cycle from silently jamming the queue forever:
+for each item with status == "in_progress":
+  if item was already in_progress when THIS cycle started
+     AND no open PR references item.id:
+    item.status = "pending"            -- the run that claimed it died mid-way
+    Add memo { type: "action_requeued", id: item.id, reason: "orphaned in_progress" }
+    Print "[Reflect] Re-queued orphaned action '{item.title}'."
+for each item with status == "blocked":
+  move it to completed[] keeping status "blocked"   -- pending[] is for workable
+                                                    -- items only; blocked needs a human
+  Print "[Reflect] Blocked action '{item.title}' moved to completed (human review)."
 ```
 
 ### 6-C7: Notifications

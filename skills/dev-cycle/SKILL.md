@@ -228,8 +228,12 @@ if lines_changed + estimated_lines_for_this_file > config.safety.max_lines_per_p
   GOTO Step 4
 ```
 
-When partial: note unfinished scope in `action_queue.json` under the action's
-`memos` field so the next dev-cycle cycle picks up where this one stopped.
+When partial: create a NEW pending action for the unfinished scope (same
+source_domain, title "{original title} (remainder)", rice_score inherited) and
+note the split in the original action's `memos` field. The original action then
+proceeds to "proposed" like any other PR — the remainder is independently
+selectable next cycle and cannot be silently lost with the original stuck
+in_progress.
 
 ---
 
@@ -280,8 +284,12 @@ while attempt <= max_attempts:
 if test_status != "passed" after 3 attempts:
   Print "[BLOCKED] Tests failed after 3 attempts. Action marked as blocked."
   Print "Review test output above and fix manually."
-  Update action status to "blocked" in action_queue.json
+  Set action status to "blocked" and MOVE it to completed[] in action_queue.json
+  (pending[] holds only workable items; evolve's 6-C6 hygiene sweep enforces the
+   same rule — a blocked item must never sit in pending/in_progress forever)
   git stash  (preserve work without committing)
+  git checkout main   (never leave the session on the dead feature branch —
+                       the next evolve cycle's git operations assume main)
   EXIT with non-zero status.
 ```
 
@@ -331,7 +339,10 @@ AND no changed file matches config.safety.protected_paths
 AND protected_blocked == false                     -- no protected file was skipped (#35)
 AND changed_files_count <= config.safety.auto_merge_max_files   -- default 5
 AND changed_lines_count <= config.safety.auto_merge_max_lines   -- default 100
-AND test_status == "passing"                       -- this cycle's tests are green
+AND test_status == "passed"                        -- the CANONICAL Step-4 value;
+                                                   -- "skipped" (no test_command)
+                                                   -- is NOT eligible — auto-merge
+                                                   -- requires actually-green tests
 ```
 If NOT eligible (the default), create the PR as **Draft**. If eligible, create it
 **ready** (omit `--draft`) and stamp `auto_merge_eligible=true` in the meta

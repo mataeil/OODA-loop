@@ -9,7 +9,7 @@ is **opt-in** (`safety.enable_auto_merge`, default `false`) and **low-risk only*
 `seed/config.json` is opted in (the riskiest config): Level 3,
 `enable_auto_merge: true`, `auto_merge_max_files: 5`, `auto_merge_max_lines: 100`,
 standard `protected_paths`. The gate must STILL refuse anything that isn't small,
-non-protected, ready, and green.
+non-protected, ready, and passing tests.
 
 ## Expected gate decisions (Step 4-C unit)
 
@@ -18,7 +18,7 @@ non-protected, ready, and green.
 
 | PR | Decision |
 |----|----------|
-| 1 file, +3/−1, non-protected, ready, green | ✅ **auto-merge** |
+| 1 file, +3/−1, non-protected, ready, tests passed | ✅ **auto-merge** |
 | touches `skills/evolve/SKILL.md` (protected) | ❌ hold (protected path) |
 | 6 changed files (> 5) | ❌ hold (too many files) |
 | +200 lines (> 100) | ❌ hold (too many lines) |
