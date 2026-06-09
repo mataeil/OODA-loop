@@ -338,11 +338,16 @@ evolve 4-C2 when `safety.enable_rollback` (or `safety.enable_auto_merge`) is on.
     then and restores state. Type 'rollback {cycle}' to confirm:"
    Accept ONLY the exact phrase; anything else: "Cancelled." — exit.
 4. Re-check the HALT file.
-5. Revert the repo (non-destructive default):
+5. Revert the repo. CAUTION: `git revert {sha}..HEAD` reverts each commit in the
+   range and **fails on any merge commit in that range** (it needs `-m`, and a
+   mixed range can't take a single `-m`) — leaving main HALF-reverted. This is
+   safe only on a linear history; auto-merge uses `--squash` precisely to keep it
+   linear. If the range may contain `--merge` merge commits, prefer `--hard`.
+     # default (linear history, e.g. squash-merged auto-merges):
      git revert --no-edit {checkpoint.commit_sha}..HEAD
      git push origin HEAD
-   (If the operator passed `--hard`, use `git reset --hard {sha}` + force-push
-    instead — destructive; warn first.)
+     # robust fallback / operator `--hard` (destructive — warn first):
+     git reset --hard {checkpoint.commit_sha} && git push --force origin HEAD
 6. Restore confidence.json and action_queue.json pending items from
    checkpoint.state_snapshot.
 7. Create the HALT file: "Manual rollback to cycle {cycle} ({sha}). Delete to resume."

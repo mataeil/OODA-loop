@@ -30,8 +30,13 @@ The Tier B finding (auto-merge was unreachable dead code) is now resolved by
   gated) and **`/ooda-config rollback {cycle}`** (now implemented — reverts repo
   + state to a checkpoint). Level-3 DANGER prompt corrected to the opt-in reality.
 - Default behavior is unchanged: **you stay in command; nothing auto-merges
-  unless you flip the switch.** The new auto-merge path is implemented but awaits
-  a live throwaway re-verification (see TESTING.md "remaining gate").
+  unless you flip the switch.**
+- **Live-verified end-to-end** (Tier B+, throwaway repo): a low-risk PR
+  auto-merged; oversize/protected stayed Draft; a failed post-merge health check
+  auto-reverted + HALTed; `/ooda-config rollback` worked. The run **found and
+  fixed a rollback bug** — auto-merge now uses `gh pr merge --squash` (linear
+  `main`) so the 4-C2 / Step-R revert is a clean `git revert HEAD` (a `--merge`
+  merge commit needed `-m` and left `main` half-reverted). See TESTING.md.
 
 ### Honesty relabel — auto-merge is experimental (Tier B finding)
 
