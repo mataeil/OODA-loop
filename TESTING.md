@@ -145,6 +145,20 @@ So Levels 0–3 — including opt-in low-risk auto-merge with working auto-rever
 manual rollback — are now verified (static suite + controlled + live throwaway
 runs). The default (auto-merge off) is unchanged and fully verified.
 
+### Multi-stack note
+
+The auto-merge gate is **stack-agnostic**: it decides from `gh pr view` facts
+(draft state, changed files vs `protected_paths`, additions+deletions, the
+tests-green signal) and never inspects the language. `verify.py` asserts a
+low-risk green change is eligible across Go / Rust / Node / Ruby / Java file
+shapes. The only stack-specific input is the *tests-green signal*, produced by
+`check-tests`, which parses pytest, unittest, Go, Mocha, Vitest, Rust/Cargo, Bun,
+and a generic fallback. The live A/B/C/D run above was on a Python repo; to
+confirm a non-Python stack end-to-end, run the same procedure in a Go or Node
+throwaway repo (seed a tiny green change → `/ooda-config auto-merge on` →
+`/evolve` → expect the low-risk PR to auto-merge). The gate logic is identical;
+only `config.test_command` changes.
+
 ## Adding a fixture
 
 1. Create `tests/<name>/seed/` with the minimal state (and a `config.json` if it's
