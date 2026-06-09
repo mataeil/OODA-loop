@@ -1000,6 +1000,18 @@ if confidence >= threshold:
       condition_met = evaluate trigger.condition against domain state JSON
       if condition_met:
         Check HALT. If exists: stop.
+        -- SAFETY GATE — chains get the SAME gates as the 4-A primary skill;
+        -- a chain must never be a side door around them:
+        if trigger.target not in config.safety.skill_allowlist:
+          Print "[Act] SAFETY: chain /{trigger.target} not in allowlist. Skipping."
+          continue
+        if trigger.target is an implementation/PR-creating skill (e.g. /dev-cycle):
+          if progressive_complexity.current_level < 3 OR implementation.enabled == false:
+            Print "[Act] SAFETY: chain /{trigger.target} requires Level 3 + implementation.enabled. Skipping."
+            continue
+          if prs_created_this_cycle >= config.safety.max_prs_per_cycle:
+            Print "[Act] SAFETY: max_prs_per_cycle ({max}) reached. Skipping /{trigger.target}."
+            continue
         Print "[Act] Chain trigger: {trigger.condition} → /{trigger.target} starting..."
         Execute: /{trigger.target}
         chain_executed.append(trigger.target)
@@ -1011,6 +1023,8 @@ if confidence >= threshold:
   else if config.domains[winner].chain exists and is non-empty:
     for each chain_skill in config.domains[winner].chain (max 3):
       Check HALT. If exists: stop.
+      Apply the same SAFETY GATE as Source 1 (allowlist; level/implementation
+      gate and max_prs_per_cycle for PR-creating skills). Skip on any failure.
       Print "[Act] Chain (legacy): /{chain_skill} starting..."
       Execute: /{chain_skill}
       chain_executed.append(chain_skill)
@@ -1026,6 +1040,13 @@ Print "[Act] Chain summary: {len(chain_executed)} skills executed: {chain_execut
 
 After execution, check if a new PR was created (new open PR matching domain
 branch_prefix or skill output indicating PR creation).
+
+Track `prs_created_this_cycle` (starts at 0 each cycle; increment per new PR
+detected here). This is what enforces `config.safety.max_prs_per_cycle`
+(default 1): the 4-B chain gate consults it before invoking another PR-creating
+skill, and if a skill somehow opens a PR beyond the limit anyway, classify that
+PR as Risk Tier 3 (Draft, human review) regardless of other gates and add a
+memo `{type: "safety_violation", message: "max_prs_per_cycle exceeded"}`.
 
 If PR created, determine risk tier (distinct from progressive complexity levels):
 
@@ -1080,7 +1101,11 @@ maintains checkpoints for post-merge recovery.
 
 **Pre-action checkpoint** (before Step 4-B execution):
 ```
-if config.safety.enable_rollback:
+if config.safety.enable_rollback OR config.safety.enable_auto_merge:
+  -- enable_auto_merge FORCES checkpointing: a merge the agent performs by
+  -- itself must always have a recorded recovery point, even when the operator
+  -- left enable_rollback off. (4-C Tier 1 additionally re-checkpoints
+  -- immediately before the merge itself, so the revert target is merge-adjacent.)
   checkpoint = {
     cycle: cycle_count,
     branch: current git branch,
@@ -1119,23 +1144,32 @@ if PR was auto-merged AND health check fails:
   -- merge stays on the branch (verified: Tier-B+ live run, 2026-06).
   git revert --no-edit HEAD
   git push origin HEAD
+  -- If the push FAILS (network, protection rule), the bad merge is still live
+  -- on the remote while local has the revert. Do NOT swallow this: create the
+  -- HALT regardless (below) and make the failure loud:
+  if push failed:
+    Print "[Rollback] ⚠ Revert committed locally but push FAILED: {error}"
+    Print "[Rollback] Remote still has the bad merge. Push manually: git push origin HEAD"
   -- Restore state from checkpoint
   restore confidence.json from checkpoint.state_snapshot.confidence
   restore action_queue.json pending from checkpoint
-  -- Create HALT file
-  Create HALT: "Auto-rollback: PR #{n} merged but health check failed. Reverted to {checkpoint.commit_sha}."
+  -- Create HALT file — ALWAYS, even if the push failed (especially then)
+  Create HALT: "Auto-rollback: PR #{n} merged but health check failed. Reverted to {checkpoint.commit_sha}.{' PUSH FAILED — remote still has the bad merge.' if push failed}"
   Print "[Rollback] Reverted PR #{n}. HALT created. Human review required."
 ```
 
-**Manual rollback** via `/ooda-config rollback {cycle}` (implemented in
-`ooda-config/SKILL.md`). Behavior:
+**Manual rollback** via `/ooda-config rollback {cycle}` — `ooda-config/SKILL.md`
+Step R is the CANONICAL definition (typed confirmation phrase `rollback {cycle}`,
+non-destructive `git revert {sha}..HEAD` default on linear history, `--hard`
+fallback, HALT on completion). Summary only — do not re-derive behavior from here:
 ```
 1. Find checkpoint by cycle number in checkpoints.json
 2. If not found: "No checkpoint for cycle {cycle}" — exit
-3. Confirm: "Rollback to cycle {cycle} (commit {sha})? This reverts all changes since. (yes/no)"
-4. git reset --hard {checkpoint.commit_sha}
+3. Typed confirm (exact phrase "rollback {cycle}", anything else cancels)
+4. git revert --no-edit {checkpoint.commit_sha}..HEAD  (default, non-destructive;
+   `git reset --hard` only with the operator's explicit --hard flag)
 5. Restore state files from checkpoint snapshot
-6. Print "Rolled back to cycle {cycle}."
+6. Create HALT; print "Rolled back to cycle {cycle}."
 ```
 
 ### 4-D: Execution Output
