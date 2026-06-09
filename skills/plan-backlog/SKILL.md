@@ -56,6 +56,11 @@ If no GitHub remote is found:
 - Write state file with `"status": "no_remote"` (preserve and **increment** `run_count` if state already exists)
 - Exit 0 — do NOT crash or show raw git errors
 
+EVERY early-exit state write (`no_remote`, `no_issues`, fetch/parse error) MUST
+also include `"actionable_items": 0, "top_rice_score": 0.0` — evolve's 4-B chain
+trigger evaluates those fields (`actionable_items >= 1 AND top_rice_score >= 50`);
+omitting them leaves the condition undecidable instead of cleanly false.
+
 ```bash
 gh issue list --state open --json number,title,labels,body,createdAt,assignees --limit 100
 ```

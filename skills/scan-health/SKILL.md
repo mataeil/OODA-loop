@@ -174,12 +174,21 @@ Write to `agent/state/service_health.json`:
   "last_run": "<ISO 8601>",
   "run_count": "<N>",
   "status": "healthy | degraded | critical",
+  "consecutive_failures": 0,
   "alerts": [{ "severity": "warning", "type": "slow_response", "endpoint": "...", "detail": "..." }],
   "baseline": {
     "endpoints": [{ "url": "...", "avg_response_ms": 130, "last_status": 200, "consecutive_failures": 0 }]
   }
 }
 ```
+
+Top-level `consecutive_failures` = the MAX of the per-endpoint
+`consecutive_failures` values, written every run. This is the variable evolve's
+4-B chain trigger evaluates (`consecutive_failures >= 3`) — trigger conditions
+read top-level state fields, so the nested per-endpoint counters alone would
+leave the trigger undecidable. Also: when `config.health_endpoints` is empty,
+write `status: "no_endpoints"` (readers must treat it as neither healthy nor
+critical — informational only).
 
 Status: `healthy` = all 2xx, no warning/critical alerts (info alerts are OK). `degraded` = any warning alert. `critical` = any critical alert.
 Update `avg_response_ms` using an exponential moving average:

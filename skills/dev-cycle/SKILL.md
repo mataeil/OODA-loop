@@ -78,7 +78,7 @@ if file exists at config.safety.halt_file:
 Read config.json → progressive_complexity.current_level  (authoritative source)
 Also check config.json → implementation.enabled
 if implementation.enabled == false AND not manually invoked by user:
-  Print "Implementation domain is disabled. Enable with: /ooda-config implementation enable"
+  Print "Implementation domain is disabled. Enable it: set implementation.enabled=true in config.json (done automatically by /ooda-config level 3)"
   EXIT cleanly (not an error).
 if progressive_complexity.current_level < 3 AND not manually invoked by user:
   Print "Implementation requires Level 3. Current: {current_level}"
@@ -414,12 +414,19 @@ Print the final summary:
 dev-cycle complete — {ISO timestamp}
 Action  : {selected.title} (RICE: {selected.effective_rice})
 Branch  : auto/dev-cycle/{slug}
-PR      : #{pr_number} (Draft)  |  {pr_url}
+PR      : #{pr_number} ({Draft|ready})  |  {pr_url}
 Files   : {files_changed} changed
 Lines   : {lines_changed} changed
 Tests   : {test_status}
 Status  : proposed
+pr_created : {true|false}
 ```
+
+`pr_created` is a REQUIRED report variable (true iff a PR was actually opened
+this run) — it is what evolve's 4-B evaluates for this skill's chain trigger
+(`pr_created == true`). Report variables are the evaluation source for skills
+whose contract output file (here `action_queue.json`) doesn't carry the
+condition fields at top level.
 
 If PR was not created (gh unavailable):
 ```

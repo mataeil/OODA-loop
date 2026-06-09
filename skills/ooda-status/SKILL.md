@@ -74,10 +74,15 @@ cat agent/state/evolve/confidence.json 2>/dev/null || echo "MISSING"
 cat agent/state/evolve/action_queue.json 2>/dev/null || echo "MISSING"
 ```
 
-**agent/state/evolve/metrics.json** — cost_today, cost_limit
+**agent/state/evolve/metrics.json** — execution counters/streaks (under `counters`)
 ```bash
 cat agent/state/evolve/metrics.json 2>/dev/null || echo "MISSING"
 ```
+
+**Cost source**: today's spend comes from `agent/state/evolve/cost_ledger.json`
+(`total_estimated_usd`, after confirming `date` == today UTC; stale date ⇒ $0.00
+pending reset) and the limit from `config.cost.daily_limit_usd`. metrics.json has
+NO cost fields — never read cost from it.
 
 **Domain state files** — for each domain in config.domains, read its state_file path:
 - last_run timestamp
@@ -112,7 +117,7 @@ Top action: first item sorted by RICE score descending.
 **Alerts** — collect all alerts arrays from domain state files. Count total.
 Show `none` if count is 0, otherwise show the count.
 
-**Cost** — from metrics.json: `cost_today` / `cost_limit`. Show `—/—` if unavailable.
+**Cost** — `cost_ledger.json.total_estimated_usd` (if `date` == today UTC, else $0.00) / `config.cost.daily_limit_usd`. Show `—/—` if unavailable.
 
 **Orient Health (v1.2.0)** — parsed from the Orient layer state files:
 
@@ -233,7 +238,7 @@ empty), print: `No cycle to share yet. Run /evolve first.`
 **New columns and rows explained:**
 
 - **Vel (Velocity)**: cycles per day = `total_cycles / days_since_first_cycle`. Helps detect runaway loops or idle periods.
-- **Trend**: confidence direction over last 5 cycles. `↑` = increased, `↓` = decreased, `→` = unchanged. Computed by comparing current confidence to the confidence 5 cycles ago (from decision_log snapshots).
+- **Trend**: per-domain confidence direction. decision_log only snapshots the WINNER's confidence each cycle, so compare the domain's two most recent decision_log appearances (`↑`/`↓`/`→` by delta); a domain with fewer than two appearances in the retained log renders `→`. Do not pretend a "5 cycles ago" per-domain snapshot exists — it doesn't.
 - **Oldest**: age of the oldest pending action in action_queue, in days. Shows `—` if queue is empty. Highlights aging items that may need human review.
 - **Saturation**: `consecutive_observe_only_cycles` from state.json. Render as a progress bar toward `saturation.halt_threshold` (e.g., `████░░░░░░ 40%`). Shows `0` if no saturation.
 - **$/h (Cost rate)**: `cost_ledger.total_estimated_usd / hours_since_midnight_utc`. Helps predict whether daily limit will be hit.
@@ -286,5 +291,5 @@ After rendering the dashboard, check whether a suggestion should be shown:
 | Individual domain state file missing | Show `?` for score, conf, last, status for that domain only. |
 | Any state file contains invalid JSON | Treat as missing (use defaults), add `[WARN] Corrupt state file: <path>` to alerts section. |
 | action_queue.json missing | Show `Actions: — pending, — proposed` and `Next: —`. |
-| metrics.json missing | Show `Cost: —/— today`. |
+| cost_ledger.json missing | Show `Cost: —/— today`. |
 | HALT active | Show full dashboard. Mark `HALT: ACTIVE`. Do not suppress any data. |
