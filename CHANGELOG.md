@@ -8,7 +8,7 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
-## [Unreleased]
+## [v1.2.0] — 2026-06-09
 
 Post-beta quality work toward a stable `1.2.0` (surfaced by the stable-gate
 verification — see TESTING.md).

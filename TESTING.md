@@ -85,19 +85,17 @@ sandbox instead of relying on the session CWD). It exercised Levels 0–1
 (observe/test). It did **not** exercise the Level-3 Act path (autonomous PR
 creation / auto-merge / rollback), which needs a GitHub remote.
 
-## What is NOT yet covered (the honest gap)
+## Coverage status (v1.2.0)
 
-After the controlled live run above, two gaps remain before a **stable `1.2.0`**
-(currently `v1.2.0-beta`):
+Levels 0–3 are verified end-to-end — the static suite + controlled runs +
+**independent fresh-session live runs** (Tier A in a sandbox; Tier B / B+ in a
+throwaway GitHub repo — each a separate Claude Code session running the `/evolve`
+slash command against a real remote). The two earlier gaps are now closed:
 
-1. **Fully-independent invocation.** The live run was Claude executing the spec
-   with explicit paths. The gold standard is a *fresh* Claude Code session whose
-   working directory IS a sandbox project, running the `/evolve` **slash command**
-   itself over several cycles. (It can't be done from this framework repo: the
-   skill resolves `config.json` from the session CWD, and Step 6-D would commit +
-   push OODA-loop's *own* state — so it needs a separate session in a throwaway
-   project. ~2 minutes for a human.)
-2. **The Level-3 Act path — now exercised live (Tier B, throwaway repo, 2026-06).**
+1. **Fully-independent invocation — done.** Tier A/B/B+ were fresh sessions whose
+   CWD was the target project, invoking `/evolve` itself over multiple cycles
+   (not this framework repo, which would commit its own state).
+2. **The Level-3 Act path — exercised live (Tier B / B+, throwaway repo, 2026-06).**
    A fresh Level-3 run against a real GitHub remote produced this result:
    - ✅ **Autonomous PR creation works.** `dev-cycle` selected the top-RICE
      action, branched, fixed `src/calc.py`, ran the suite (green), and opened a
