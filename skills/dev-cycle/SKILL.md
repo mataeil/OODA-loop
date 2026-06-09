@@ -194,11 +194,17 @@ before writing or editing any file:
       Print "BLOCKED: {file} matches protected path '{pattern}'. Skipping."
       Print "Protected paths cannot be modified by dev-cycle, even at Level 3."
       Add to PR body notes: "⚠ Protected path {file} was NOT modified (blocked by safety policy)."
+      Set protected_blocked = true   -- forces Draft / Risk Tier 3 below (#35)
       DO NOT write/edit this file — continue to next file.
 ```
 
 If ALL planned files are protected, mark the action as "blocked" with memo
 "All target files are protected paths" and EXIT cleanly.
+
+If `protected_blocked` is true (some — not all — target files were protected and
+skipped), the PR is **never auto-merge-eligible** even if the remaining diff is
+small and green: a partial change with safety-critical files silently dropped may
+be incomplete or incoherent, so a human must review it (#35).
 
 **Size limit enforcement:**
 
@@ -322,6 +328,7 @@ auto-merge-eligible iff ALL of these hold:
 config.safety.enable_auto_merge == true            -- opt-in, default false
 AND config.progressive_complexity.current_level >= 3
 AND no changed file matches config.safety.protected_paths
+AND protected_blocked == false                     -- no protected file was skipped (#35)
 AND changed_files_count <= config.safety.auto_merge_max_files   -- default 5
 AND changed_lines_count <= config.safety.auto_merge_max_lines   -- default 100
 AND test_status == "passing"                       -- this cycle's tests are green
@@ -337,7 +344,7 @@ gh pr create \
   --title "{selected.title}" \
   $([ "$auto_merge_eligible" = true ] || echo --draft) \
   --body "$(cat <<'EOF'
-<!-- ooda:meta source_domain={selected.source_domain} rice={selected.effective_rice} action_id={selected.id} auto_merge_eligible={true|false} -->
+<!-- ooda:meta source_domain={selected.source_domain} rice={selected.effective_rice} action_id={selected.id} auto_merge_eligible={true|false} protected_blocked={true|false} -->
 
 ## Source
 - **Domain**: {selected.source_domain}
