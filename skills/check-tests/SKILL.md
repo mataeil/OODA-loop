@@ -79,9 +79,9 @@ Capture exit code, stdout, stderr. Parse:
     - **Mocha**: `(\d+) passing`, `(\d+) failing`, `(\d+) pending`
     - **RSpec**: `(\d+) examples?,\s*(\d+) failures?(?:,\s*(\d+) pending)?`
     - **Rust/Cargo**: `test result: (?:ok|FAILED)\.\s*(\d+) passed;\s*(\d+) failed;\s*(\d+) ignored` — Cargo emits a single summary line. `ignored` maps to `skipped`. Coverage is not emitted by default; requires `cargo-tarpaulin` or `cargo llvm-cov`.
+    - **Python unittest** (stdlib `python -m unittest`): `Ran\s+(\d+)\s+tests?` gives `total`. If a line matches `^OK\b` → `failed=0, passed=total` (`OK \(skipped=(\d+)\)` sets `skipped`). If a line matches `^FAILED\s*\((.+)\)` → inside the parens read `failures=(\d+)` and `errors=(\d+)` (sum → `failed`) and `skipped=(\d+)` if present; then `passed = total - failed - skipped`. unittest emits NO coverage — use `python3 -m coverage run -m unittest && coverage report` for the pytest-cov `TOTAL ... %` line. (Listed — and therefore tried — BEFORE Bun, since Bun also matches `Ran (\d+) tests`.)
     - **Bun**: `(\d+)\s+pass(?:\b)` for passed, `(\d+)\s+fail(?:\b)` for failed — Bun uses present tense (`pass`/`fail`) NOT past tense (`passed`/`failed`). Also `Ran\s+(\d+)\s+tests` for total. `(\d+)\s+skip` for skipped. Coverage requires `--coverage` flag.
     - **Vitest**: Uses the same Istanbul/v8 table format as Jest for coverage. Test counts use `Tests\s+(\d+)\s+passed\s+\((\d+)\)` format — note: no colon after `Tests`, no comma separators. Parse each token independently as with Jest.
-    - **Python unittest** (stdlib `python -m unittest`): `Ran\s+(\d+)\s+tests?` gives `total`. If a line matches `^OK\b` → `failed=0, passed=total` (`OK \(skipped=(\d+)\)` sets `skipped`). If a line matches `^FAILED\s*\((.+)\)` → inside the parens read `failures=(\d+)` and `errors=(\d+)` (sum → `failed`) and `skipped=(\d+)` if present; then `passed = total - failed - skipped`. unittest emits NO coverage — use `python3 -m coverage run -m unittest && coverage report` for the pytest-cov `TOTAL ... %` line. (Check this BEFORE Bun, since Bun also matches `Ran (\d+) tests`.)
     - **Fallback**: generic `(\d+)\s+(?:tests?\s+)?passed`, `(\d+)\s+(?:tests?\s+)?failed`
     - **Go skipped**: count `--- SKIP:` lines for skipped tests (only visible in verbose `-v` mode; if not verbose, skipped count defaults to 0)
     - Compute `total = passed + failed + skipped` when the framework does not emit a total
@@ -123,10 +123,21 @@ Write to `agent/state/test_coverage.json`:
   "status": "passing|failing|error",
   "results": { "total": N, "passed": N, "failed": N, "skipped": N, "coverage_pct": N.N },
   "previous_results": { "...previous results object..." },
+  "previous_status": "passing|failing|error",
+  "new_failures": N,
+  "coverage_drop": N.N,
   "alerts": [{"severity": "warning", "type": "regression", "detail": "..."}],
   "history": [{"timestamp": "...", "passed": N, "failed": N, "coverage_pct": N.N}]
 }
 ```
+
+- `previous_status` — the prior run's `status`, persisted so Step 3's rule (c)
+  ("previous run status was error") is actually decidable next run.
+- `new_failures` — `max(0, results.failed - previous_results.failed)` this run
+  (0 on first run). `coverage_drop` — `max(0, previous coverage_pct - current)`
+  in percentage points. **These two are the variables evolve's 4-B chain
+  trigger evaluates** (`new_failures >= 1 OR coverage_drop > 5`) — they must be
+  written EVERY run, not only when an alert fires.
 
 History: append the current run, then truncate to the most recent 50 entries (drop oldest first). If the array already exceeds 50 (e.g., manual edits), truncate to 50 in this write.
 

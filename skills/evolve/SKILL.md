@@ -998,9 +998,16 @@ if confidence >= threshold:
   contract = read YAML frontmatter from skills/{skill}/SKILL.md
   if contract.chain_triggers exists and is non-empty:
     for each trigger in contract.chain_triggers (max config.safety.max_chain_depth, default 3):
-      -- Evaluate condition against skill output (domain state file just written)
+      -- Evaluate condition against the INVOKED SKILL's own output: the
+      -- top-level fields of the state file its contract lists under
+      -- output.files (e.g. check-tests → test_coverage.json, run-deploy →
+      -- deploy.json) — NOT the winner domain's file. If the condition variable
+      -- is not a top-level field there (e.g. dev-cycle's pr_created), read it
+      -- from the skill's printed Report variables. A variable found in neither
+      -- place ⇒ condition is FALSE (log "[Act] Chain condition undecidable:
+      -- {var} not found — treating as false", never guess).
       -- Condition format: "field_name >= value AND other_field == 'string'"
-      condition_met = evaluate trigger.condition against domain state JSON
+      condition_met = evaluate trigger.condition as above
       if condition_met:
         Check HALT. If exists: stop.
         -- SAFETY GATE — chains get the SAME gates as the 4-A primary skill;
