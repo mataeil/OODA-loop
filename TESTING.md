@@ -145,6 +145,31 @@ So Levels 0–3 — including opt-in low-risk auto-merge with working auto-rever
 manual rollback — are now verified (static suite + controlled + live throwaway
 runs). The default (auto-merge off) is unchanged and fully verified.
 
+### Unattended operation — live soak run (v1.3.0, throwaway repo, 2026-06)
+
+The v1.3.0 "fails stopped, never runaway" rails were exercised live over **14
+completed cycles** in a fresh throwaway project (`min_cycle_interval` 0, lock
+timeout shortened to 2 min for measurement):
+
+| Rail | Result |
+|------|--------|
+| Lock lifecycle | ✅ created/released every cycle; clean accumulation, zero leftovers |
+| **Crash self-heal** | ✅ mid-cycle kill left `.lock` + `cycle_in_progress:true` → after the stale timeout the next `/evolve` removed the lock, ran 0-C crash recovery, and proceeded — **no manual `rm`** |
+| Min-interval skip | ✅ early ticks printed `[SKIP] Too soon` and left **no lock** (next on-time tick ran immediately) |
+| Silent-failure breaker | ✅ 3 consecutive failing executions → HALT auto-created → next invocation stopped at Step 0 (**fails stopped**) |
+
+Teardown clean: zero residual locks/HALT, config restored, no git pollution.
+Two side findings, both addressed: the 0-C diagnostic named the last *completed*
+cycle instead of the crashed one (wording fixed in the spec — behavior was
+correct), and the throwaway's gitignored `agent/state/` correctly triggered the
+6-D loud warning (the guard works; real deployments should keep state tracked).
+
+**Method caveat (honest):** there is no shipped binary — the canonical executor
+is Claude interpreting `SKILL.md`. This soak drove the rail steps via a
+verbatim-transcribed reactive driver (auditable script), i.e. it verifies the
+rails' *logic against real files, locks, and processes*, the same substrate
+`/evolve` manipulates.
+
 ### Multi-stack note
 
 The auto-merge gate is **stack-agnostic**: it decides from `gh pr view` facts

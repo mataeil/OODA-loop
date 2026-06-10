@@ -8,6 +8,18 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
+## [Unreleased]
+
+- **Live soak run recorded** (TESTING.md): the v1.3.0 unattended-operation rails
+  — lock lifecycle, crash self-heal, min-interval skip, silent-failure breaker →
+  HALT — all verified live over 14 cycles in a throwaway project ("fails
+  stopped" closed by measurement).
+- evolve 0-C: crash-recovery diagnostics now name the **crashed** cycle
+  (`cycle_count + 1`) instead of the last completed one (soak-run finding;
+  behavior was already correct, the message blamed the wrong number).
+
+---
+
 ## [v1.3.0] — 2026-06-10
 
 **The unattended-operation release.** A 37-agent adversarially-verified review
