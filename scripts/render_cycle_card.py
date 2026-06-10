@@ -63,7 +63,7 @@ def render(project: Path) -> tuple[str, str]:
     orient = d.get("orient_summary") or DASH
 
     # DECIDE
-    dom = d.get("domain", DASH)
+    dom = d.get("selected_domain", d.get("domain", DASH))  # canonical, legacy fallback
     score = fmt_num(d.get("score"))
     confidence = d.get("confidence", conf.get(dom))
     gate = "OK" if (confidence is not None and confidence >= 0.6) else ("low" if confidence is not None else DASH)
@@ -117,7 +117,7 @@ def render(project: Path) -> tuple[str, str]:
         )
     # 3) a new intervention written this cycle (memos.json)
     if not learn:
-        memos = load(ev / "memos.json")
+        memos = load(ev / "memos.json", {}) or {}
         for iv in (memos.get("interventions", []) or []):
             if iv.get("created_at_cycle") == cyc:
                 learn.append(
@@ -128,7 +128,7 @@ def render(project: Path) -> tuple[str, str]:
     # 4) observation micro-adjustment (confidence delta vs previous cycle, same domain)
     if not learn and len(log) >= 2:
         prev = log[-2]
-        if (prev.get("domain") == dom and prev.get("confidence") is not None
+        if (prev.get("selected_domain", prev.get("domain")) == dom and prev.get("confidence") is not None
                 and d.get("confidence") is not None):
             delta = round(d["confidence"] - prev["confidence"], 3)
             if abs(delta) >= 0.001:

@@ -7,20 +7,18 @@
     {
       "cycle": 151,
       "timestamp": "2026-04-13T15:00:00Z",
-      "domain": "service_health",
-      "skill": "/scan-health",
       "score": 9.1,
       "confidence": 0.74,
       "result": "pr_created",
       "pr_number": 28,
       "risk_tier": 1,
-      "orient_summary": "service_health flaky on /api/expand; proposing a retry wrapper."
+      "orient_summary": "service_health flaky on /api/expand; proposing a retry wrapper.",
+      "selected_domain": "service_health",
+      "selected_skill": "/scan-health"
     },
     {
       "cycle": 152,
       "timestamp": "2026-04-14T03:14:00Z",
-      "domain": "test_coverage",
-      "skill": "/check-tests",
       "score": 11.3,
       "confidence": 0.74,
       "result": "pr_created",
@@ -28,8 +26,15 @@
       "risk_tier": 1,
       "orient_summary": "flaky-retry pattern confirmed (3rd time); coverage now the most stale + highest-signal domain.",
       "pr_outcomes": [
-        { "pr": 28, "domain": "service_health", "outcome": "rejected", "confidence_delta": -0.2 }
-      ]
+        {
+          "pr": 28,
+          "domain": "service_health",
+          "outcome": "rejected",
+          "confidence_delta": -0.2
+        }
+      ],
+      "selected_domain": "test_coverage",
+      "selected_skill": "/check-tests"
     }
   ]
 }
