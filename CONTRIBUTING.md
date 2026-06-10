@@ -95,14 +95,18 @@ Use dry-run mode to test the orchestrator without executing actions:
 /evolve --dry-run
 ```
 
-Run the verification suite before opening a PR (it must stay green):
+Run the verification suite before opening a PR (it must stay green — CI runs
+both tiers on every PR):
 
 ```bash
-python3 tests/verify.py     # static fixture walkthrough; see TESTING.md
+python3 tests/verify.py     # Tier 0: static fixture walkthrough
+tests/e2e/run.sh --local    # Tier 1: E2E rail scenarios (Docker: tests/e2e/run.sh)
 ```
 
-See **[TESTING.md](TESTING.md)** for how the engine is verified and how to add a
-fixture for your change.
+If your change touches a *rail* in `skills/evolve/SKILL.md` (locking, breakers,
+ledger, queue hygiene, 6-D), update the matching transcribed block in
+`tests/e2e/driver/engine.py` in the same PR. See **[TESTING.md](TESTING.md)**
+for the full three-tier process and how to add a fixture for your change.
 
 ---
 
