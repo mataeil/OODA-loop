@@ -42,6 +42,10 @@ def render(project: Path) -> tuple[str, str]:
     ev = project / "agent" / "state" / "evolve"
     state = load(ev / "state.json", {}) or {}
     conf = load(ev / "confidence.json", {}) or {}
+    # accept both shapes: flat {domain: float} and nested {domains: {domain: {score}}}
+    if isinstance(conf.get("domains"), dict):
+        conf = {k: (v.get("score") if isinstance(v, dict) else v)
+                for k, v in conf["domains"].items()}
     ledger = load(ev / "cost_ledger.json", {}) or {}
     reflections = (load(ev / "reflections.json", {}) or {}).get("reflections", [])
 

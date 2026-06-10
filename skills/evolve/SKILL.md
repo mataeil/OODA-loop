@@ -437,6 +437,18 @@ else:
 
 ### 2-B: Confidence Update
 
+`confidence.json` exists in two shapes in the wild and BOTH must be read
+correctly (surfaced by the 2026-06 framework-repo dogfood run, where live state
+was nested while fixtures were flat):
+- flat (fixtures, early projects): `{ "domain_name": 0.7, ... }`
+- nested (live deployments): `{ "domains": { "domain_name": { "score": 0.7,
+  "last_updated": ..., "recent_outcomes": [...] } } }`
+
+Read rule: if a top-level `domains` key holds objects, the per-domain value is
+`domains[name].score`; otherwise the top-level value itself. Write rule:
+preserve the file's existing shape (update `score` in place for nested; the
+bare float for flat) — never silently convert a project's state file.
+
 ```
 for each PR in merged_prs:
   match PR.headRefName to domain via config.domains.*.branch_prefix
@@ -1567,7 +1579,11 @@ Persist:
 
 ### 6-C2: action_queue.json
 
-Persist queue: pending sorted by RICE desc (cap 20), in_progress, completed (keep last 30).
+Persist queue: pending sorted by `effective_rice` desc — falling back to
+`rice_score` for legacy items that predate the field, initializing the missing
+field BEFORE sorting (the 6-C6 guard runs later in the step order, so sorting
+must not assume it already ran; a legacy item otherwise crashes the sort —
+surfaced by the 2026-06 dogfood run). Cap 20; in_progress; completed (keep last 30).
 
 ### 6-C3: CHANGELOG.md
 
