@@ -6,13 +6,22 @@ internally consistent, and does it produce the documented behavior from real
 on-disk state?** This page documents how that's verified, honestly including what
 is *not* yet covered.
 
-## Run it
+## Run it — the official test process
 
 ```bash
-python3 tests/verify.py        # static fixture walkthrough — exits 0 iff all pass
+python3 tests/verify.py        # Tier 0: static fixture walkthrough (38 checks)
+tests/e2e/run.sh               # Tier 1: isolated Docker E2E (19 rail scenarios)
+tests/e2e/run.sh --local       #         …same suite without Docker
 ```
 
-Current status: **38 checks, 0 failures.**
+Both tiers run in CI on every push and pull request
+(`.github/workflows/e2e.yml`). Current status: **Tier 0: 38/0 · Tier 1: 19/19.**
+
+| Tier | What | When |
+|------|------|------|
+| **0** | static walkthrough + 4 deterministic references (`tests/verify.py`) | CI, every push/PR |
+| **1** | **Docker E2E** — spec-transcribed rail driver on real FS / real git / real processes (SIGKILL) / injected clock, fully isolated ([tests/e2e/](tests/e2e/)) | CI, every push/PR |
+| **2** | live Claude runs — the real `/evolve` in a fresh session (Tier A core / Tier B+ auto-merge / unattended soak — sections below) | human-triggered, per release gate |
 
 ## What's verified, and how
 

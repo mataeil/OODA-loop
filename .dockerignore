@@ -1,0 +1,8 @@
+# keep the E2E image lean and free of local-only material
+.git
+.claude
+agent/state/*
+!agent/state/.gitkeep
+docs/demo.gif
+docs/social-preview.png
+*.lock

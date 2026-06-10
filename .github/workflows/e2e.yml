@@ -1,0 +1,25 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  static-verify:
+    name: "Tier 0 · static verify"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run fixture walkthrough
+        run: python3 tests/verify.py
+
+  docker-e2e:
+    name: "Tier 1 · Docker E2E (isolated rails)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build isolated image
+        run: docker build -t ooda-e2e -f tests/e2e/Dockerfile .
+      - name: Run E2E suite in container
+        run: docker run --rm ooda-e2e

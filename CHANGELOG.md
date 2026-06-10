@@ -10,6 +10,19 @@ independently. Bump there signals migration work for downstream projects.
 
 ## [Unreleased]
 
+### Added — official Docker E2E tier (Tier 1)
+- **`tests/e2e/`** — 19 rail scenarios driven by a spec-transcribed deterministic
+  driver (`driver/engine.py`, every block cites its SKILL.md section) against a
+  real filesystem, real git repos, real processes (incl. SIGKILL crash), and an
+  injected clock, fully isolated in Docker (`tests/e2e/run.sh`, `--local`
+  fallback). Covers: lock lifecycle + stale self-heal + crash recovery, all
+  breakers end-to-end (interval/saturation/silent-failure/HALT convergence),
+  cost-ledger reset/backfill/corrupt-fail-closed, 6-D explicit staging + the
+  #31 gitignore guard, weekly-episode exactly-once, action-queue hygiene.
+- **`.github/workflows/e2e.yml`** — CI now runs Tier 0 (static verify) +
+  Tier 1 (Docker E2E) on every push and pull request; TESTING.md documents the
+  official three-tier process (0 static / 1 Docker E2E / 2 live Claude runs).
+
 - **Live soak run recorded** (TESTING.md): the v1.3.0 unattended-operation rails
   — lock lifecycle, crash self-heal, min-interval skip, silent-failure breaker →
   HALT — all verified live over 14 cycles in a throwaway project ("fails
