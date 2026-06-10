@@ -171,10 +171,24 @@ mkdir -p agent/state/evolve
 mkdir -p agent/safety
 ```
 Initialize state files: `state.json`, `confidence.json`, `metrics.json`, `action_queue.json`,
-`memos.json`, `goals.json`, `episodes.json`, `principles.json`, `skill_gaps.json`,
+`memos.json` (with `"score_adjustments": {}, "interventions": [], "history": []`),
+`goals.json`, `episodes.json`, `principles.json`, `skill_gaps.json`,
+`reflections.json` (`{"schema_version": "1.0.0", "reflections": []}`),
 `cost_ledger.json`, `CHANGELOG.md` in `agent/state/evolve/`. Use canonical schemas.
+(`cascades.json` and per-domain `lens.json` are created lazily by evolve.)
 
-Add to `.gitignore` if not already present: `config.json`, `agent/state/`, `agent/safety/HALT`.
+Add to `.gitignore` if not already present:
+```
+config.json
+agent/safety/HALT
+agent/state/**/*.lock
+agent/state/evolve/.lock
+```
+Do NOT gitignore `agent/state/` itself: evolve Step 6-D deliberately commits the
+state JSONs (decision history, confidence, episodes — the auditable memory of
+the loop). Ignoring the directory silently turns every 6-D commit into a no-op
+and the project loses its own learning trail (issue #31). Only the transient
+lock files (and the HALT kill-switch) stay untracked.
 
 Print:
 ```

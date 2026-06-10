@@ -14,7 +14,6 @@ input:
     - deploy_health_wait_seconds
     - health_endpoints
     - safety.halt_file
-    - safety.branch_prefix
 output:
   files: [agent/state/deploy.json]
 safety:

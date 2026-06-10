@@ -35,12 +35,17 @@ Read from `config.progressive_complexity.current_level`. Only a human may change
 |-------|---------|------------|------------|----------------|
 | 0     | 1 domain  | No  | No  | No  |
 | 1     | 2 domains | No  | No  | No  |
-| 2     | All       | Draft only | No  | No  |
-| 3     | All       | Yes | Yes | Yes |
+| 2     | All       | No  | No  | No  |
+| 3     | All       | Yes (Draft by default) | Opt-in only | Opt-in only |
 
-- **Level 0-1**: Observe only. State file updates and decision logs permitted.
-- **Level 2**: Draft PRs allowed. Human must approve and merge.
-- **Level 3**: Full autonomy. Auto-merge permitted for non-protected paths.
+- **Level 0-2**: Observe only — no PRs. (Implementation — and therefore any PR —
+  unlocks at Level 3; `config.example.json` sets `implementation: false` for
+  levels 0-2 and dev-cycle's level gate enforces it.)
+- **Level 3**: Autonomous implementation. PRs are **Draft by default — a human
+  merges**. Auto-merge happens ONLY when `safety.enable_auto_merge` is
+  explicitly true, and then only for low-risk PRs (non-protected, within
+  auto_merge size limits, tests passed), with a post-merge health check that
+  auto-reverts + HALTs on failure.
 
 First cycle is observe-only when `config.safety.first_cycle_observe_only` is
 true, regardless of level.
@@ -104,8 +109,12 @@ Tracks estimated API cost against `config.cost.daily_limit_usd`.
 
 Cost is tracked in `agent/state/evolve/cost_ledger.json`, updated by evolve at
 the end of each cycle. Each entry records cycle ID, timestamp, and estimated
-token cost. The ledger resets daily at 00:00 UTC. If the ledger file is missing
-or corrupt, the cycle MUST treat cost as at-limit and halt (fail-closed).
+token cost. The ledger resets daily at 00:00 UTC. If the ledger file is
+**missing** (fresh install — no spend has occurred), evolve initializes it at
+$0.00 and the 6-C8 integrity gate audits any cycle gaps. If it exists but is
+**corrupt** (unparseable), the cycle MUST fail closed: back it up, create a
+HALT, and stop — today's spend is unknown, and recreating it at $0.00 would
+defeat the daily cap.
 
 ---
 

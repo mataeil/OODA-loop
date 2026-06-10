@@ -76,8 +76,12 @@ state_file path (default `agent/state/<name>.json`).
 Back up config.json. Insert into `config.domains`:
 ```json
 { "weight": <w>, "state_file": "<path>", "primary_skill": "<skill>",
-  "chain": [], "branch_prefix": "auto/<name>/", "fallback": true, "enabled": true }
+  "chain": [], "branch_prefix": "auto/<name>/", "fallback": true,
+  "enabled": true, "status": "active" }
 ```
+(`status` is the field evolve's filters treat as authoritative — a domain
+without it would never be selected. `enabled` is kept for back-compat; evolve
+treats a domain with `enabled: true` and NO `status` field as `"active"`.)
 Create empty state file if absent (`{ "schema_version": "1.0.0", "domain": "<name>", "last_run": null }`).
 Append primary_skill to `safety.skill_allowlist` if not already present.
 Write + validate. Print confirmation showing state file status and allowlist change.
@@ -111,28 +115,9 @@ protected_paths list, and skill_allowlist.
 
 ## Step G — validate
 
-Run checks in order; print `[PASS]` or `[FAIL] <reason>` for each:
-
-1. config.json exists and is readable
-2. Parses as valid JSON
-3. `schema_version` field present
-4. `project.name`, `project.locale`, `project.timezone` all present
-5. `safety.halt_file`, `safety.confidence_threshold`, `safety.max_prs_per_cycle` present
-6. Value ranges: `confidence_threshold` in [0.0, 1.0]; `max_prs_per_cycle` >= 1; `min_cycle_interval_minutes` >= 1
-7. If present, `health_check_timeout_seconds` is a number in [2, 30]
-8. If present, `test_timeout_seconds` is a number >= 10
-9. If present, `deploy_monitor_timeout_seconds` is a number >= 60
-10. If present, `deploy_health_wait_seconds` is a number >= 5
-11. If present, `deploy_workflow_inputs` is a plain object (not array, not null)
-12. If present, `safety.lock_timeout_minutes` is a number >= 1
-13. At least one domain defined
-14. Each domain has `weight`, `primary_skill`, `state_file`, `enabled`
-15. Every enabled domain's `primary_skill` is in `safety.skill_allowlist`
-16. `progressive_complexity.current_level` is 0–3
-17. No sensitive field holds a raw token (must use `$ENV_VAR` form)
-
-Final: `Validation: <N> passed, <M> failed`
-On any failure append: `Run /ooda-config show to review your settings.`
+The full check list (1–27) is defined ONCE in **"Step G — validate (extended)"**
+below — that section is canonical. (An earlier 17-check copy of this list lived
+here and drifted from the extended one; never maintain two lists.)
 
 ---
 
@@ -160,7 +145,12 @@ Wipe the lens snapshot for the named domain, forcing a fresh start on the next c
    Any answer other than "yes" → `Cancelled.` and exit.
 5. Back up the existing lens file to `lens.json.bak` in the same directory before overwriting.
    Print: `  Backed up: <lens_path>.bak`
-6. Overwrite lens.json with: `{ "schema_version": "1.0.0", "domain": "<name>", "reset_at": "<ISO timestamp>", "evidence": [] }`
+6. Overwrite lens.json with the FULL empty schema (every array evolve 5-E reads
+   must exist — a reset file missing `focus_items`/`learned_thresholds`/
+   `discovered_signals` breaks the next lens update):
+   `{ "schema_version": "1.0.0", "domain": "<name>", "reset_at": "<ISO timestamp>",
+      "focus_items": [], "learned_thresholds": [], "discovered_signals": [],
+      "deprecated_items": [], "evidence": [] }`
 7. Print: `Lens reset: <name>  (evidence cleared, backup saved, next cycle starts fresh)`
 
 ---
@@ -396,8 +386,11 @@ Run checks in order; print `[PASS]` or `[FAIL] <reason>` for each:
 11. If present, `deploy_workflow_inputs` is a plain object (not array, not null)
 12. If present, `safety.lock_timeout_minutes` is a number >= 1
 13. At least one domain defined
-14. Each domain has `weight`, `primary_skill`, `state_file`, `enabled`
-15. Every enabled domain's `primary_skill` is in `safety.skill_allowlist`
+14. Each domain has `weight`, `primary_skill`, `state_file`, and `status`
+    (or legacy `enabled` — warn `[WARN] domain {name}: no status field; evolve
+    treats enabled:true as status:"active"` instead of failing)
+15. Every active domain's (`status == "active"`, or legacy `enabled: true`)
+    `primary_skill` is in `safety.skill_allowlist`
 16. `progressive_complexity.current_level` is 0–3
 17. No sensitive field holds a raw token (must use `$ENV_VAR` form)
 18. At least one domain has `fallback: true` (confidence gate escape)
