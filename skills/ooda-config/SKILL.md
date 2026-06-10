@@ -2,7 +2,7 @@
 name: ooda-config
 description: View, modify, and validate config.json settings via slash commands.
 ooda_phase: support
-version: "1.1.0"
+version: "1.2.0"
 input:
   files: [config.json]
   config_keys: []

@@ -2,7 +2,7 @@
 name: ooda-setup
 description: 3-step project setup wizard. Auto-detects language, test framework, CI, and endpoints. Creates config.json from config.example.json.
 ooda_phase: support
-version: "1.0.0"
+version: "1.1.0"
 input:
   files: [config.example.json]
   config_keys: []

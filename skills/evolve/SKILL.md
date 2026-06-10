@@ -2,7 +2,7 @@
 name: evolve
 description: OODA Meta-Orchestrator. Observes all domain states, orients by learning from past outcomes, decides the highest-priority action, and executes it. Run with /evolve or /loop 4h /evolve.
 ooda_phase: meta
-version: "1.1.0"
+version: "1.2.0"
 input:
   files:
     - config.json

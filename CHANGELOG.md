@@ -8,6 +8,102 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
+## [v1.3.0] — 2026-06-10
+
+**The unattended-operation release.** A 37-agent adversarially-verified review
+of every SKILL.md (126 raw findings → 22 confirmed + the verified tail) focused
+on one question: *can /evolve run on a schedule for days without a babysitter?*
+Seven fix PRs (#41–#47) later, the answer is designed to be yes — and every
+failure mode now converges on the HALT file (the loop fails **stopped**, never
+runaway).
+
+### Fixed — autonomy blockers (evolve)
+- **Lock leaks**: the 0-D min-interval skip and the 4-A HALT re-check both
+  EXITed without deleting the lock created in 0-B — under /loop or cron, every
+  early tick (or any mid-cycle HALT) blocked the next on-time run for up to
+  30 minutes. The 0-B pseudocode also contradicted its own stale-lock rule
+  (unconditional EXIT ⇒ one crash = permanent block until manual `rm`).
+  Staleness is now checked inline, stale locks fall through to crash recovery,
+  and every early-exit path releases the lock. **Crashes self-heal.**
+- **Saturation breaker**: evaluated the current cycle's outputs before Act ran
+  (always empty ⇒ counter crept up wrongly) and silently no-oped when the
+  counter field was missing. Now evaluates the previous completed cycle and
+  initializes the field.
+- **`max_silent_failures`** (declared since v1.1, never enforced): N consecutive
+  execution errors now HALT after the cycle completes cleanly.
+- **Cost ledger policy**: missing (fresh install) ⇒ initialize at $0 with 6-C8
+  gap audit; **corrupt ⇒ fail closed** (backup + HALT) — recreating a corrupt
+  ledger at $0.00 mid-day would have defeated the daily cap.
+
+### Fixed — scoring / learning correctness (evolve)
+- **3-J score verification** hardcoded linear staleness + omitted
+  balance_penalty while 3-A defaults to logarithmic ⇒ a false "[WARN] Score
+  mismatch" EVERY cycle that then **replaced the correct score with the wrong
+  one** (silent winner swaps). 3-J now re-runs the exact 3-A pipeline.
+- Cascades were detected then **never written to disk**, and the +3.0 bonus
+  re-applied every cycle while pending (compounding). Persisted + one-shot.
+- Contrarian check stored a shape no consumer could read — now a standard
+  intervention (+1.0, 3 cycles). Starvation window was 11 cycles (off-by-one).
+  Futile-loop count now derived from decision_log (survives restarts).
+- Balance penalty read flat `metrics.total_skill_executions` while 6-C5 writes
+  nested `counters.*` ⇒ the penalty was silently zero forever. Aligned.
+- Episodes: spec schema diverged from fixtures/live shape AND the week
+  comparison read a field id-keyed entries don't have ⇒ a duplicate episode
+  every cycle after the first week boundary. Canonical = fixture schema
+  (`EP-YYYY-Wnn` id) with an existence guard.
+
+### Fixed — Act-path safety enforcement (evolve + dev-cycle)
+- **Chains bypassed every 4-A gate** (allowlist, level, implementation) — a
+  chain_trigger could run /dev-cycle at Level 2. Chains now pass the same
+  SAFETY GATE as the primary skill.
+- **`max_prs_per_cycle`** (declared, never enforced): now tracked in 4-C,
+  consulted by the chain gate, and any over-limit PR is forced to Tier 3 +
+  a safety_violation memo.
+- Checkpoints were taken only when `enable_rollback` — with auto-merge on and
+  rollback off the agent could self-merge with **no recovery point**. Either
+  flag now forces the checkpoint. Auto-rollback handles `git push` failure
+  loudly (HALT always created).
+- Action lifecycle: orphaned in_progress items re-queue, blocked items move to
+  completed[], a partial PR spawns a remainder action, dev-cycle returns to
+  main on failure. Nothing jams the queue forever.
+
+### Fixed — cross-skill contracts
+- **Every bundled chain_trigger referenced variables its skill never wrote.**
+  4-B now defines the evaluation source (skill's contract output file →
+  Report variables → false, logged); check-tests writes
+  `new_failures`/`coverage_drop`/`previous_status`, scan-health writes top-level
+  `consecutive_failures`, plan-backlog writes `actionable_items: 0` on every
+  early exit, dev-cycle's Report declares `pr_created`.
+- decision_log canonical field names: `selected_domain`/`selected_skill`
+  (three writer sites used bare `domain`/`skill` that no reader queried).
+- Canonical test marker: `test_status == "passed"` (was "passed" vs "passing"
+  vs "green" across three layers — auto-merge could never fire end-to-end).
+- ooda-status reads cost from cost_ledger.json (metrics.json never had cost
+  fields); Trend computed from data that exists.
+- ooda-config: /domain add writes `status:"active"` (CLI-added domains could
+  never win); duplicate validate list collapsed (27-check list is canonical);
+  lens reset writes the full empty schema; +2 validate checks updated for the
+  enabled→status canon.
+- **#31 resolved**: state JSONs are deliberately versioned (they're the
+  auditable memory); only lock files + HALT stay gitignored; 6-D warns loudly
+  if the state path is ignored. ooda-setup initializes reflections.json +
+  full-shape memos.json.
+- agent/safety/autonomous-mode.md + SECURITY.md + README level tables synced to
+  the real engine (Levels 0–2 = no PRs; Level 3 = Draft by default; auto-merge
+  opt-in only). skill_gaps capped at 50.
+
+### Added
+- **"Run it continuously (unattended operation)"** README section (EN + KO):
+  `/loop 4h /evolve`, the cron one-liner, and the six rails that make the loop
+  fail stopped.
+- Reference scripts hardened: render_cycle_card no longer crashes without
+  memos.json (+ canonical-key reads); dryrun_score reads the real
+  `confidence_weight` key.
+
+verify.py **38/0** after every one of the seven PRs.
+
+---
+
 ## [v1.2.1] — 2026-06-09
 
 Auto-merge finishing touches + deeper verification, from the Tier B+ live-run
