@@ -164,12 +164,17 @@ operation therefore self-heals from crashes; manual `rm` is never required
 
 ```
 if state.json.cycle_in_progress == true:
-  last = state.json.decision_log[-1] (if exists)
-  Print "[WARN] Previous cycle #{last.cycle} did not complete."
-  Print "  Last domain: {last.selected_domain}, skill: {last.selected_skill}, started: {last.timestamp}"
+  -- The crashed cycle never reached Step 6, so it has NO decision_log entry:
+  -- decision_log[-1] is the last COMPLETED cycle, and the crashed one is
+  -- cycle_count + 1. Name them correctly in the diagnostics (surfaced by the
+  -- v1.3.0 live soak run — the old message blamed the wrong cycle number).
+  crashed_cycle = state.cycle_count + 1
+  last = state.json.decision_log[-1] (if exists — the last completed cycle)
+  Print "[WARN] Cycle #{crashed_cycle} did not complete (crash/kill detected)."
+  Print "  Last completed: #{last.cycle} — domain {last.selected_domain}, skill {last.selected_skill}, at {last.timestamp}"
   Print "  Resetting cycle_in_progress. Starting fresh cycle."
   Set cycle_in_progress = false, write state.json.
-  Add memo: { type: "crash_recovery", cycle: last.cycle, domain: last.selected_domain }
+  Add memo: { type: "crash_recovery", cycle: crashed_cycle, last_completed: last.cycle }
   Continue with fresh cycle (do NOT resume old one).
 ```
 
