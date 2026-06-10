@@ -2,7 +2,7 @@
 name: plan-backlog
 description: Score GitHub Issues using the RICE framework and propose a priority ordering. Strategize phase skill — turns raw issues into a ranked action plan written to agent/state/backlog.json.
 ooda_phase: strategize
-version: "1.0.0"
+version: "1.1.0"
 input:
   files: [agent/state/backlog.json]
   config_keys: []

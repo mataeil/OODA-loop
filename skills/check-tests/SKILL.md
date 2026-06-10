@@ -2,7 +2,7 @@
 name: check-tests
 description: Run test suite, track coverage trends, and detect regressions. Detect phase skill — uses config.test_command to execute tests and records results.
 ooda_phase: detect
-version: "1.1.0"
+version: "1.2.0"
 input:
   files: [agent/state/test_coverage.json]
   config_keys: [test_command, test_timeout_seconds]

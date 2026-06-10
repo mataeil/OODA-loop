@@ -2,7 +2,7 @@
 name: ooda-status
 description: Display OODA-loop status dashboard. Shows cycle count, domain states, confidence scores, action queue, and alerts in a single view.
 ooda_phase: support
-version: "1.1.0"
+version: "1.2.0"
 input:
   files:
     - config.json

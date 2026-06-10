@@ -2,7 +2,7 @@
 name: scan-health
 description: Monitor service health endpoints and detect anomalies. Observe phase skill — reads config.health_endpoints, checks availability, records baseline metrics.
 ooda_phase: observe
-version: "1.0.0"
+version: "1.1.0"
 input:
   files: [agent/state/service_health.json]
   config_keys: [health_endpoints, health_check_timeout_seconds]

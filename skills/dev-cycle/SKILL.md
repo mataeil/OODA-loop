@@ -2,7 +2,7 @@
 name: dev-cycle
 description: Full implementation cycle pipeline. Takes the highest-RICE action from the action queue and implements it through a structured test → implement → verify workflow. Primary skill for the implementation domain — invoked by evolve when implementation is selected.
 ooda_phase: support
-version: "1.1.0"
+version: "1.2.0"
 input:
   files:
     - agent/state/evolve/action_queue.json

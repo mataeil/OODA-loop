@@ -2,7 +2,7 @@
 name: run-deploy
 description: Trigger deployment via GitHub Actions workflow_dispatch. Execute phase skill — validates pre-deploy conditions, fires the configured workflow, monitors completion, and verifies post-deploy health.
 ooda_phase: execute
-version: "1.0.0"
+version: "1.1.0"
 input:
   files:
     - agent/state/service_health.json
