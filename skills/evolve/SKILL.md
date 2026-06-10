@@ -318,8 +318,14 @@ for each domain_name, domain_config in config.domains:
 Also read evolve self-state: state.json, confidence.json, memos.json,
 goals.json, action_queue.json, skill_gaps.json, cost_ledger.json.
 
-If `cost_ledger.json` is missing or corrupt (invalid JSON), create with initial structure:
+If `cost_ledger.json` is MISSING (fresh install / first run), create with initial structure:
 `{"schema_version": "1.0.0", "date": "<today YYYY-MM-DD>", "entries": [], "total_estimated_usd": 0.0}`
+
+If it EXISTS but is CORRUPT (unparseable JSON): **fail closed** — back it up to
+`cost_ledger.json.corrupt`, create the HALT file ("cost ledger corrupt — today's
+spend unknown; refusing to run without cost accounting"), and EXIT (delete the
+lock first). Recreating a corrupt ledger as $0.00 would silently erase today's
+spend and defeat the daily cap.
 
 **Daily reset**: Compare `cost_ledger.json.date` to current UTC date (`YYYY-MM-DD`).
 If different: reset `total_estimated_usd` to 0.0, clear `entries`, update `date` to today.
@@ -1789,8 +1795,11 @@ with $0.0 total cost — the entry recording logic was never firing.
 ```
 -- Ensure cost_ledger.json is initialized (Step 0-Pre already handles this,
 -- but re-check here in case Step 0 was bypassed or file was deleted)
-if cost_ledger.json is missing or corrupt:
+if cost_ledger.json is missing:
   Write: {"schema_version": "1.0.0", "date": "<today>", "entries": [], "total_estimated_usd": 0.0}
+if cost_ledger.json is corrupt (unparseable):
+  fail closed — same as Step 0-Pre: back up to .corrupt, create HALT, delete lock, EXIT
+  (never recreate a corrupt ledger as $0.00 mid-day; that erases today's spend)
 
 -- Estimate cost for this cycle based on skill contract cost_limit_usd
 -- Each skill contract declares a cost_limit_usd (e.g., scan-health: $0.02, check-tests: $0.05)
@@ -1957,6 +1966,16 @@ from writing an unbounded number of synthetic entries.
 > forward, not to reconstruct prior days.
 
 ### 6-D: Git Commit
+
+Guard first — verify the state path is actually trackable:
+```bash
+if git check-ignore -q agent/state/evolve/state.json; then
+  echo "[WARN] agent/state/ is gitignored — state commits are NO-OPs."
+  echo "[WARN] The decision history is NOT being versioned. Remove 'agent/state/'"
+  echo "[WARN] from .gitignore (keep only *.lock + HALT ignored) to fix. See ooda-setup."
+  # skip the adds/commit below — do not stage into the void silently
+fi
+```
 
 ```bash
 git add agent/state/evolve/state.json

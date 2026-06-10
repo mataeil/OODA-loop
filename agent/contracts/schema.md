@@ -313,8 +313,10 @@ input:
 output:
   files:
     - agent/state/backlog.json
-    - agent/state/evolve/action_queue.json
   prs: none
+# NOTE: plan-backlog writes ONLY backlog.json. Action extraction into
+# agent/state/evolve/action_queue.json is evolve's job (Step 5), reading the
+# scored backlog — plan-backlog never touches the queue itself.
 
 chain_triggers:
   - target: dev-cycle

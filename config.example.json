@@ -89,7 +89,9 @@
       "age_multiplier": 0.1,
       "rice_multiplier": 0.01,
       "open_pr_penalty": -3.0
-    }
+    },
+    "rice_extensions": {},
+    "__rice_extensions_doc__": "Optional per-label RICE multipliers applied during action extraction (evolve Step 5), e.g. {\"security\": 2.0, \"chore\": 0.5}. Empty = no extensions."
   },
   "confidence": {
     "initial": 0.7,
