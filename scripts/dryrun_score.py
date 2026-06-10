@@ -4,8 +4,11 @@ objectively verify domain ordering — e.g. that a season mode's weight_override
 flip the winner. Side-effect free.
 
 This implements the documented formula:
-    score = staleness + dampened_alert + goals*goal_weight + confidence*conf_weight
-            + memo + balance_penalty
+    score = staleness + confidence*confidence_weight (+ season weight_overrides)
+    -- scope note: goals / alerts / one-shot memos / balance contribute 0 unless
+    -- seeded in state; the bundled fixtures don't seed them, so this reference
+    -- implements the terms that decide the fixture winners. Full term list
+    -- lives in evolve Step 3-A.
     staleness = weight * K * ln(1 + hours/T)   (logarithmic; K=10, T=4)
 
 Scope/assumptions (stated honestly — this is a ranking reference, not the engine):
@@ -43,7 +46,7 @@ def score_domains(config_path, now_iso=None, project_root=None):
     K = scoring.get("staleness_k", 10)
     T = scoring.get("staleness_t", 4)
     never = scoring.get("hours_if_never_run", 168)
-    conf_weight = scoring.get("conf_weight", 0.2)
+    conf_weight = scoring.get("confidence_weight", 0.2)  # canonical key (was misread as conf_weight)
     goal_weight = scoring.get("goal_weight", 0.3)
     conf_initial = (cfg.get("confidence", {}) or {}).get("initial", 0.7)
 

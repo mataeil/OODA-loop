@@ -126,7 +126,7 @@ A cron job runs the same logic on day 100 as day 1. An OODA loop re-orients.
 
 **Day 3.** A few cycles in. Confidence scores climb as observations confirm each other. Bump to Level 1 — coverage tracking added, still no code changes.
 
-**Day 7.** Level 2. Full backlog tracking, RICE scoring, reports, draft PRs you merge. The Adaptive Lens has started learning — health checks that always pass get deprioritized, flaky patterns get flagged sooner.
+**Day 7.** Level 2. Full backlog tracking, RICE scoring, reports — still no code changes (PRs unlock at Level 3). The Adaptive Lens has started learning — health checks that always pass get deprioritized, flaky patterns get flagged sooner.
 
 **Day 30.** Level 3 (deliberate opt-in). It picks the highest-scoring backlog item, writes code, runs your tests, and leaves a PR + Cycle Card waiting for your morning — small by design (20 files / 500 lines max). By default every implementation change is a **Draft PR you review**; opt into low-risk auto-merge with `/ooda-config auto-merge on` and it merges small, green, non-protected changes itself — with a post-merge health check that auto-reverts on failure (see "Auto-merge status"). It watches at 3am, notices what you'd notice at 9am, and re-aims from what you merge or reject.
 
@@ -177,10 +177,32 @@ Start at Level 0. Move up when you trust the observations.
 |-------|------|-------------|
 | 0 | Just watching | 1 domain. Observe only. No PRs. |
 | 1 | Watching + testing | 2 domains. Coverage tracking added. |
-| 2 | Full observation | All domains. Draft PRs (you merge). Reports, scoring, lens learning. |
+| 2 | Full observation | All domains. Reports, scoring, lens learning. (PRs unlock at Level 3.) |
 | 3 | Autonomous | Implementation enabled — autonomous **Draft PRs you review** by default; low-risk auto-merge is opt-in (`/ooda-config auto-merge on`). |
 
 Skipping levels (e.g. 0 → 3) enforces a 3-cycle observe-only cooldown at the new level. `/ooda-config level 2`.
+
+### Run it continuously (unattended operation)
+
+One cycle is `/evolve`. Continuous operation is just `/evolve` on a schedule —
+the safety rails are built for exactly this:
+
+```bash
+# inside a Claude Code session — recurring loop
+/loop 4h /evolve
+
+# or headless from cron / CI
+0 */4 * * *  cd /path/to/project && claude -p "/evolve"
+```
+
+What makes unattended safe — and why the loop fails *stopped*, never runaway:
+
+- **Overlap-proof** — a lock file skips concurrent runs; `min_cycle_interval_minutes` cleanly skips too-early ticks (and releases the lock).
+- **Crash-proof** — a crashed cycle self-heals: the stale lock expires (`lock_timeout_minutes`, default 30), crash recovery resets the half-finished cycle, and the next tick proceeds. No manual cleanup.
+- **Failure breaker** — `max_silent_failures` consecutive skill errors (default 3) auto-create a HALT.
+- **Saturation breaker** — 15 fruitless observe-only cycles auto-create a HALT (warn at 5, boost at 10).
+- **Cost breaker** — crossing the daily cap auto-creates a HALT; a corrupt cost ledger fails closed.
+- **One switch** — every breaker converges on the same HALT file; nothing resumes until a human deletes it.
 
 ---
 
@@ -192,7 +214,7 @@ Safe by default. Level 0 cannot create PRs. Level 3 requires deliberate opt-in.
 - **Protected paths** — `agent/safety/*`, `skills/evolve/*`, `agent/contracts/*` can never be modified or auto-merged. The agent cannot rewrite its own rules.
 - **Confidence gate** — Actions below 0.6 confidence are skipped or downgraded.
 - **PR limits** — Max 20 files, 500 lines per PR. Enforced in config.
-- **Hard cost cap** — Daily API cost is tracked in `cost_ledger.json`. Crossing `cost.daily_limit_usd` ($10 default) **auto-creates a HALT**; warning at 80%. Resets 00:00 UTC. Missing ledger fails closed.
+- **Hard cost cap** — Daily API cost is tracked in `cost_ledger.json`. Crossing `cost.daily_limit_usd` ($10 default) **auto-creates a HALT**; warning at 80%. Resets 00:00 UTC. A missing ledger initializes at $0 (fresh install; gap-audited); a *corrupt* ledger fails closed (HALT).
 - **Rollback** — Pre-action checkpoints (`enable_rollback`, also forced when auto-merge is on) snapshot HEAD + state before every action. When auto-merge is on, a failed post-merge health check **auto-reverts + HALTs**. For manual recovery, `/ooda-config rollback {cycle}` reverts the repo + state to any recorded checkpoint.
 - **Adaptive Lens safety** — Bad learning decays 2× faster than good learning grows; lens corruption falls back to base behavior.
 

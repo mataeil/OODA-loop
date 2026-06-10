@@ -17,8 +17,9 @@ public disclosure until a fix is available.
 ## Threat Model
 
 OODA-loop is an autonomous AI agent that can read your codebase, open pull
-requests, run deployment workflows, and at Level 3 merge PRs without human
-approval. This capability creates a threat surface that differs from ordinary
+requests, run deployment workflows, and — at Level 3 with the separate
+`safety.enable_auto_merge` opt-in (off by default) — merge low-risk PRs without
+human approval. This capability creates a threat surface that differs from ordinary
 software. The threats and mitigations below reflect deliberate design decisions.
 
 ### Threat 1: Self-Modification
@@ -58,7 +59,7 @@ repeatedly, or accumulates large API costs without operator awareness.
 **Mitigation.**
 - Maximum 1 PR per cycle (`max_prs_per_cycle: 1`).
 - Maximum 20 files and 500 lines per PR (`max_files_per_pr`, `max_lines_per_pr`).
-  Exceeding either limit forces Level 3 review.
+  Exceeding either limit forces human review (Risk Tier 3 — the PR stays a Draft).
 - Minimum 30-minute interval between cycles (`min_cycle_interval_minutes: 30`).
 - Daily API cost cap of $10 USD by default (`cost.daily_limit_usd`). A warning
   fires at 80% of the limit; a hard stop fires when the limit is reached.
@@ -150,7 +151,7 @@ intentional changes or be triggered repeatedly to stall progress.
 
 **Mitigation.**
 - Rollback is opt-in (`safety.enable_rollback: false` by default).
-- Manual rollback requires explicit confirmation ("yes/no" prompt).
+- Manual rollback requires a typed confirmation phrase (`rollback {cycle}`).
 - Auto-rollback only fires after auto-merged PRs with health check failure —
   not for draft PRs or manually-merged PRs.
 - Only 5 checkpoints are retained. Rollback beyond 5 cycles is not possible.
@@ -213,7 +214,7 @@ you are confident in the agent's behavior.
 | 0     | Just watching      | 1              | No             | No         |
 | 1     | Watching + testing | 2              | No             | No         |
 | 2     | Full observation   | All            | No             | No         |
-| 3     | Autonomous         | All            | Yes            | Yes        |
+| 3     | Autonomous         | All            | Yes (Draft)    | Opt-in     |
 
 At Levels 0–2 the agent only observes and proposes. No PRs are merged without
 human approval.

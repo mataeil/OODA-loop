@@ -12,7 +12,7 @@ is *not* yet covered.
 python3 tests/verify.py        # static fixture walkthrough — exits 0 iff all pass
 ```
 
-Current status: **31 checks, 0 failures.**
+Current status: **38 checks, 0 failures.**
 
 ## What's verified, and how
 

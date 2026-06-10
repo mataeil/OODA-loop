@@ -1950,6 +1950,11 @@ if missing is non-empty:
   Print "[Reflect] Cost ledger gate: backfilled {len(missing)} cycle(s) {missing[0]}..{missing[-1]} (total ${cost_ledger.total_estimated_usd})."
 else:
   -- Ledger in sync with state.cycle_count. No action.
+
+-- Cap skill_gaps.gaps at 50 entries whenever the file is written (here or from
+-- 4-B error logging): evict resolved==true entries oldest-first, then unresolved
+-- oldest-first. Unbounded growth over hundreds of unattended cycles bloats every
+-- read of the file.
 ```
 
 Rationale: fails loud, not silent, and now *self-heals multi-cycle drift*. If
