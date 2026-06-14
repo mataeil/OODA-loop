@@ -49,3 +49,19 @@ mission. The loop self-drives toward the installed purpose.
 Mission-hit rate also rose (B 25→42, C 33→42). **Open gap → Iteration 2:** futile
 rate is still 33–58% — scoring rewards mission + staleness but a domain with
 *no actionable work right now* still wins on staleness. Fix next.
+
+## Iteration 2 — Work-availability (dry-domain dampener)
+
+A *work* domain (strategize/execute) that ran dry last time gets its staleness
+dampened ×0.3 until it produces output again; monitors (observe) keep cadence;
+an active alert exempts. `config.scoring.dry_domain_dampen`.
+
+| scenario | before futile% → after | before goal% → after |
+|---|---|---|
+| A_webapp | 58.3 → 58.3 | 66.7 → 66.7 (futile is quiet-monitor polling — Iteration 3) |
+| B_library | 58.3 → 58.3 | 80.0 → **100.0** |
+| C_greenfield | 33.3 → **25.0** | 57.1 → 57.1 (loopVal 0.333 → 0.35) |
+
+**Open gap → Iteration 3:** A's futile is a *quiet monitor* (service_health)
+being re-polled on staleness when nothing's wrong. Monitors need a cadence, not
+every-cycle polling. Add a mild dry-dampener / cadence for observe domains.

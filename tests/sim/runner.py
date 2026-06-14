@@ -45,22 +45,40 @@ MISSION_WEIGHT = 6.0
 BALANCE_WEIGHT = 5.0
 
 
-def _score(domains, hours, confidence, execs, total_execs, ev, mission_aware):
-    """Mirror of evolve 3-A scoring (+ optional mission term). Returns {domain: score}."""
+DRY_DAMPEN = 0.3   # staleness multiplier for a work-domain that last ran dry
+
+
+def _score(domains, hours, confidence, execs, total_execs, ev, mission_aware,
+           last_output=None, work_aware=True):
+    """Mirror of evolve 3-A scoring (+ mission term + dry-domain dampener).
+
+    Returns {domain: score}. work_aware: when a *work* domain (strategize/execute)
+    produced no actionable output the last time it ran, dampen its staleness so it
+    stops winning empty cycles. Monitoring (observe) domains keep their cadence —
+    a quiet monitor still needs polling — unless they are themselves off-mission.
+    An active alert always exempts a domain from the dampener.
+    """
+    last_output = last_output or {}
     scores = {}
     n = len(domains)
     for name, d in domains.items():
         staleness = d["weight"] * 10.0 * math.log(1 + hours[name] / 4.0)
+        is_work_domain = d.get("kind") in ("strategize", "execute")
+        ran_dry = last_output.get(name) is False
+        alerting = bool(ev.get("alerts", {}).get(name))
+        if work_aware and is_work_domain and ran_dry and not alerting:
+            staleness *= DRY_DAMPEN
         conf_term = confidence.get(name, 0.7) * 0.2
         share = execs.get(name, 0) / max(total_execs, 1)
         balance = max(-BALANCE_WEIGHT * (share - 1.0 / n), -10.0)
-        alert = 5.0 if ev.get("alerts", {}).get(name) else 0.0
+        alert = 5.0 if alerting else 0.0
         mission = (MISSION_WEIGHT * d.get("mission_alignment", 0.0)) if mission_aware else 0.0
         scores[name] = staleness + conf_term + balance + alert + mission
     return scores
 
 
-def run(scenario_key: str, cycles: int = 12, mission_aware: bool = True) -> dict:
+def run(scenario_key: str, cycles: int = 12, mission_aware: bool = True,
+        work_aware: bool = True) -> dict:
     sc = SCENARIOS[scenario_key]
     domains = sc["domains"]
     tmp = tempfile.TemporaryDirectory()
@@ -83,6 +101,7 @@ def run(scenario_key: str, cycles: int = 12, mission_aware: bool = True) -> dict
     hours = {n: 24.0 for n in domains}      # all start stale
     confidence = {n: 0.7 for n in domains}
     execs = {n: 0 for n in domains}
+    last_output = {}                         # domain -> bool (had_output last run)
     goal_hits = 0
     trace = []
     on_mission_opportunities = 0
@@ -90,9 +109,11 @@ def run(scenario_key: str, cycles: int = 12, mission_aware: bool = True) -> dict
 
     for c in range(1, cycles + 1):
         ev = sc["events"](c)
-        scores = _score(domains, hours, confidence, execs, sum(execs.values()), ev, mission_aware)
+        scores = _score(domains, hours, confidence, execs, sum(execs.values()), ev,
+                        mission_aware, last_output, work_aware)
         winner = max(scores, key=scores.get)
         out = respond(sc, c, winner, ev)
+        last_output[winner] = out["had_output"]
 
         # was there an on-mission opportunity this cycle? (work in any aligned domain)
         opp = any(domains[d].get("mission_alignment", 0) >= 0.5 and ev.get("work", {}).get(d)
@@ -137,8 +158,8 @@ def run(scenario_key: str, cycles: int = 12, mission_aware: bool = True) -> dict
     }
 
 
-def run_all(cycles: int = 12, mission_aware: bool = True) -> list:
-    return [run(k, cycles, mission_aware) for k in SCENARIOS]
+def run_all(cycles: int = 12, mission_aware: bool = True, work_aware: bool = True) -> list:
+    return [run(k, cycles, mission_aware, work_aware) for k in SCENARIOS]
 
 
 def _print(rows, label):
@@ -156,12 +177,13 @@ def main() -> int:
     if "--cycles" in args:
         i = args.index("--cycles"); cycles = int(args[i + 1]); args = args[:i] + args[i + 2:]
     mission = "--no-mission" not in args
-    args = [a for a in args if a != "--no-mission"]
+    work = "--no-work" not in args
+    args = [a for a in args if a not in ("--no-mission","--no-work")]
     if args and args[0] in SCENARIOS:
-        r = run(args[0], cycles, mission)
+        r = run(args[0], cycles, mission, work)
         print(json.dumps(r, indent=2))
     else:
-        _print(run_all(cycles, mission), f"mission_aware={mission}, {cycles} cycles")
+        _print(run_all(cycles, mission, work), f"mission={mission} work={work}, {cycles} cycles")
     return 0
 
 

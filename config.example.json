@@ -100,7 +100,8 @@
     },
     "rice_extensions": {},
     "__rice_extensions_doc__": "Optional per-label RICE multipliers applied during action extraction (evolve Step 5), e.g. {\"security\": 2.0, \"chore\": 0.5}. Empty = no extensions.",
-    "mission_weight": 6.0
+    "mission_weight": 6.0,
+    "dry_domain_dampen": 0.3
   },
   "confidence": {
     "initial": 0.7,
