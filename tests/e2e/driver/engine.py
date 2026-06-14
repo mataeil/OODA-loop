@@ -431,6 +431,7 @@ class Engine:
         outc["entries"].append({"cycle_id": cycle_id, "timestamp": now,
                                 "domain": o["selected_domain"], "skill": o["selected_skill"],
                                 "result_type": rt, "quality_multiplier": q,
+                                "on_mission": o.get("on_mission"),
                                 "pr_number": o.get("pr_number"), "verifier_verdict": None})
         cap = (self.cfg.get("memory") or {}).get("outcomes_buffer_size", 200)
         outc["entries"] = outc["entries"][-cap:]

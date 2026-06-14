@@ -2136,6 +2136,8 @@ outcomes.entries.append({
                  OR (action_queue item id acted on) OR null,
   result_type: <one of the table above>,
   quality_multiplier: <from the table>,
+  on_mission: (config.mission set AND
+               config.domains[selected_domain].mission_alignment >= 0.5),  -- Iter 8
   pr_number: pr_number or null,
   verifier_verdict: null   -- filled by Step 7-B if eval.enabled
 })

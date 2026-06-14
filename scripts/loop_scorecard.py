@@ -56,6 +56,11 @@ def compute(project: Path, window: int | None = None) -> dict:
 
     success = sum(rt_count.get(rt, 0) for rt in SUCCESS_RT)
     futile = rt_count.get("futile", 0) + rt_count.get("error", 0)
+    # mission-hit rate: of the value-producing cycles (quality > 0), how many were
+    # on-mission? (the loop staying on purpose, not just busy). Iteration 8.
+    producing = [e for e in scope if e.get("quality_multiplier", 0) > 0]
+    on_mission_n = sum(1 for e in producing if e.get("on_mission"))
+    mission_hit_pct = _pct(on_mission_n, len(producing))
 
     prs_created = counters.get("total_prs_created", 0)
     prs_merged = counters.get("total_prs_merged", 0)
@@ -93,6 +98,7 @@ def compute(project: Path, window: int | None = None) -> dict:
         # done-conditions + learning-loop health
         "active_goals": len(active_goals),
         "goal_progress_pct": goal_progress_pct,
+        "mission_hit_pct": mission_hit_pct,
         "skill_gap_resolution_pct": gap_resolution_pct,
         "lesson_application_pct": lesson_application_pct,
         # raw context
@@ -154,6 +160,7 @@ def render(project: Path, window: int | None = None) -> str:
         f"│  Cost / Success     ${_fmt(s['cost_per_successful_cycle']):<7}                       │",
         f"├─ done-conditions + learning ──────────────────────────┤",
         f"│  Goal Progress      {_fmt(s['goal_progress_pct'],'%'):<6}  ({s['active_goals']} active goals)      │",
+        f"│  Mission-hit Rate   {_fmt(s['mission_hit_pct'],'%'):<6}  (value cycles on-mission)  │",
         f"│  Gap Resolution     {_fmt(s['skill_gap_resolution_pct'],'%'):<6}  (skill gaps closed)       │",
         f"│  Lesson Application  {_fmt(s['lesson_application_pct'],'%'):<6} (reflexions re-applied)    │",
         f"├───────────────────────────────────────────────────────┤",

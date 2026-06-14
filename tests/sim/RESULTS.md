@@ -117,3 +117,11 @@ goals exist.)
 `scripts/loop_scorecard.py grade()` distills goal progress + futile rate + loop
 value into a single A–F grade with a composite score, so an operator gets an
 at-a-glance verdict. Fixture → **B (0.798)**; empty state → `—` (no false grade).
+
+## Iteration 8 — Mission-hit rate on the scorecard (measure staying on purpose)
+
+Each cycle's Outcome Record now carries `on_mission` (winning domain's
+mission_alignment ≥ 0.5). The scorecard reports **Mission-hit Rate** = of the
+value-producing cycles, how many were on-mission — measuring whether the loop
+stays on its purpose, not just busy. Fixture → 60%. (Plumbed through 6-C9,
+score_outcome, the E2E driver, and the sim runner.)
