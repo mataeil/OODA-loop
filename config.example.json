@@ -238,5 +238,15 @@
     "warning_threshold_pct": 80,
     "max_backfill_cycles": 100,
     "__doc__": "daily_limit_usd: crossing it auto-creates a HALT (hard stop). warning_threshold_pct: warn at this % of the cap. max_backfill_cycles: Step 6-C8 caps how many missing ledger entries it will synthesize in one cycle so a corrupt cycle counter can't write thousands of entries (default 100)."
+  },
+  "eval": {
+    "enabled": false,
+    "model": "claude-haiku-4-5",
+    "grade_on": [
+      "pr_created",
+      "pr_merged",
+      "action_extracted"
+    ],
+    "__doc__": "Opt-in maker/checker layer (evolve Step 7-B). When enabled, a SEPARATE model independently judges whether each gradeable cycle achieved its declared goal and writes {achieved,reason,confidence} into outcomes.json verifier_verdict. The deterministic quality_multiplier (Step 6-C9) is always the scorecard's ground truth; this is a second opinion, never an override. Default off = zero extra cost."
   }
 }
