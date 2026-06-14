@@ -770,6 +770,21 @@ if domain.min_interval_hours is set AND hours_since_last < domain.min_interval_h
   Print "[Decide] {domain} cooldown: {hours_since_last}h < {min_interval_hours}h minimum"
   continue to next domain
 
+-- Dry-domain dampener (v1.4.1): a WORK domain (its primary skill's ooda_phase is
+-- "strategize" or "execute", e.g. plan-backlog / dev-cycle) that produced NO
+-- actionable output the last time it ran has nothing to do — yet staleness would
+-- keep selecting it, burning futile cycles. Dampen its staleness until it next
+-- produces output. MONITOR domains (ooda_phase "observe", e.g. scan-health) are
+-- exempt: a quiet monitor still needs polling (their cadence is governed by
+-- min_interval_hours / the alert path instead). An active alert also exempts.
+-- Sandbox A/B/C: this cut futile cycles and lifted a library project's goal
+-- completion to 100% (tests/sim/RESULTS.md, Iteration 2).
+last_run = most recent decision_log entry where selected_domain == domain
+if domain primary skill ooda_phase in ("strategize","execute")
+   AND last_run exists AND last_run.had_output == false
+   AND no active alert for this domain this cycle:
+  staleness *= config.scoring.dry_domain_dampen   -- default 0.3
+
 -- Alert recency dampener (prevents alert-driven domain monopoly)
 cooldown_hours = config.signals.alert_cooldown_hours  -- default 4
 if urgent_signal > 0 AND alert severity is NOT "critical":
