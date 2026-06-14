@@ -220,6 +220,8 @@ Skipping levels (e.g. 0 → 3) enforces a 3-cycle observe-only cooldown at the n
 One cycle is `/evolve`. Continuous operation is just `/evolve` on a schedule —
 the safety rails are built for exactly this:
 
+OODA-loop doesn't ship a scheduler — it **composes with Claude Code's own**: `/loop` (in-session), `/schedule` → routines (durable cloud), or a local scheduled task. `evolve` is the cycle; Claude Code is the cadence. Full design in **[OODA-loop × Claude Code](docs/claude-code-integration.md)** (covers `/loop` vs `/schedule` vs `/goal`, state across cloud runs, and the HALT hook).
+
 ```bash
 # inside a Claude Code session — recurring loop
 /loop 4h /evolve
@@ -228,6 +230,8 @@ the safety rails are built for exactly this:
 0 */4 * * *  cd /path/to/project && claude -p "/evolve"
 ```
 
+> Installed as a **plugin**, skills are namespaced — use `/ooda-loop:evolve` (and `/loop 4h /ooda-loop:evolve`). Installed via `git clone … && install.sh`, the bare `/evolve` works.
+
 What makes unattended safe — and why the loop fails *stopped*, never runaway:
 
 - **Overlap-proof** — a lock file skips concurrent runs; `min_cycle_interval_minutes` cleanly skips too-early ticks (and releases the lock).
@@ -235,7 +239,7 @@ What makes unattended safe — and why the loop fails *stopped*, never runaway:
 - **Failure breaker** — `max_silent_failures` consecutive skill errors (default 3) auto-create a HALT.
 - **Saturation breaker** — 15 fruitless observe-only cycles auto-create a HALT (warn at 5, boost at 10).
 - **Cost breaker** — crossing the daily cap auto-creates a HALT; a corrupt cost ledger fails closed.
-- **One switch** — every breaker converges on the same HALT file; nothing resumes until a human deletes it.
+- **One switch, hook-enforced** — every breaker converges on the same HALT file, and a shipped `PreToolUse` hook (`hooks/hooks.json`) deterministically blocks file/shell/merge tools while it exists (works in cloud routines too) — not just by skill cooperation. Removing the HALT file resumes.
 
 ---
 

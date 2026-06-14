@@ -15,7 +15,7 @@ tests/e2e/run.sh --local       #         …same suite without Docker
 ```
 
 Both tiers run in CI on every push and pull request
-(`.github/workflows/e2e.yml`). Current status: **Tier 0: 42/0 · Tier 1: 22/22.**
+(`.github/workflows/e2e.yml`). Current status: **Tier 0: 47/0 · Tier 1: 22/22.**
 
 | Tier | What | When |
 |------|------|------|
