@@ -33,3 +33,19 @@ Run: `python3 tests/sim/runner.py [--no-mission] [--cycles N]`
 3. loopVal is low because few cycles end in a merged PR; observe/strategize
    cycles cap at 0.2. The loop needs to convert observation into accepted change
    faster (chain to implementation on the critical path). → a gap.
+
+## Iteration 1 — Mission Capture (now the spec default)
+
+ooda-setup now captures `config.mission` + per-domain `mission_alignment`; evolve
+3-A/3-A2/3-J add a `mission_weight × alignment` term; ooda-status shows the
+mission. The loop self-drives toward the installed purpose.
+
+| scenario | before (no-mission) goal% | after (mission) goal% | Δ |
+|---|---|---|---|
+| A_webapp | 50.0 | **66.7** | +16.7 |
+| B_library | 60.0 | **80.0** | +20.0 |
+| C_greenfield | 42.9 | **57.1** | +14.2 |
+
+Mission-hit rate also rose (B 25→42, C 33→42). **Open gap → Iteration 2:** futile
+rate is still 33–58% — scoring rewards mission + staleness but a domain with
+*no actionable work right now* still wins on staleness. Fix next.

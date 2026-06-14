@@ -59,6 +59,8 @@ Do not let a single corrupt file abort the entire dashboard.
 cat config.json 2>/dev/null || echo "MISSING"
 ```
 
+Also read `config.mission` (the project's purpose the loop drives toward) and each domain's `mission_alignment`.
+
 Read each domain's `status` field from config.json to identify which domains are `"available"` (not yet configured) vs `"active"` vs `"disabled"`.
 
 **agent/state/evolve/state.json** — cycle_count, last_cycle timestamp
@@ -157,6 +159,7 @@ Replace `{placeholders}` with the computed values from Step 2.
 ```
 ╔══════════════════════════════════════════════════════╗
 ║  OODA-loop status                                    ║
+║ Mission: {mission_oneline_or_—}                       ║
 ╠══════════════════════════════════════════════════════╣
 ║ Cycle: #{N}  Last: {ago}  Level: {N}  Vel: {N}/day   ║
 ╠══════════════════════════════════════════════════════╣
