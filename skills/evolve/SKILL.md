@@ -770,20 +770,24 @@ if domain.min_interval_hours is set AND hours_since_last < domain.min_interval_h
   Print "[Decide] {domain} cooldown: {hours_since_last}h < {min_interval_hours}h minimum"
   continue to next domain
 
--- Dry-domain dampener (v1.4.1): a WORK domain (its primary skill's ooda_phase is
--- "strategize" or "execute", e.g. plan-backlog / dev-cycle) that produced NO
--- actionable output the last time it ran has nothing to do — yet staleness would
--- keep selecting it, burning futile cycles. Dampen its staleness until it next
--- produces output. MONITOR domains (ooda_phase "observe", e.g. scan-health) are
--- exempt: a quiet monitor still needs polling (their cadence is governed by
--- min_interval_hours / the alert path instead). An active alert also exempts.
--- Sandbox A/B/C: this cut futile cycles and lifted a library project's goal
--- completion to 100% (tests/sim/RESULTS.md, Iteration 2).
+-- Dry-domain dampener (v1.4.1): a domain that produced NO actionable output the
+-- last time it ran has (likely) nothing to do — yet staleness would keep
+-- selecting it, burning futile cycles. Dampen its staleness until it next
+-- produces output. An active alert always exempts (something IS wrong → go look).
+--   WORK domains (ooda_phase strategize/execute, e.g. plan-backlog / dev-cycle):
+--     hard dampen — nothing to build means don't build (Iter 2: B goal 80→100%).
+--   MONITOR domains (ooda_phase observe, e.g. scan-health): MILD dampen — a quiet
+--     monitor must still be POLLED periodically, just not every cycle (Iter 3:
+--     A futile 58→50%, goal 67→83%). Cadence emerges from the mild dampen rather
+--     than requiring a hand-set min_interval_hours.
+-- (tests/sim/RESULTS.md, Iterations 2–3.)
 last_run = most recent decision_log entry where selected_domain == domain
-if domain primary skill ooda_phase in ("strategize","execute")
-   AND last_run exists AND last_run.had_output == false
+if last_run exists AND last_run.had_output == false
    AND no active alert for this domain this cycle:
-  staleness *= config.scoring.dry_domain_dampen   -- default 0.3
+  if domain primary skill ooda_phase in ("strategize","execute"):
+    staleness *= config.scoring.dry_domain_dampen    -- default 0.3
+  else:
+    staleness *= config.scoring.monitor_dry_dampen   -- default 0.6
 
 -- Alert recency dampener (prevents alert-driven domain monopoly)
 cooldown_hours = config.signals.alert_cooldown_hours  -- default 4

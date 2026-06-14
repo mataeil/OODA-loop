@@ -45,7 +45,8 @@ MISSION_WEIGHT = 6.0
 BALANCE_WEIGHT = 5.0
 
 
-DRY_DAMPEN = 0.3   # staleness multiplier for a work-domain that last ran dry
+DRY_DAMPEN = 0.3           # staleness x for a dry WORK domain (strategize/execute)
+DRY_DAMPEN_OBSERVE = 0.6  # milder x for a quiet MONITOR (observe) — still polled
 
 
 def _score(domains, hours, confidence, execs, total_execs, ev, mission_aware,
@@ -66,8 +67,10 @@ def _score(domains, hours, confidence, execs, total_execs, ev, mission_aware,
         is_work_domain = d.get("kind") in ("strategize", "execute")
         ran_dry = last_output.get(name) is False
         alerting = bool(ev.get("alerts", {}).get(name))
-        if work_aware and is_work_domain and ran_dry and not alerting:
-            staleness *= DRY_DAMPEN
+        if work_aware and ran_dry and not alerting:
+            # work domains: hard dampen (nothing to do). monitors: mild dampen
+            # (still poll periodically, just don't dominate every cycle).
+            staleness *= DRY_DAMPEN if is_work_domain else DRY_DAMPEN_OBSERVE
         conf_term = confidence.get(name, 0.7) * 0.2
         share = execs.get(name, 0) / max(total_execs, 1)
         balance = max(-BALANCE_WEIGHT * (share - 1.0 / n), -10.0)
