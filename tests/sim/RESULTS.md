@@ -65,3 +65,16 @@ an active alert exempts. `config.scoring.dry_domain_dampen`.
 **Open gap → Iteration 3:** A's futile is a *quiet monitor* (service_health)
 being re-polled on staleness when nothing's wrong. Monitors need a cadence, not
 every-cycle polling. Add a mild dry-dampener / cadence for observe domains.
+
+## Iteration 3 — Monitor cadence (mild dry-dampen for observe domains)
+
+A quiet monitor (e.g. service_health with nothing wrong) was re-picked every
+cycle on staleness → futile. Now observe domains that ran dry get a *mild*
+staleness ×`config.scoring.monitor_dry_dampen` (0.6) — still polled periodically,
+no longer dominating. Alert exempts.
+
+| scenario | futile% | goal% | mission% |
+|---|---|---|---|
+| A_webapp | 58.3 → **50.0** | 66.7 → **83.3** | 41.7 → **50.0** |
+| B_library | 58.3 (unchanged) | 100.0 | 41.7 |
+| C_greenfield | 25.0 (unchanged) | 57.1 | 41.7 |
