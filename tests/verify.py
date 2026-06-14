@@ -489,6 +489,18 @@ def check_scorecard(r: Runner) -> None:
         empty["loop_value_score"] is None and empty["cycles_scored"] == 0,
         f"empty loop_value={empty['loop_value_score']}",
     )
+    # loop-engineering letter grade (Iteration 7)
+    letter, comp = sc.grade(s)
+    r.check(
+        "scorecard: loop-engineering grade computes (fixture → B, 0.798)",
+        letter == "B" and comp == 0.798,
+        f"grade={letter} composite={comp}",
+    )
+    r.check(
+        "scorecard: grade is DASH on empty state (no data, no false grade)",
+        sc.grade(empty)[0] == "—",
+        f"empty grade={sc.grade(empty)}",
+    )
 
 
 def check_longhorizon(r: Runner) -> None:

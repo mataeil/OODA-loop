@@ -207,10 +207,28 @@ Initialize state files: `state.json`, `confidence.json`, `metrics.json`, `action
 `cost_ledger.json`, `CHANGELOG.md` in `agent/state/evolve/`. Use canonical schemas.
 (`cascades.json`, `cycle_log.jsonl`, and per-domain `lens.json` are created lazily by evolve.)
 
-**Seed at least one verifiable goal (loop-engineering done-condition).** A loop
-with no written, machine-checkable goal "runs until the money runs out." Write
-`goals.json` with one active goal whose `metric_command` is a shell command that
-prints a number or boolean the engine can check each cycle (Step 2-C drives
+**Auto-derive verifiable goals FROM the mission (v1.4.1, Iteration 6).** Don't
+make the operator hand-write done-conditions — *propose* them from the mission
+text + the detected stack, then let them confirm. This is the "state your
+purpose, the loop figures out how to measure it" install flow. Map mission
+phrases to concrete `metric_command`s, e.g.:
+
+| mission says… | proposed goal + metric_command |
+|---|---|
+| "green tests" / "reliable" / "correctness" | `g_tests`: `{test_command} exit 0` (or coverage ≥ N from test_coverage.json) |
+| "ship the backlog" / "close issues" | `g_backlog`: `jq '.pending\|length==0' agent/state/evolve/action_queue.json` |
+| "fast" / "p95 latency" / "uptime" | `g_health`: `jq '.status=="healthy"' agent/state/service_health.json` |
+| (a named feature/MVP) | `g_mvp`: a milestone the operator pastes a check for |
+
+Present 1–3 derived goals: `Proposed done-conditions from your mission: …
+(Enter to accept, or edit)`. Write the accepted ones to `goals.json` as active
+goals with `progress: 0.0`. If the mission was skipped or nothing maps, fall
+through to the manual prompt below.
+
+**Or seed at least one verifiable goal manually (loop-engineering done-condition).**
+A loop with no written, machine-checkable goal "runs until the money runs out."
+Write `goals.json` with one active goal whose `metric_command` is a shell command
+that prints a number or boolean the engine can check each cycle (Step 2-C drives
 `goal.progress` from it, and the Loop Scorecard's Goal Progress KPI surfaces it):
 ```json
 { "schema_version": "1.0.0", "goals": [
