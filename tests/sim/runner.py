@@ -161,7 +161,8 @@ def run(scenario_key: str, cycles: int = 12, mission_aware: bool = True,
         eng.run_cycle(f"2026-07-{c:02d}T06:00:00", {
             "selected_domain": winner, "selected_skill": f"/{winner}",
             "result": out["result"], "had_output": out["had_output"],
-            "pr_number": out.get("pr_number"), "pr_outcome": out.get("pr_outcome")})
+            "pr_number": out.get("pr_number"), "pr_outcome": out.get("pr_outcome"),
+            "on_mission": out.get("on_mission")})
         execs[winner] = execs.get(winner, 0) + 1
         for n in domains:                    # advance staleness clocks
             hours[n] = 0.0 if n == winner else hours[n] + 4.0
