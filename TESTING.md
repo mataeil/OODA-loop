@@ -10,12 +10,12 @@ is *not* yet covered.
 
 ```bash
 python3 tests/verify.py        # Tier 0: static fixture walkthrough (38 checks)
-tests/e2e/run.sh               # Tier 1: isolated Docker E2E (19 rail scenarios)
+tests/e2e/run.sh               # Tier 1: isolated Docker E2E (22 rail scenarios)
 tests/e2e/run.sh --local       #         …same suite without Docker
 ```
 
 Both tiers run in CI on every push and pull request
-(`.github/workflows/e2e.yml`). Current status: **Tier 0: 38/0 · Tier 1: 19/19.**
+(`.github/workflows/e2e.yml`). Current status: **Tier 0: 42/0 · Tier 1: 22/22.**
 
 | Tier | What | When |
 |------|------|------|
@@ -35,7 +35,7 @@ ordering. It does **not** invoke `/evolve`; it is a fast, semantic walkthrough.
 
 ### 2. Deterministic reference implementations — `scripts/`
 
-Four side-effect-free Python references re-derive engine outputs from real state so
+Six side-effect-free Python references re-derive engine outputs from real state so
 they can be checked objectively (not just by eye):
 
 - **`scripts/render_cycle_card.py`** — implements the Step 7 Cycle Card data
@@ -56,6 +56,15 @@ they can be checked objectively (not just by eye):
   (Step 6-C6 schedule over many days). `verify.py` asserts these fire where the
   spec says, using the *shipped* `config.example.json` thresholds. (It verifies
   the *logic*; real wall-clock accumulation still only happens in live use.)
+- **`scripts/score_outcome.py`** (v1.4.0) — the single source of truth for the
+  Outcome Record (Step 6-C9): `result_type` → `quality_multiplier`. `verify.py`
+  asserts all 8 result types map to the spec table and the quality ladder is
+  strictly decreasing.
+- **`scripts/loop_scorecard.py`** (v1.4.0) — computes the Loop Scorecard KPIs
+  (Loop Value Score, completion/futile/merge/queue rates, cost-per-success,
+  goal progress, learning health) from `outcomes.json` + metrics + ledger +
+  queue. `verify.py` asserts the KPIs on the `scorecard` fixture and graceful
+  degradation on empty state.
 
 These references are *checks*, not the engine. The canonical executor is Claude
 running `SKILL.md`; the references exist to make the documented behavior falsifiable.

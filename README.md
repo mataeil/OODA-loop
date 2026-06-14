@@ -36,6 +36,8 @@ Re-render the latest card any time with `/ooda-status --share`.
 
 An autonomous **operations** layer for your live side project — it watches, decides what matters, and proposes small PRs you approve. **You stay in command:** it proposes, you merge or reject, every change is an isolated one-click-revertible PR, and it re-aims from your calls. *(Auto-merge is **opt-in and off by default** — every change is a Draft PR you merge until you run `/ooda-config auto-merge on`, which lets it merge only low-risk PRs with a post-merge auto-revert. See "Auto-merge status".)*
 
+> **Loop engineering, with a scoreboard.** 2026's shift is from *prompting* an agent to *designing the loop that runs it until a verifiable goal is met*. OODA-loop is that loop — Observe→Orient→Decide→Act→Reflect on a schedule — and, since v1.4.0, the rare one that **measures whether the loop is actually working**: every cycle gets a `quality_multiplier`, and `/ooda-status --scorecard` tells you the Loop Value Score, task-completion rate, and futile-cycle rate. A loop you can't measure is just an open invoice.
+
 **The receipts** *(author-measured — run your own pilot)*: two real projects have run it continuously — **[fwd.page](https://fwd.page)** (a live URL shortener) for **152 cycles → 28 PRs, 24 merged (86%)**, and **Lynceus** (parliamentary-audit automation) for **119 cycles at observe level (no PRs yet)**. It also ran clean across **9 language/framework stacks** in sandbox (60 cycles, 36 PRs, no compile or test failures observed).
 
 **It can't give you a $6,000 surprise.** `touch agent/safety/HALT` stops everything instantly. Every change is a small PR (max 20 files / 500 lines) you can revert in one click. It can't touch its own safety rules. Typical cost is ~$1–2/day, and a **hard daily cap (default $10) auto-creates a HALT** the moment it's crossed. The first cycle, and Level 0, only watch.
@@ -103,6 +105,35 @@ OODA-loop's learning is **heuristic outcome-driven re-orientation**, *not* machi
 - **Verbal self-critique** ([Reflexion](https://arxiv.org/abs/2303.11366)-style): each decision cycle the agent writes a one-line lesson — what it did, and whether the outcome matched what it expected — stores it in `reflections.json`, and re-injects relevant past lessons into the next Orient. It's text the model re-reads, not training.
 
 Think of it as **proto-evolution**: an explicit, inspectable control loop that adjusts from real outcomes via verbal self-correction — not RL, not gradient updates. We say "re-aimed," "adjusted," "deprioritized" — never "trained" or "learned weights." Every number is in plain JSON you can read and audit. That honesty *is* the point: a loop you can trust is a loop you can inspect.
+
+---
+
+## Measuring the loop (the part most harnesses skip)
+
+The loop-engineering canon is blunt: *a loop without a verifiable result signal can't tell "we ran 100 cycles" from "we improved the project 100 times."* Most agent harnesses only report **activity** — cycles run, PRs opened, dollars spent. OODA-loop measures **outcomes**.
+
+- **Outcome Record** (`outcomes.json`, every cycle, deterministic — no model call): each cycle is scored a `quality_multiplier` from what it *actually did* — `1.0` a PR merged and held · `0.8` merged · `0.5` PR opened · `0.2` produced actionable output · `0.0` futile. `result: success` only means the skill ran; this captures whether it **helped**.
+- **Loop Scorecard** — `/ooda-status --scorecard`:
+
+  ```
+  ┌─ OODA-loop Scorecard ── 142 cycles (all) ────────────┐
+  │  Loop Value Score   0.62  ██████░░░░               │
+  │  Task Completion    58%    (merged & accepted)       │
+  │  Futile Cycle Rate  11%    (ran, changed nothing)    │
+  │  PR Merge Rate      86%    · hold 97%                │
+  │  Queue Resolution   104%   (resolved/added)          │
+  │  Cost / Success     $0.21                            │
+  ├─ done-conditions + learning ─────────────────────────┤
+  │  Goal Progress      70%    (2 active goals)          │
+  │  Gap Resolution     64%    · Lesson Application 80%  │
+  │  Verdict: working — the loop is delivering value     │
+  └──────────────────────────────────────────────────────┘
+  ```
+
+- **Maker ≠ checker.** The deterministic score is ground truth (it can't be gamed). Turn on `/ooda-config auto-merge`'s sibling, `eval`, and a *separate* model independently grades whether each cycle met its declared goal — a second opinion, never an override.
+- **Verifiable goals.** Write a `goals.json` done-condition with a `metric_command`; the loop runs *toward* it and the scorecard shows the progress. (Loop-engineering rule #1: write the machine-checkable goal before the loop starts.)
+
+Every metric is a deterministic function over plain-JSON state — the same reference scripts (`scripts/loop_scorecard.py`, `scripts/score_outcome.py`) the CI suite checks. Read them; they don't lie to you.
 
 ---
 

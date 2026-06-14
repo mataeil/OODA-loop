@@ -8,7 +8,40 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
-## [Unreleased]
+## [v1.4.0] — 2026-06-14
+
+**The measurement release.** Deep research into 2026 "loop engineering" (Anthropic
++ practitioner canon) found OODA-loop's one structural gap: it measured
+*activity* (cycles, PRs, cost) but never whether the loop *improved the project*.
+This release adds the outcome-measurement stack the canon demands — so the loop
+can tell "we ran 100 cycles" from "we improved the project 100 times."
+
+### Added — outcome measurement
+- **Outcome Record** (evolve Step 6-C9, every cycle, deterministic): scores each
+  cycle a `quality_multiplier` (0.0–1.0) from its real `result_type` into a new
+  `agent/state/evolve/outcomes.json`; appends a machine-readable line to
+  `cycle_log.jsonl`. The atomic "did this help?" signal. New loop-effectiveness
+  counters (futile cycles, actions added/resolved). `scripts/score_outcome.py`
+  is the single source of truth.
+- **Loop Scorecard** — `/ooda-status --scorecard` (`scripts/loop_scorecard.py`):
+  Loop Value Score, Task Completion Rate, Futile Cycle Rate, PR Merge & hold
+  rate, Action Queue Resolution, Cost per Successful Cycle, plus Goal Progress
+  and learning-loop health (gap resolution, lesson application) and a
+  working/partial/stalled verdict. Graceful `—` on fresh state.
+- **Merge-and-hold back-annotation** (Step 2-B4): outcomes upgrade
+  pr_created→pr_merged→pr_merged_held as PRs merge and survive, or downgrade to
+  pr_rejected on a revert-within-48h — so merge-and-hold is a real signal.
+- **Maker/checker eval** (Step 7-B, opt-in `config.eval`, off by default): a
+  *separate* model independently grades whether a cycle met its declared goal
+  (→ `outcomes.json.verifier_verdict`); the deterministic score stays ground
+  truth. Disagreement logs an `eval_disagreement` skill_gap.
+- **Verifiable goals** (loop-engineering canon #1): ooda-setup now seeds/
+  documents a `goals.json` done-condition with a `metric_command`; the scorecard
+  shows Goal Progress. Confidence-calibration metric tracked as #56.
+- Verification: `verify.py` 38 → **42** (outcome-scoring, eval-config,
+  scorecard checks + the deterministic references); Docker E2E 19 → **22**
+  (the driver now transcribes Step 6-C9; measurement scenarios). Config:
+  `memory.outcomes_buffer_size`, `eval` block; ooda-config validate #28.
 
 ### Added — official Docker E2E tier (Tier 1)
 - **`tests/e2e/`** — 19 rail scenarios driven by a spec-transcribed deterministic
