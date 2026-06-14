@@ -114,7 +114,16 @@
       "skills/evolve/*",
       "agent/contracts/*"
     ],
-    "skill_allowlist": ["/scan-health", "/check-tests", "/plan-backlog", "/run-deploy", "/dev-cycle", "/scan-market", "/scan-ux", "/scan-competitors"],
+    "skill_allowlist": [
+      "/scan-health",
+      "/check-tests",
+      "/plan-backlog",
+      "/run-deploy",
+      "/dev-cycle",
+      "/scan-market",
+      "/scan-ux",
+      "/scan-competitors"
+    ],
     "lock_timeout_minutes": 30,
     "max_chain_depth": 3,
     "max_silent_failures": 3,
@@ -152,7 +161,7 @@
         "domains": "all",
         "implementation": true,
         "auto_merge": false,
-        "__auto_merge_doc__": "Descriptive only — the engine reads config.safety.enable_auto_merge (NOT this field) to decide auto-merge. Level 3 enables autonomous implementation (Draft PRs by default); set safety.enable_auto_merge=true to also auto-merge low-risk PRs. See safety.__auto_merge_doc__ and README 'Auto-merge status'."
+        "__auto_merge_doc__": "Descriptive only \u2014 the engine reads config.safety.enable_auto_merge (NOT this field) to decide auto-merge. Level 3 enables autonomous implementation (Draft PRs by default); set safety.enable_auto_merge=true to also auto-merge low-risk PRs. See safety.__auto_merge_doc__ and README 'Auto-merge status'."
       }
     },
     "last_level_change": null
@@ -184,7 +193,8 @@
     "principle_similarity_threshold": 0.5,
     "principle_min_occurrences": 2,
     "reflection_recall_count": 3,
-    "reflections_buffer_size": 20
+    "reflections_buffer_size": 20,
+    "outcomes_buffer_size": 200
   },
   "season_modes": {
     "enabled": false,

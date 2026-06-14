@@ -395,6 +395,46 @@ def check_auto_merge_gating(r: Runner) -> None:
     )
 
 
+def check_outcome_scoring(r: Runner) -> None:
+    """Outcome Record (Step 6-C9): result_type → quality_multiplier is the atomic
+    'did this cycle help?' signal. Verify the reference matches the spec table."""
+    import importlib.util
+
+    so_path = ROOT.parent / "scripts" / "score_outcome.py"
+    spec = importlib.util.spec_from_file_location("so", so_path)
+    so = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(so)
+
+    cases = {
+        "pr_merged_held": ({"pr_outcome": "merged_held"}, 1.0),
+        "pr_merged": ({"pr_outcome": "merged"}, 0.8),
+        "pr_created": ({"result": "success", "pr_number": 7}, 0.5),
+        "action_extracted": ({"result": "success", "had_output": True}, 0.2),
+        "observe": ({"result": "observe_only"}, 0.1),
+        "futile": ({"result": "success", "had_output": False}, 0.0),
+        "error": ({"result": "error"}, 0.0),
+        "pr_rejected": ({"pr_outcome": "rejected"}, 0.0),
+    }
+    mismatches = []
+    for expect_rt, (cyc, expect_q) in cases.items():
+        rt, q = so.score(cyc)
+        if rt != expect_rt or q != expect_q:
+            mismatches.append(f"{expect_rt}→({rt},{q})")
+    r.check(
+        "outcome-scoring: all 8 result_types map to the spec quality_multiplier",
+        not mismatches,
+        f"mismatches={mismatches}" if mismatches else "8/8 match Step 6-C9 table",
+    )
+    # ordering invariant: merged_held > merged > created > extracted > observe > futile
+    ladder = [so.QUALITY[k] for k in
+              ("pr_merged_held", "pr_merged", "pr_created", "action_extracted", "observe", "futile")]
+    r.check(
+        "outcome-scoring: quality ladder is strictly decreasing (held>merged>created>extracted>observe>futile)",
+        all(ladder[i] > ladder[i + 1] for i in range(len(ladder) - 1)),
+        f"ladder={ladder}",
+    )
+
+
 def check_longhorizon(r: Runner) -> None:
     """Long-horizon thresholds (saturation / contrarian / decay) fire where the
     spec says — verified against the SHIPPED config.example.json values."""
@@ -446,6 +486,7 @@ def main() -> int:
     r.section("cycle-card", lambda: check_cycle_card(r))
     r.section("cycle-card-render", lambda: check_cycle_card_render(r))
     r.section("auto-merge-gating", lambda: check_auto_merge_gating(r))
+    r.section("outcome-scoring", lambda: check_outcome_scoring(r))
     r.section("long-horizon", lambda: check_longhorizon(r))
     return r.report()
 
