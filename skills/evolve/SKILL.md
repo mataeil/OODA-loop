@@ -2246,11 +2246,16 @@ priority order and render exactly one (or two — see below):
    `lens re-aimed → flaky-alert threshold 0.30→0.25 after 3 confirmations (+0.1)`
 3. **A new intervention** written in Step 5-C (`starvation` / `monopoly_breaker`
    / `contrarian`): `monopoly_breaker → service_health −10.0 for 1 cycle`
-4. **An observation micro-adjustment** (Step 2-B1):
+4. **Delivered output this cycle** (Step 6-C9 Outcome Record) — for build /
+   implementation-heavy loops the headline is *what shipped*, not a tiny
+   confidence tick: `delivered pr_created (quality 0.5) → goal 'ship_v1'`.
+   (Surfaced by the F1-game dogfood: a productive build cycle was mislabeled
+   "observing".)
+5. **An observation micro-adjustment** (Step 2-B1):
    `test_coverage produced findings → confidence +0.02`
-5. **A re-applied lesson** (Step 2-F) — a past verbal self-critique whose lesson
+6. **A re-applied lesson** (Step 2-F) — a past verbal self-critique whose lesson
    informed this cycle: `recalled lesson: skip backlog after 2× no_remote (held)`
-6. **Nothing changed:** `no new orientation this cycle (observing)`
+7. **Nothing changed:** `no new orientation this cycle (observing)`
 
 If BOTH a human-decision confidence change (1) and a lens change (2) occurred,
 render both as two LEARN lines — together they are the clearest proof the loop

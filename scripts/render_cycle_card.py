@@ -129,7 +129,18 @@ def render(project: Path) -> tuple[str, str]:
                     f"for {iv.get('expires_after_cycles')} cycle(s)"
                 )
                 break
-    # 4) observation micro-adjustment (confidence delta vs previous cycle, same domain)
+    # 4) delivered output this cycle — for build/implementation-heavy loops the
+    #    headline LEARN is what shipped, not a +0.02 confidence tick. Read the
+    #    latest Outcome Record (outcomes.json, Step 6-C9) for this cycle.
+    if not learn:
+        outc = (load(ev / "outcomes.json", {}) or {}).get("entries", []) or []
+        oc = next((e for e in reversed(outc) if e.get("cycle_id") == cyc), None)
+        if oc and (oc.get("quality_multiplier") or 0) > 0:
+            rt = oc.get("result_type", "output")
+            goal = oc.get("declared_goal")
+            tail = f" → goal '{goal}'" if goal else ""
+            learn.append(f"delivered {rt} (quality {fmt_num(oc.get('quality_multiplier'))}){tail}")
+    # 5) observation micro-adjustment (confidence delta vs previous cycle, same domain)
     if not learn and len(log) >= 2:
         prev = log[-2]
         if (prev.get("selected_domain", prev.get("domain")) == dom and prev.get("confidence") is not None
