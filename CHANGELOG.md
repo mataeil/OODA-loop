@@ -8,6 +8,36 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
+## [v1.6.0] — 2026-06-14
+
+**The Claude-Code-native release.** OODA-loop is Claude-Code-exclusive, so it now
+*composes with* Claude Code's orchestration primitives instead of reinventing
+them — and ships the missing deterministic safety control.
+
+### Added
+- **[docs/claude-code-integration.md](docs/claude-code-integration.md)** — the
+  canonical composition design: the division of labor between Claude Code
+  (cadence + rails: `/loop`, `/schedule`/routines, `/goal`, hooks, subagents) and
+  OODA-loop (the cycle, memory, scorecard); when to use `/loop` vs `/schedule`
+  vs `/goal`; **state persistence across fresh-clone cloud runs**; and the
+  `config.mission` (strategic, persistent) vs `/goal` (tactical, per-session)
+  distinction.
+- **HALT enforced by a hook** — `hooks/hooks.json` ships a `PreToolUse` guard
+  (`hooks/halt-guard.sh`, dependency-free) that BLOCKS file/shell/merge tools
+  while `agent/safety/HALT` exists, so the kill-switch is deterministic at the
+  Claude Code level (and works in cloud routines, where only repo/plugin hooks
+  run) — not merely by each skill's Step-0 check. Always allows the HALT-clearing
+  action; no-ops in non-OODA repos. Plus a SessionStart notice when HALT is
+  present. verify.py +5 halt-hook checks (42 → 47).
+
+### Fixed / clarified
+- **Skill namespacing**: documented that a plugin install exposes
+  `/ooda-loop:evolve` while the git/symlink install exposes the bare `/evolve` —
+  the docs' bare commands assumed the symlink install.
+- Cloud-routine guidance: `evolve` already commits `agent/state/` each cycle
+  (state is versioned, not gitignored — #31), which is exactly what survives a
+  fresh-clone routine run; `CLAUDE_CODE_REMOTE` distinguishes unattended context.
+
 ## [v1.5.0] — 2026-06-14
 
 **The self-driving release.** OODA-loop becomes a loop-engineering framework you

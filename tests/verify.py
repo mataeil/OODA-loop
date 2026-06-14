@@ -435,6 +435,37 @@ def check_outcome_scoring(r: Runner) -> None:
     )
 
 
+def check_halt_hook(r: Runner) -> None:
+    """The shipped PreToolUse HALT guard (hooks/halt-guard.sh) must deterministically
+    block tools while HALT exists, allow clearing it, and never touch non-OODA repos."""
+    import subprocess
+    import tempfile
+
+    script = ROOT.parent / "hooks" / "halt-guard.sh"
+    r.check("halt-hook: hooks.json is valid + guard script present", script.exists()
+            and (json.loads((ROOT.parent / "hooks" / "hooks.json").read_text()).get("hooks", {}).get("PreToolUse")) is not None,
+            "hooks/hooks.json wires PreToolUse → halt-guard.sh")
+
+    def run(env_dir, stdin):
+        return subprocess.run(["bash", str(script)], input=stdin, text=True,
+                              capture_output=True, env={**os.environ, "CLAUDE_PROJECT_DIR": env_dir}).returncode
+
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "config.json").write_text("{}")
+        (Path(d) / "agent" / "safety").mkdir(parents=True)
+        rc_noh = run(d, "{}")
+        (Path(d) / "agent" / "safety" / "HALT").write_text("stop")
+        rc_block = run(d, '{"tool_input":{"command":"npm test"}}')
+        rc_clear = run(d, '{"tool_input":{"command":"rm agent/safety/HALT"}}')
+    with tempfile.TemporaryDirectory() as nonp:   # no config.json → not an OODA repo
+        rc_nonp = run(nonp, "{}")
+
+    r.check("halt-hook: allows tools when no HALT (exit 0)", rc_noh == 0, f"rc={rc_noh}")
+    r.check("halt-hook: BLOCKS tools while HALT exists (exit 2)", rc_block == 2, f"rc={rc_block}")
+    r.check("halt-hook: allows the HALT-clearing action (exit 0)", rc_clear == 0, f"rc={rc_clear}")
+    r.check("halt-hook: no-ops in a non-OODA repo (exit 0)", rc_nonp == 0, f"rc={rc_nonp}")
+
+
 def check_eval_config(r: Runner) -> None:
     """The opt-in maker/checker (config.eval) must be SAFE by default and never
     waste a model call on a no-value cycle."""
@@ -556,6 +587,7 @@ def main() -> int:
     r.section("cycle-card-render", lambda: check_cycle_card_render(r))
     r.section("auto-merge-gating", lambda: check_auto_merge_gating(r))
     r.section("outcome-scoring", lambda: check_outcome_scoring(r))
+    r.section("halt-hook", lambda: check_halt_hook(r))
     r.section("eval-config", lambda: check_eval_config(r))
     r.section("long-horizon", lambda: check_longhorizon(r))
     return r.report()
