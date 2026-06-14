@@ -1,0 +1,3 @@
+{ "schema_version": "1.0.0", "reflections": [
+  {"cycle":2,"status":"applied"},{"cycle":3,"status":"open"},{"cycle":4,"status":"applied"}
+] }

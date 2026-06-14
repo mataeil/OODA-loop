@@ -1,0 +1,6 @@
+{ "schema_version": "1.0.0", "goals": [
+  {"id":"g1","title":"Drain the action backlog to zero","status":"active","progress":0.5,
+   "metric_command":"jq '.pending|length==0' agent/state/evolve/action_queue.json"},
+  {"id":"g2","title":"Keep test coverage >= 80%","status":"active","progress":1.0,
+   "metric_command":"jq '.results.coverage_pct>=80' agent/state/test_coverage.json"}
+] }
