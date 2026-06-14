@@ -403,6 +403,7 @@ Run checks in order; print `[PASS]` or `[FAIL] <reason>` for each:
 25. If `saturation` block present, `warn_threshold < boost_threshold < halt_threshold`
 26. If `safety.enable_auto_merge` is true, `progressive_complexity.current_level` must be 3
 27. If present, `safety.auto_merge_max_files` <= `safety.max_files_per_pr` and `safety.auto_merge_max_lines` <= `safety.max_lines_per_pr` (the low-risk bar must be tighter than the hard PR cap)
+28. If `eval.enabled` is true, `eval.model` is a non-empty string and `eval.grade_on` is a non-empty list containing none of `futile`/`error`/`observe` (never spend an eval call on a no-value cycle)
 
 Final: `Validation: <N> passed, <M> failed`
 On any failure append: `Run /ooda-config show to review your settings.`

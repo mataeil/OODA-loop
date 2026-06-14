@@ -435,6 +435,24 @@ def check_outcome_scoring(r: Runner) -> None:
     )
 
 
+def check_eval_config(r: Runner) -> None:
+    """The opt-in maker/checker (config.eval) must be SAFE by default and never
+    waste a model call on a no-value cycle."""
+    cfg = load_json(ROOT.parent / "config.example.json")
+    ev = cfg.get("eval", {})
+    r.check(
+        "eval-config: maker/checker is OFF by default (deterministic score stands alone)",
+        ev.get("enabled") is False,
+        f"eval.enabled={ev.get('enabled')}",
+    )
+    bad = [g for g in ev.get("grade_on", []) if g in ("futile", "error", "observe")]
+    r.check(
+        "eval-config: grade_on never includes no-value cycle types (futile/error/observe)",
+        not bad and bool(ev.get("grade_on")),
+        f"grade_on={ev.get('grade_on')} bad={bad}",
+    )
+
+
 def check_scorecard(r: Runner) -> None:
     """Loop Scorecard (scripts/loop_scorecard.py): the headline measurement
     artifact. Verify the canon KPIs compute correctly from a seeded outcome set."""
@@ -522,6 +540,7 @@ def main() -> int:
     r.section("cycle-card-render", lambda: check_cycle_card_render(r))
     r.section("auto-merge-gating", lambda: check_auto_merge_gating(r))
     r.section("outcome-scoring", lambda: check_outcome_scoring(r))
+    r.section("eval-config", lambda: check_eval_config(r))
     r.section("long-horizon", lambda: check_longhorizon(r))
     return r.report()
 

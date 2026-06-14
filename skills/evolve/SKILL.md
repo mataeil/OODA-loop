@@ -565,6 +565,43 @@ if config.domain_dependencies exists:
   Write memos.json
 ```
 
+### 2-B4: Outcome Back-Annotation (merge & hold, v1.4.0)
+
+The Step 6-C9 Outcome Record scores a cycle from what was knowable AT cycle end
+(a freshly-opened PR scores `pr_created` = 0.5). The true value of that PR is
+only knowable later — when a human merges it, and when it survives. This step
+back-annotates the earlier outcome entry as that information arrives, so the
+scorecard reflects *accepted, durable* value rather than mere PR creation.
+
+```
+for each PR in merged_prs (from 1-B):
+  find the outcomes.json entry where entry.pr_number == PR.number
+  if found and entry.result_type in ("pr_created",):
+    entry.result_type = "pr_merged"; entry.quality_multiplier = 0.8
+    Print "[Orient] Outcome back-annotated: cycle #{entry.cycle_id} PR #{n} merged (0.5 → 0.8)."
+
+for each merged outcome entry older than 48h whose hold has not been resolved:
+  -- merge-and-hold check: was the merge commit reverted since?
+  reverted = `gh api repos/{owner}/{repo}/commits?since=...` shows a revert of PR.number
+             (or git log --grep "Revert" referencing the PR/merge SHA)
+  if reverted:
+    entry.result_type = "pr_rejected"; entry.quality_multiplier = 0.0
+    Print "[Orient] PR #{n} was REVERTED within 48h → outcome downgraded to 0.0."
+  else:
+    entry.result_type = "pr_merged_held"; entry.quality_multiplier = 1.0
+    Print "[Orient] PR #{n} merged and held 48h → confirmed value (1.0)."
+
+for each PR in closed_prs (not merged):
+  find the outcomes.json entry where entry.pr_number == PR.number
+  if found: entry.result_type = "pr_rejected"; entry.quality_multiplier = 0.0
+
+Write outcomes.json if any entry changed.
+```
+
+This is what makes `pr_merged_held` (1.0) and the merge-and-hold rate on the
+scorecard real signals rather than aspirational ones. The `score_outcome.py`
+reference already maps these result_types; this step is what SETS them over time.
+
 ### 2-C: Goal Progress
 
 ```
@@ -2201,6 +2238,55 @@ section **How the "learning" actually works**.
 
 ---
 
+## Step 7-B: Outcome Verdict (separate-model eval, opt-in)
+
+Loop-engineering canon: **the writer must not grade its own work.** OODA-loop's
+deterministic Outcome Record (6-C9) is always on and unbiased because it scores
+from facts, not opinion. This step adds the *maker/checker* layer — a SEPARATE
+model reads what the cycle actually did and judges whether it achieved the
+declared goal. It runs ONLY when `config.eval.enabled == true` (default
+**false** — the deterministic signal stands alone at zero extra cost).
+
+```
+if not config.eval.enabled: skip Step 7-B.
+-- Only grade cycles worth grading (don't spend a call on observe/futile):
+if this cycle's result_type not in config.eval.grade_on
+   (default ["pr_created","pr_merged","action_extracted"]): skip.
+
+-- Invoke a SEPARATE model (config.eval.model, default a small fast model such
+-- as claude-haiku-4-5) — NOT the cycle's own context. Give it ONLY:
+--   the declared_goal (goals.json goal or action title),
+--   the orient_summary, the skill's output summary, and the PR diff if any.
+verdict = evaluator(
+  system: "You are an independent reviewer. You did NOT do this work. Decide
+           ONLY whether it achieved the declared goal. Be skeptical; default to
+           achieved=false if the evidence is weak. Output {achieved, reason, confidence}.",
+  input:  { declared_goal, orient_summary, skill_output, pr_diff }
+) -> { achieved: bool, reason: string (<=30 words), confidence: 0.0-1.0 }
+
+-- Write into THIS cycle's outcomes.json entry (do not change quality_multiplier;
+-- the deterministic score is the ground truth — the verdict is a second opinion):
+outcomes.entries[-1].verifier_verdict = verdict
+Write outcomes.json.
+Print "[Eval] Independent verdict: {achieved} ({confidence}) — {reason}"
+
+-- If the independent verdict DISAGREES with the deterministic score
+-- (achieved=false but quality_multiplier>=0.5, i.e. a merged/created PR the
+-- reviewer thinks missed the goal), record a skill_gap of type "eval_disagreement"
+-- so persistent maker/checker divergence is visible on the scorecard.
+if verdict.achieved == false AND quality_multiplier >= 0.5:
+  skill_gaps.gaps.append({ name: "eval_disagreement_{domain}", type: "eval_gap",
+    detail: "Deterministic score {q} but independent reviewer says goal not met: {reason}",
+    frequency: 1, first_seen: now, resolved: false })
+```
+
+Honesty rule: the deterministic `quality_multiplier` remains the scorecard's
+ground truth (it cannot be gamed). The verdict is an *independent second signal*
+— never let the maker's own model overwrite the deterministic score. The
+scorecard surfaces verifier agreement as a separate line when eval is enabled.
+
+---
+
 ## I/O Contract
 
 ```yaml
@@ -2242,6 +2328,7 @@ input:
     - deploy_workflow
     - notifications
     - cost
+    - eval
 
 output:
   files:
