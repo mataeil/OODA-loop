@@ -105,6 +105,42 @@ versioned*, not gitignored — see issue #31). For cloud routines:
 On a local machine (`/loop` or a Desktop scheduled task) the working directory is
 reused, so state persists on disk *and* in git — no extra steps.
 
+> **This is verified, not aspirational.** `tests/e2e/scenarios/test_cloud_state.py`
+> proves it with real git: run 1 commits + pushes its state in one clone; run 2,
+> a *separate fresh clone* of the same remote, reads run 1's `cycle_count`,
+> continues to cycle 2 (no reset), and accumulates the Outcome Record across both
+> — exactly the fresh-clone path a cloud routine takes.
+
+### Cloud routine recipe (copy-paste)
+
+```text
+1. Make state push to a branch the next run reads. In config.json keep
+   agent/state/ TRACKED (not gitignored — #31). Decide the state branch:
+     • simplest: let the routine push to your default branch (main), OR
+     • isolate: dedicate `ooda/state` and run the routine against it.
+
+2. Create the routine (Claude Code, in the repo):
+     /schedule
+       cadence:  every 4 hours        (cloud minimum is 1h)
+       repo:     your project
+       branch:   main  (or ooda/state)
+       prompt:   (below)
+
+3. Routine prompt — re-anchors mission, runs one cycle, persists state:
+     Read config.json (the mission) and agent/state/ (prior cycles).
+     Run /ooda-loop:evolve for exactly one OODA cycle.
+     Ensure Step 6-D committed agent/state/**; then push to this branch so the
+     next run inherits it. If agent/safety/HALT exists, stop without acting.
+
+4. Verify after a few runs:
+     /ooda-status --scorecard      → cycle_count climbs, Loop Value Score trends
+```
+
+Notes: cloud runs are autonomous (no permission prompts) — keep `enable_auto_merge`
+OFF unless you've opted in, and the HALT hook (below) still applies because plugin
+hooks run in the cloud. Use the bare `/evolve` only if the routine repo uses the
+symlink install; for a plugin install use `/ooda-loop:evolve`.
+
 ---
 
 ## The HALT kill-switch, enforced by a hook

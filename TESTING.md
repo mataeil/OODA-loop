@@ -10,12 +10,12 @@ is *not* yet covered.
 
 ```bash
 python3 tests/verify.py        # Tier 0: static fixture walkthrough (38 checks)
-tests/e2e/run.sh               # Tier 1: isolated Docker E2E (22 rail scenarios)
+tests/e2e/run.sh               # Tier 1: isolated Docker E2E (23 rail scenarios)
 tests/e2e/run.sh --local       #         …same suite without Docker
 ```
 
 Both tiers run in CI on every push and pull request
-(`.github/workflows/e2e.yml`). Current status: **Tier 0: 47/0 · Tier 1: 22/22.**
+(`.github/workflows/e2e.yml`). Current status: **Tier 0: 47/0 · Tier 1: 23/23.**
 
 | Tier | What | When |
 |------|------|------|

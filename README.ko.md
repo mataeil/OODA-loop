@@ -66,6 +66,8 @@ git clone https://github.com/mataeil/OODA-loop.git ~/.ooda-loop
 ~/.ooda-loop/install.sh
 ```
 
+> **명령어 표기 (한 번만 읽기).** 이 README는 **bare 형태**(`/evolve`, `/ooda-setup`, `/ooda-status`)로 씁니다 — **git/symlink 설치(방법 B)**가 노출하는 형태입니다. **플러그인(방법 A)**으로 설치했다면 Claude Code가 모든 스킬에 네임스페이스를 붙이므로 **`ooda-loop:` 를 접두**하세요: `/ooda-loop:evolve`, `/ooda-loop:ooda-setup`, `/loop 4h /ooda-loop:evolve`. 스킬·동작은 동일, 접두사만 다릅니다. (`/help`로 내 설치가 노출하는 정확한 이름 확인 가능.)
+
 **프로젝트에 설정:**
 
 ```bash
