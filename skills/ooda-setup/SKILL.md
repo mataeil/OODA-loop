@@ -115,7 +115,36 @@ Show `(not detected)` for any missing item.
 
 ---
 
-## Step 2/3: Domain Configuration
+## Step 2/3: Mission + Domain Configuration
+
+**Capture the mission FIRST — it is what the loop self-drives toward.** This is
+the single most important input: an installed OODA-loop without a mission just
+cycles by staleness; with one, every Decide is pulled toward the project's
+purpose. Ask:
+
+```
+[2/3] In one sentence — what is this project for, and what does "done well" mean?
+      (e.g. "Keep the live URL shortener fast and reliable and ship the launch
+       backlog." This steers every cycle. Press Enter to skip — not recommended.)
+```
+
+Write the answer to `config.mission` (empty string if skipped — scoring then
+falls back to staleness-only, with a printed warning that the loop has no
+purpose to drive toward).
+
+Then, for EACH domain enabled below, set `mission_alignment` in [0.0, 1.0] — how
+much working that domain advances the stated mission. Infer a sensible default
+from the mission text and the domain's role (a domain the mission names directly
+→ ~1.0; a generally-useful domain → ~0.6; an off-mission/curiosity domain like
+`competitors` for an internal tool → ~0.1), then show the inferred values and let
+the operator adjust:
+
+```
+  service_health   alignment 1.0   (mission mentions "reliable")
+  backlog          alignment 1.0   (mission mentions "ship the backlog")
+  competitors      alignment 0.2   (not on the critical path)
+Adjust any? (e.g. "competitors 0.0", or Enter to accept)
+```
 
 Print:
 ```

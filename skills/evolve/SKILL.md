@@ -23,6 +23,7 @@ input:
     - "Notification APIs (config.notifications)"
   config_keys:
     - domains
+    - mission
     - implementation
     - scoring
     - confidence
@@ -798,8 +799,22 @@ if config.scoring.balance_enabled (default true):
 else:
   balance_penalty = 0
 
+-- Mission alignment (v1.4.1): the loop drives toward the project's declared
+-- mission, captured at /ooda-setup into config.mission with a per-domain
+-- config.domains[d].mission_alignment in [0.0, 1.0]. A domain that advances the
+-- mission is pulled up; an off-mission distraction (alignment 0) is not. This is
+-- what makes an installed OODA-loop *self-drive toward its purpose* rather than
+-- merely cycling by staleness. Sandbox A/B/C simulation: adding this term lifted
+-- goal completion +13–20pp across all three projects (tests/sim/RESULTS.md).
+if config.mission is set:
+  M = config.scoring.mission_weight                   -- default 6.0
+  mission_term = M * (config.domains[domain].mission_alignment or 0.0)
+else:
+  mission_term = 0                                    -- back-compat: no mission, no term
+
 score = staleness
       + dampened_alert                             -- from 3-B, with recency dampener
+      + mission_term                               -- v1.4.1 mission alignment
       + (goal_contribution * config.scoring.goal_weight)   -- from 3-C
       + (confidence * config.scoring.confidence_weight)
       + memo_adjustment                            -- from memos.json, consumed in 2-D
@@ -827,6 +842,7 @@ impl_score = (pending_count * config.scoring.implementation_formula.pending_mult
            + (goal_contribution * config.scoring.goal_weight)
            + (confidence * config.scoring.confidence_weight)
            + memo_adjustment
+           + (config.mission set ? config.scoring.mission_weight * (config.implementation.mission_alignment or 1.0) : 0)
 
 if pending_count === 0: impl_score = 0
 ```
@@ -950,7 +966,7 @@ pipeline** for that domain — same staleness curve (`config.scoring.staleness_c
 logarithmic by default, NOT a hardcoded linear product), and the same terms:
 
 ```
-verify = staleness(per 3-A curve) + signal_bonuses + (goal * goal_weight)
+verify = staleness(per 3-A curve) + signal_bonuses + mission_term + (goal * goal_weight)
        + (confidence * confidence_weight) + memo_adjustment + balance_penalty
 ```
 

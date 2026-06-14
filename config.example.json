@@ -5,6 +5,7 @@
     "locale": "en",
     "timezone": "UTC"
   },
+  "mission": "One sentence: what this project is for and what 'done well' means. The loop drives toward this. Set by /ooda-setup; empty string disables mission-aware scoring.",
   "domains": {
     "service_health": {
       "weight": 2.0,
@@ -14,7 +15,8 @@
       "branch_prefix": "auto/scan-health/",
       "fallback": true,
       "enabled": true,
-      "status": "active"
+      "status": "active",
+      "mission_alignment": 1.0
     },
     "test_coverage": {
       "weight": 0.5,
@@ -24,7 +26,8 @@
       "branch_prefix": "auto/check-tests/",
       "fallback": true,
       "enabled": true,
-      "status": "active"
+      "status": "active",
+      "mission_alignment": 1.0
     },
     "backlog": {
       "weight": 0.3,
@@ -34,7 +37,8 @@
       "branch_prefix": "auto/plan-backlog/",
       "fallback": false,
       "enabled": true,
-      "status": "active"
+      "status": "active",
+      "mission_alignment": 0.5
     },
     "business_strategy": {
       "weight": 1.0,
@@ -45,7 +49,8 @@
       "fallback": true,
       "enabled": true,
       "status": "available",
-      "description": "Market research and strategic analysis. Run /ooda-skill create scan-market to configure."
+      "description": "Market research and strategic analysis. Run /ooda-skill create scan-market to configure.",
+      "mission_alignment": 0.5
     },
     "ux_evolution": {
       "weight": 1.0,
@@ -56,7 +61,8 @@
       "fallback": true,
       "enabled": true,
       "status": "available",
-      "description": "UX audit and UI analysis. Run /ooda-skill create scan-ux to configure."
+      "description": "UX audit and UI analysis. Run /ooda-skill create scan-ux to configure.",
+      "mission_alignment": 0.5
     },
     "competitors": {
       "weight": 0.3,
@@ -67,7 +73,8 @@
       "fallback": false,
       "enabled": true,
       "status": "available",
-      "description": "Competitor monitoring and intelligence. Run /ooda-skill create scan-competitors to configure."
+      "description": "Competitor monitoring and intelligence. Run /ooda-skill create scan-competitors to configure.",
+      "mission_alignment": 0.5
     }
   },
   "domain_dependencies": {},
@@ -75,7 +82,8 @@
     "enabled": false,
     "weight": 1.5,
     "primary_skill": "/dev-cycle",
-    "observe_loop_escape_bonus": 5.0
+    "observe_loop_escape_bonus": 5.0,
+    "mission_alignment": 1.0
   },
   "scoring": {
     "staleness_curve": "logarithmic",
@@ -91,7 +99,8 @@
       "open_pr_penalty": -3.0
     },
     "rice_extensions": {},
-    "__rice_extensions_doc__": "Optional per-label RICE multipliers applied during action extraction (evolve Step 5), e.g. {\"security\": 2.0, \"chore\": 0.5}. Empty = no extensions."
+    "__rice_extensions_doc__": "Optional per-label RICE multipliers applied during action extraction (evolve Step 5), e.g. {\"security\": 2.0, \"chore\": 0.5}. Empty = no extensions.",
+    "mission_weight": 6.0
   },
   "confidence": {
     "initial": 0.7,
