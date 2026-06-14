@@ -261,3 +261,10 @@ the Cycle Card LEARN line and `/ooda-status --share` source from it.
 - **CONTRIBUTING.md** — How to add domains, write new skills, and extend the harness
 - **SECURITY.md** — Safety levels in detail, HALT file usage, and protected path policy
 - **CHANGELOG.md** — Framework release notes (per-milestone v1.2.0 breakdown)
+
+<!-- v1.4.1 self-driving additions -->
+| **Mission** (v1.4.1) | `config.mission` — one sentence stating the project's purpose, captured at `/ooda-setup`. The loop self-drives toward it: 3-A adds `mission_weight × mission_alignment` and deprioritizes off-mission domains. Empty = staleness-only (back-compat). |
+| **mission_alignment** (v1.4.1) | Per-domain [0,1] — how much working a domain advances the mission. ≥0.5 = on-mission; <0.2 = a distraction (its staleness is dampened ×`off_mission_dampen`). Auto-inferred at setup, operator-adjustable. |
+| **Dry-domain / monitor dampener** (v1.4.1) | A domain that ran dry last cycle has its staleness dampened so it stops winning futile cycles — hard (×0.3) for work domains, mild (×0.6) for monitors (still polled). Alert exempts. |
+| **Goal-completion idle gate** (v1.4.1) | Decide 3-E2: when all active goals are at 100% and nothing is actionable/alerting, the cycle idles instead of spinning — the loop ran *until* the goal was met. |
+| **Mission-hit rate / Loop grade** (v1.4.1) | Scorecard: fraction of value-producing cycles that were on-mission, and a single A–F grade (composite of goal progress + futile rate + loop value). |

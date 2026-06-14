@@ -125,3 +125,13 @@ mission_alignment ≥ 0.5). The scorecard reports **Mission-hit Rate** = of the
 value-producing cycles, how many were on-mission — measuring whether the loop
 stays on its purpose, not just busy. Fixture → 60%. (Plumbed through 6-C9,
 score_outcome, the E2E driver, and the sim runner.)
+
+## Summary — baseline → after 8 iterations (12-cycle)
+
+| scenario | goal% | futile% | mission% | loopVal |
+|---|---|---|---|---|
+| A_webapp | 50 → **83** | 50 → 50 | 42 → **50** | 0.10 |
+| B_library | 60 → **100** | 75 → **25** | 25 → **75** | 0.05 → **0.15** |
+| C_greenfield | 43 → **71** | 33 → 42 | 33 → **50** | 0.28 → **0.37** |
+
+Iterations 9 (positioning docs) and 10 (this v1.5.0 release) close the arc.

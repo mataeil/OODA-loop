@@ -8,6 +8,44 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
+## [v1.5.0] — 2026-06-14
+
+**The self-driving release.** OODA-loop becomes a loop-engineering framework you
+*install with a purpose*: state the mission at setup and the loop drives toward
+it. Every change here was tuned empirically — 8 measured iterations against three
+simulated real projects (`tests/sim/`), each kept only if the scorecard improved
+(`tests/sim/RESULTS.md`).
+
+### Added — self-driving (mission-aware scoring)
+- **Mission capture** at `/ooda-setup` → `config.mission` + per-domain
+  `mission_alignment`; evolve 3-A/3-A2/3-J add a `mission_weight × alignment`
+  term. Sandbox: goal completion +14–40pp across all three projects (Iter 1).
+- **Work-availability**: a work domain that ran dry gets staleness ×0.3
+  (`dry_domain_dampen`); a quiet monitor ×0.6 (`monitor_dry_dampen`) — polled,
+  not spammed. Cut futile cycles; lifted a library project to 100% goal
+  (Iters 2–3).
+- **Off-mission deprioritization**: domains with alignment <0.2 get staleness
+  ×0.2 (`off_mission_dampen`) — distractions stop stealing cycles; alert exempts.
+  B mission-hit 42→75%, futile 58→25% (Iter 4).
+- **Goal-completion idle gate** (Decide 3-E2): when all active goals hit 100% and
+  nothing is actionable/alerting, the cycle idles instead of spinning — the loop
+  runs *until* the goal is met (Iter 5).
+- **Install auto-derives goals** from the mission text + stack (Iter 6).
+
+### Added — measurement surfacing
+- **Loop grade** (A–F) and **Mission-hit Rate** on `/ooda-status --scorecard`
+  (Iters 7–8) — at-a-glance "is the loop working, and staying on purpose?".
+
+### Added — the instrument
+- **`tests/sim/`** — sandbox simulation harness (3 scenarios × N cycles via the
+  real scoring spec + engine driver → scorecard + loop-engineering quality
+  metrics) and `RESULTS.md`, the empirical log of all 8 iterations. Analysis
+  tool, not a CI gate.
+
+Cumulative sandbox result (baseline → now): B_library goal 60→100% / futile
+75→25% / mission-hit 25→75%; A_webapp goal 50→83%; C_greenfield goal 43→71%.
+verify.py 42/0 · Docker E2E 22/22, green on every iteration's CI.
+
 ## [v1.4.0] — 2026-06-14
 
 **The measurement release.** Deep research into 2026 "loop engineering" (Anthropic
