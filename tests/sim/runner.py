@@ -110,6 +110,9 @@ def run(scenario_key: str, cycles: int = 12, mission_aware: bool = True,
     execs = {n: 0 for n in domains}
     last_output = {}                         # domain -> bool (had_output last run)
     goal_hits = 0
+    goal_done = False
+    skipped_idle = 0
+    ran = 0
     trace = []
     on_mission_opportunities = 0
     on_mission_hits = 0
@@ -120,6 +123,17 @@ def run(scenario_key: str, cycles: int = 12, mission_aware: bool = True,
                         mission_aware, last_output, work_aware)
         winner = max(scores, key=scores.get)
         out = respond(sc, c, winner, ev)
+        # Goal-completion gate (Iter 5): once the mission goal is met, don't burn
+        # a full cycle on nothing — if there's no alert and no actionable output,
+        # SKIP (idle), like the min-interval skip. The loop ran UNTIL the goal.
+        alert_now = bool(ev.get("alerts"))
+        if goal_done and not out["had_output"] and not alert_now:
+            skipped_idle += 1
+            for n in domains:
+                hours[n] += 4.0
+            trace.append((c, "(idle)", None, False, False))
+            continue
+        ran += 1
         last_output[winner] = out["had_output"]
 
         # was there an on-mission opportunity this cycle? (work in any aligned domain)
@@ -140,6 +154,8 @@ def run(scenario_key: str, cycles: int = 12, mission_aware: bool = True,
             g = read_json(eng.ev / "goals.json")
             g["goals"][0]["progress"] = min(goal_hits / sc["goal"]["target_cycles"], 1.0)
             write_json(eng.ev / "goals.json", g)
+            if g["goals"][0]["progress"] >= 1.0:
+                goal_done = True
 
         # record the cycle through the real engine (writes outcomes.json etc.)
         eng.run_cycle(f"2026-07-{c:02d}T06:00:00", {
@@ -161,6 +177,7 @@ def run(scenario_key: str, cycles: int = 12, mission_aware: bool = True,
         "mission_hit_rate_pct": round(100.0 * on_mission_hits / on_mission_opportunities, 1)
         if on_mission_opportunities else None,
         "goal_progress_pct": round(100.0 * goal_progress, 1),
+        "skipped_idle": skipped_idle,
         "winners": [t[1] for t in trace],
     }
 

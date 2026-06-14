@@ -90,3 +90,16 @@ exempts.
 | A_webapp | 50.0 | 50.0 | 83.3 | 0.10 |
 | B_library | 58→**25** | 42→**75** | 100 | 0.083→**0.15** |
 | C_greenfield | 25→42 | 42→**50** | 57→**71** | 0.35→**0.367** |
+
+## Iteration 5 — Goal-completion idle gate (verifiable stopping)
+
+Canon #1: a loop runs *until* a verifiable goal is met — so once met, stop
+spinning. New Decide gate 3-E2: when all active goals are at 100% and there's no
+alert and nothing actionable, the cycle idles (a skip, not a futile cycle).
+`config.goal_completion_idle`.
+
+| scenario (20cy) | futile% | idle cycles | loopVal |
+|---|---|---|---|
+| A_webapp | 50→**46** | 0→**7** (idled after goal) | 0.10→0.108 |
+| B_library | 15 (real maintenance work) | 0 | 0.17 |
+| C_greenfield | 45→**35** | 0→**3** | 0.38→**0.45** |

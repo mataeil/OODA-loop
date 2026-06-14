@@ -261,5 +261,6 @@
       "action_extracted"
     ],
     "__doc__": "Opt-in maker/checker layer (evolve Step 7-B). When enabled, a SEPARATE model independently judges whether each gradeable cycle achieved its declared goal and writes {achieved,reason,confidence} into outcomes.json verifier_verdict. The deterministic quality_multiplier (Step 6-C9) is always the scorecard's ground truth; this is a second opinion, never an override. Default off = zero extra cost."
-  }
+  },
+  "goal_completion_idle": true
 }
