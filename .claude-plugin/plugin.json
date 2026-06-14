@@ -1,7 +1,7 @@
 {
   "name": "ooda-loop",
   "displayName": "OODA-loop",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "An autonomous operations layer for your live side project. It watches, re-orients from which PRs you merge and reject, and opens small revertible PRs — bounded by a HALT file, protected paths, and a hard cost cap. Built on Boyd's OODA loop. You stay in command.",
   "author": {
     "name": "Taeil Ma",

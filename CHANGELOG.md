@@ -8,6 +8,21 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
+## [v1.6.1] — 2026-06-14
+
+### Added / clarified — plugin namespacing + cloud routine recipe
+- **Command-naming callout** at the top of README / README.ko: the docs use the
+  bare `/evolve` form (git/symlink install); plugin installs prefix with
+  `ooda-loop:` (`/ooda-loop:evolve`). Stated once at first command exposure
+  rather than noising every line.
+- **Cloud routine recipe** in docs/claude-code-integration.md — the exact
+  `/schedule` setup + routine prompt + the git state-branch flow.
+- **Cloud state persistence is now verified** (not just documented):
+  tests/e2e/scenarios/test_cloud_state.py proves with real git that state
+  committed in one clone is read by a separate FRESH clone (cycle_count
+  continuity, Outcome Record accumulation) — the fresh-clone path a cloud
+  routine takes. Docker E2E 22 → 23.
+
 ## [v1.6.0] — 2026-06-14
 
 **The Claude-Code-native release.** OODA-loop is Claude-Code-exclusive, so it now

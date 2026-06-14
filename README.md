@@ -66,6 +66,8 @@ git clone https://github.com/mataeil/OODA-loop.git ~/.ooda-loop
 ~/.ooda-loop/install.sh
 ```
 
+> **Command naming (read once).** This README writes the **bare** form — `/evolve`, `/ooda-setup`, `/ooda-status`. That's what the **git/symlink install (Option B)** exposes. If you installed the **plugin (Option A)**, Claude Code namespaces every skill — **prefix it with `ooda-loop:`**: `/ooda-loop:evolve`, `/ooda-loop:ooda-setup`, `/loop 4h /ooda-loop:evolve`. Same skills, same behaviour — just the prefix. (Run `/help` to see the exact names your install exposes.)
+
 **Set up your project:**
 
 ```bash
