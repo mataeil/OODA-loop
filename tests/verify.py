@@ -471,6 +471,9 @@ def check_scorecard(r: Runner) -> None:
         "pr_merge_rate_pct": 100.0,           # 1/1
         "action_resolution_rate_pct": 50.0,   # 2/4
         "cost_per_successful_cycle": 0.15,     # 0.30/2
+        "goal_progress_pct": 75.0,            # mean(0.5, 1.0)
+        "skill_gap_resolution_pct": 50.0,     # 2/4 resolved
+        "lesson_application_pct": 66.7,       # 2/3 applied
     }
     mismatches = [k for k, v in expect.items() if s.get(k) != v]
     r.check(

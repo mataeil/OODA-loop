@@ -216,6 +216,10 @@ canon):
 - **Action Queue Resolution** — resolved ÷ added (a value < 100% means the
   backlog is growing faster than the loop clears it).
 - **Cost per Successful Cycle** — total cost ÷ accepted-value cycles.
+- **Goal Progress** — mean progress of active `goals.json` done-conditions
+  (the loop-engineering "run until a verifiable goal is met" signal).
+- **Gap Resolution** / **Lesson Application** — learning-loop health: are
+  self-diagnosed skill gaps closed, and are reflexion lessons re-applied?
 - **Verdict** — working / partial / stalled, from the Loop Value Score.
 
 Graceful degradation: with no `outcomes.json` yet (pre-v1.4.0 state or a fresh

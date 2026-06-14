@@ -1,0 +1,4 @@
+{ "schema_version": "1.0.0", "gaps": [
+  {"name":"g_a","resolved":true},{"name":"g_b","resolved":false},
+  {"name":"g_c","resolved":true},{"name":"g_d","resolved":false}
+] }

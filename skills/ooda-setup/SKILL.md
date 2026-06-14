@@ -178,6 +178,20 @@ Initialize state files: `state.json`, `confidence.json`, `metrics.json`, `action
 `cost_ledger.json`, `CHANGELOG.md` in `agent/state/evolve/`. Use canonical schemas.
 (`cascades.json`, `cycle_log.jsonl`, and per-domain `lens.json` are created lazily by evolve.)
 
+**Seed at least one verifiable goal (loop-engineering done-condition).** A loop
+with no written, machine-checkable goal "runs until the money runs out." Write
+`goals.json` with one active goal whose `metric_command` is a shell command that
+prints a number or boolean the engine can check each cycle (Step 2-C drives
+`goal.progress` from it, and the Loop Scorecard's Goal Progress KPI surfaces it):
+```json
+{ "schema_version": "1.0.0", "goals": [
+  { "id": "g1", "title": "<your done-condition, e.g. drain the action backlog>",
+    "status": "active", "progress": 0.0, "target": 1.0,
+    "metric_command": "jq '.pending|length==0' agent/state/evolve/action_queue.json" } ] }
+```
+Ask the operator for one goal during setup; if they skip, write an empty
+`{ "goals": [] }` and print a reminder that the loop has no done-condition yet.
+
 Add to `.gitignore` if not already present:
 ```
 config.json

@@ -43,6 +43,9 @@ def compute(project: Path, window: int | None = None) -> dict:
     counters = metrics.get("counters", {}) or {}
     ledger = _load(ev / "cost_ledger.json", {}) or {}
     queue = _load(ev / "action_queue.json", {}) or {}
+    goals = (_load(ev / "goals.json", {}) or {}).get("goals", []) or []
+    gaps = (_load(ev / "skill_gaps.json", {}) or {}).get("gaps", []) or []
+    refl = (_load(ev / "reflections.json", {}) or {}).get("reflections", []) or []
 
     scope = outcomes[-window:] if window else outcomes
     n = len(scope)
@@ -65,6 +68,16 @@ def compute(project: Path, window: int | None = None) -> dict:
     if cost_total in (None, 0.0):
         cost_total = ledger.get("total_estimated_usd", 0.0)
 
+    # verifiable done-conditions (loop-engineering canon #1): mean progress of
+    # active goals — the loop runs until its written goals are met.
+    active_goals = [g for g in goals if g.get("status") == "active"]
+    goal_progress_pct = (
+        round(100.0 * sum(g.get("progress", 0.0) for g in active_goals) / len(active_goals), 1)
+        if active_goals else None)
+    # learning-loop health: are self-diagnosed gaps and lessons acted on?
+    gap_resolution_pct = _pct(sum(1 for g in gaps if g.get("resolved")), len(gaps))
+    lesson_application_pct = _pct(sum(1 for x in refl if x.get("status") == "applied"), len(refl))
+
     return {
         "window": window or "all",
         "cycles_scored": n,
@@ -77,6 +90,11 @@ def compute(project: Path, window: int | None = None) -> dict:
         "pr_merge_and_hold_rate_pct": _pct(held, prs_merged),
         "action_resolution_rate_pct": _pct(actions_resolved, actions_added),
         "cost_per_successful_cycle": (round(cost_total / success, 4) if success else None),
+        # done-conditions + learning-loop health
+        "active_goals": len(active_goals),
+        "goal_progress_pct": goal_progress_pct,
+        "skill_gap_resolution_pct": gap_resolution_pct,
+        "lesson_application_pct": lesson_application_pct,
         # raw context
         "pending_actions": len(queue.get("pending", []) or []),
         "result_breakdown": rt_count,
@@ -117,6 +135,11 @@ def render(project: Path, window: int | None = None) -> str:
         f"│  PR Merge Rate      {_fmt(s['pr_merge_rate_pct'],'%'):<6}  · hold {_fmt(s['pr_merge_and_hold_rate_pct'],'%')}            │",
         f"│  Queue Resolution   {_fmt(s['action_resolution_rate_pct'],'%'):<6}  (resolved/added)         │",
         f"│  Cost / Success     ${_fmt(s['cost_per_successful_cycle']):<7}                       │",
+        f"├─ done-conditions + learning ──────────────────────────┤",
+        f"│  Goal Progress      {_fmt(s['goal_progress_pct'],'%'):<6}  ({s['active_goals']} active goals)      │",
+        f"│  Gap Resolution     {_fmt(s['skill_gap_resolution_pct'],'%'):<6}  (skill gaps closed)       │",
+        f"│  Lesson Application  {_fmt(s['lesson_application_pct'],'%'):<6} (reflexions re-applied)    │",
+        f"├───────────────────────────────────────────────────────┤",
         f"│  Verdict: {_verdict(s)[:44]:<44} │",
         f"└──────────────────────────────────────────────────────┘",
     ]

@@ -15,3 +15,11 @@ matching metrics counters, and asserts the computed canon KPIs:
 | Cost / Successful cycle | $0.30 / 2 = **$0.15** |
 
 Tier-0 (`verify.py`) computes these from the seed and asserts the numbers.
+
+## done-conditions + learning (v1.4.0)
+
+| KPI | Expected |
+|---|---|
+| Goal Progress (mean of active goals) | mean(0.5, 1.0) = **75%** |
+| Skill Gap Resolution | 2/4 = **50%** |
+| Lesson Application (reflexions applied) | 2/3 = **66.7%** |
