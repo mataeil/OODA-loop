@@ -105,6 +105,22 @@ def compute(project: Path, window: int | None = None) -> dict:
     }
 
 
+def grade(s: dict) -> tuple[str, float]:
+    """A single loop-engineering letter grade from the whole picture: are goals
+    progressing, is the loop efficient (low futile), is it delivering value?
+    Composite in [0,1] → letter. Returns (letter, composite). DASH if no data."""
+    lv = s.get("loop_value_score")
+    if lv is None:
+        return DASH, None
+    goal = (s.get("goal_progress_pct") or 0) / 100.0
+    futile = (s.get("futile_cycle_rate_pct") or 0) / 100.0
+    composite = 0.5 * goal + 0.3 * (1 - futile) + 0.2 * min(lv / 0.5, 1.0)
+    composite = round(composite, 3)
+    letter = ("A" if composite >= 0.8 else "B" if composite >= 0.65
+              else "C" if composite >= 0.5 else "D" if composite >= 0.35 else "F")
+    return letter, composite
+
+
 def _fmt(v, suffix=""):
     return DASH if v is None else f"{v}{suffix}"
 
@@ -127,6 +143,7 @@ def render(project: Path, window: int | None = None) -> str:
     if lv is not None:
         filled = round(lv * 10)
         bar = "█" * filled + "░" * (10 - filled)
+    _grade_letter, _grade_score = grade(s)
     lines = [
         f"┌─ OODA-loop Scorecard ── {s['cycles_scored']} cycles ({s['window']}) ──────────────┐",
         f"│  Loop Value Score   {_fmt(lv):<5} {bar}   │",
@@ -140,7 +157,7 @@ def render(project: Path, window: int | None = None) -> str:
         f"│  Gap Resolution     {_fmt(s['skill_gap_resolution_pct'],'%'):<6}  (skill gaps closed)       │",
         f"│  Lesson Application  {_fmt(s['lesson_application_pct'],'%'):<6} (reflexions re-applied)    │",
         f"├───────────────────────────────────────────────────────┤",
-        f"│  Verdict: {_verdict(s)[:44]:<44} │",
+        f"│  Loop grade: {_grade_letter} ({_fmt(_grade_score)})  ·  {_verdict(s)[:30]:<30} │",
         f"└──────────────────────────────────────────────────────┘",
     ]
     return "\n".join(lines)

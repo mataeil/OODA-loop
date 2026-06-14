@@ -103,3 +103,17 @@ alert and nothing actionable, the cycle idles (a skip, not a futile cycle).
 | A_webapp | 50→**46** | 0→**7** (idled after goal) | 0.10→0.108 |
 | B_library | 15 (real maintenance work) | 0 | 0.17 |
 | C_greenfield | 45→**35** | 0→**3** | 0.38→**0.45** |
+
+## Iteration 6 — Install: auto-derive goals from the mission
+
+ooda-setup now *proposes* verifiable done-conditions (with `metric_command`s)
+from the mission text + detected stack, instead of making the operator hand-write
+them — the "state your purpose, the loop figures out how to measure it" install
+flow. (Structural; validated by the loop reaching goal 100% in the sims once
+goals exist.)
+
+## Iteration 7 — Loop-engineering letter grade on the scorecard
+
+`scripts/loop_scorecard.py grade()` distills goal progress + futile rate + loop
+value into a single A–F grade with a composite score, so an operator gets an
+at-a-glance verdict. Fixture → **B (0.798)**; empty state → `—` (no false grade).
