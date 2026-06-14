@@ -102,27 +102,33 @@ class Engine:
         """Spawn a REAL child process that acquires the lock + marks the cycle
         in progress (what a starting cycle does), then SIGKILL it mid-run —
         verifying the substrate, not a simulation of it."""
+        # The child sets BOTH the lock (0-B) AND cycle_in_progress (pre-Step-1),
+        # then signals readiness with a sentinel file written LAST. The parent
+        # waits for the sentinel before SIGKILL — so the crash debris (lock +
+        # cycle_in_progress) is always fully present, no write-ordering race.
         child = (
             "import json,sys,time;from pathlib import Path;"
-            "p=Path(sys.argv[1]);now=sys.argv[2];"
-            "lp=p/'agent/state/evolve/.lock';lp.parent.mkdir(parents=True,exist_ok=True);"
-            "lp.write_text(json.dumps({'pid':0,'started_at':now}));"
-            "sp=p/'agent/state/evolve/state.json';st=json.loads(sp.read_text());"
+            "p=Path(sys.argv[1]);now=sys.argv[2];ev=p/'agent/state/evolve';"
+            "ev.mkdir(parents=True,exist_ok=True);"
+            "(ev/'.lock').write_text(json.dumps({'pid':0,'started_at':now}));"
+            "sp=ev/'state.json';st=json.loads(sp.read_text());"
             "st['cycle_in_progress']=True;sp.write_text(json.dumps(st));"
+            "(ev/'.crash_ready').write_text('1');"   # sentinel, written LAST
             "time.sleep(300)"
         )
         proc = subprocess.Popen(["python3", "-c", child, str(self.p), now])
-        # wait (up to ~5s) until the child has actually written the lock
         import time
-        for _ in range(500):
-            if self.lock_path.exists():
+        ready = self.ev / ".crash_ready"
+        for _ in range(500):                          # up to ~5s
+            if ready.exists():
                 break
             time.sleep(0.01)
         else:
             proc.kill()
-            raise RuntimeError("child never acquired the lock")
+            raise RuntimeError("child never reached the crash point")
         proc.kill()          # SIGKILL — no cleanup runs, exactly like a crash
         proc.wait()
+        ready.unlink(missing_ok=True)                 # sentinel is test-only debris
 
     # -- the cycle ----------------------------------------------------------
     def run_cycle(self, now: str, outcome: dict | None = None) -> CycleResult:
