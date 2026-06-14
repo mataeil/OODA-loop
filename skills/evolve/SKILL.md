@@ -934,6 +934,31 @@ if highest score < 0.5:
   Jump to Step 6.
 ```
 
+### 3-E2: Goal-Completion Idle Gate (v1.4.1, Iteration 5)
+
+Loop-engineering canon #1 is that a loop runs *until a verifiable goal is met* —
+so once it IS met, the loop must stop burning cycles on it. Without this the loop
+spins futile cycles forever after the mission is accomplished.
+
+```
+if config.goal_completion_idle (default true)
+   AND goals.json has >=1 active goal AND ALL active goals have progress >= 1.0
+   AND no domain has a critical/warning alert this cycle
+   AND no domain has actionable pending work (action_queue empty or all blocked,
+       and no work-domain produced output last run):
+  Print "[Decide] 🎯 Mission goals met and nothing actionable — idling this cycle."
+  Log decision_log: { action: "skip", reason: "goals_met_idle", result: "observe_only" }
+  -- This is a SKIP, not a futile cycle: the loop succeeded and is now idling
+  -- (record result_type "observe", quality 0.1 in 6-C9 — correct rest, not waste).
+  -- A new alert or newly-extracted action immediately ends idling next cycle.
+  Jump to Step 6.
+```
+
+Sandbox: after a project's goal hit 100%, this idled the would-be-futile cycles
+(A: 7 idled instead of spun; C futile 45→35%) — RESULTS.md Iteration 5. When an
+operator wants the loop to keep finding NEW work after a goal, they add the next
+goal; an empty goal set (no done-condition) disables the gate.
+
 ### 3-F: Confidence Gate
 
 ```
