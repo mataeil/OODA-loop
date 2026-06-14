@@ -174,8 +174,9 @@ Initialize state files: `state.json`, `confidence.json`, `metrics.json`, `action
 `memos.json` (with `"score_adjustments": {}, "interventions": [], "history": []`),
 `goals.json`, `episodes.json`, `principles.json`, `skill_gaps.json`,
 `reflections.json` (`{"schema_version": "1.0.0", "reflections": []}`),
+`outcomes.json` (`{"schema_version": "1.0.0", "entries": []}`),
 `cost_ledger.json`, `CHANGELOG.md` in `agent/state/evolve/`. Use canonical schemas.
-(`cascades.json` and per-domain `lens.json` are created lazily by evolve.)
+(`cascades.json`, `cycle_log.jsonl`, and per-domain `lens.json` are created lazily by evolve.)
 
 Add to `.gitignore` if not already present:
 ```

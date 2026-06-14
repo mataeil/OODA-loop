@@ -1804,6 +1804,10 @@ Update counters.total_prs_created/merged/rejected as applicable.
 counters.domain_executions[winner] += 1
 -- everything lives under metrics.json `counters` — the 3-A balance penalty
 -- reads metrics.counters.domain_executions / metrics.counters.total_skill_executions
+-- Loop-effectiveness counters (v1.4.0) — feed the scorecard (scripts/loop_scorecard.py):
+counters.total_futile_cycles += (1 if this cycle had_output == false else 0)
+counters.actions_added += (count of NEW action_queue items extracted this cycle, Step 5-C2)
+counters.actions_resolved += (count of items that moved to completed with a merged PR this cycle)
 Update streaks (current_domain, current_streak, longest_streak).
 Set first_cycle_at if null. Set last_updated = now.
 ```
@@ -1991,6 +1995,59 @@ from writing an unbounded number of synthetic entries.
 > the daily reset intentionally cleared. Its job is to stop the bleed going
 > forward, not to reconstruct prior days.
 
+### 6-C9: Outcome Record (v1.4.0 — "did this cycle help?")
+
+**This step MUST run every cycle.** It is the atomic ground-truth signal that
+lets the loop distinguish *"we ran 100 cycles"* from *"we improved the project
+100 times"* — the missing primitive that loop-engineering measurement depends on.
+It is fully **deterministic** (no model call): it scores the cycle from facts
+already recorded this cycle. The richer separate-model verdict is layered on top
+in Step 7-B (opt-in), never replacing this.
+
+Compute `quality_multiplier` (0.0–1.0) from the cycle's actual `result_type`:
+
+| result_type | quality_multiplier | meaning |
+|---|---|---|
+| `pr_merged_held` | 1.0 | a prior cycle's PR merged and survived (no revert) — confirmed value |
+| `pr_merged` | 0.8 | PR merged this cycle (hold not yet confirmed) |
+| `pr_created` | 0.5 | PR opened, awaiting human merge |
+| `action_extracted` | 0.2 | no PR, but the cycle produced actionable output (queue grew with real work) |
+| `observe` | 0.1 | first-cycle / confidence-gated observe-only that still recorded state |
+| `futile` | 0.0 | `had_output == false` — ran, changed nothing |
+| `error` | 0.0 | skill errored |
+| `pr_rejected` | 0.0 | a prior cycle's PR was closed unmerged — negative outcome |
+
+```
+-- Append to agent/state/evolve/outcomes.json (create if missing:
+--   { "schema_version": "1.0.0", "entries": [] }):
+outcomes.entries.append({
+  cycle_id: cycle_count,
+  timestamp: now (ISO 8601),
+  domain: selected_domain,
+  skill: selected_skill,
+  declared_goal: (active goals.json goal id this cycle advanced)
+                 OR (action_queue item id acted on) OR null,
+  result_type: <one of the table above>,
+  quality_multiplier: <from the table>,
+  pr_number: pr_number or null,
+  verifier_verdict: null   -- filled by Step 7-B if eval.enabled
+})
+-- Cap entries at config.memory.outcomes_buffer_size (default 200); drop oldest.
+Write outcomes.json.
+Print "[Reflect] Outcome: {result_type} (quality {quality_multiplier})."
+```
+
+Also append ONE machine-readable line to `agent/state/evolve/cycle_log.jsonl`
+(append-only; never rewritten — this is the queryable substrate for every trend
+metric, complementing the human-readable CHANGELOG.md):
+```
+{cycle_id, timestamp, domain, skill, score, confidence, result, result_type,
+ quality_multiplier, pr_number, had_output, cost_usd, saturation}
+```
+The JSONL file has no cap (one short line per cycle; at 1 cycle/30min that is
+~17k lines/year). If it must be bounded, an operator rotates it; the engine
+never truncates it (truncating would corrupt trend history).
+
 ### 6-D: Git Commit
 
 Guard first — verify the state path is actually trackable:
@@ -2016,6 +2073,8 @@ git add agent/state/evolve/CHANGELOG.md
 git add agent/state/evolve/episodes.json    # if updated
 git add agent/state/evolve/principles.json  # if updated
 git add agent/state/evolve/reflections.json # if updated
+git add agent/state/evolve/outcomes.json    # v1.4.0 outcome record (every cycle)
+git add agent/state/evolve/cycle_log.jsonl  # v1.4.0 machine-readable cycle log
 git add agent/state/deploy.json             # if updated by run-deploy
 git add agent/state/*/lens.json             # if updated
 git add agent/state/*/lens_changelog.json   # if updated
@@ -2198,6 +2257,8 @@ output:
     - agent/state/evolve/episodes.json (weekly)
     - agent/state/evolve/principles.json (rare)
     - agent/state/evolve/reflections.json (Step 5-F, per decision cycle)
+    - agent/state/evolve/outcomes.json (Step 6-C9, per cycle)
+    - agent/state/evolve/cycle_log.jsonl (Step 6-C9, append-only)
     - "agent/state/*/lens.json (Step 5-E)"
     - "agent/state/*/lens_changelog.json (Step 5-E, when a lens item changes)"
   prs: "Determined by executed skill (evolve itself creates no PRs)"
