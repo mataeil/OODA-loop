@@ -789,6 +789,16 @@ if last_run exists AND last_run.had_output == false
   else:
     staleness *= config.scoring.monitor_dry_dampen   -- default 0.6
 
+-- Off-mission dampener (v1.4.1, Iteration 4): when a mission is set, a domain
+-- whose mission_alignment is below config.scoring.off_mission_threshold (0.2) is
+-- a distraction — it must not steal cycles from the mission on staleness alone.
+-- An active alert still exempts (a fire is a fire even off-mission). Sandbox:
+-- B mission-hit 42→75% / futile 58→25%, C goal 57→71% (RESULTS.md, Iteration 4).
+if config.mission is set
+   AND (config.domains[domain].mission_alignment or 0.0) < config.scoring.off_mission_threshold
+   AND no active alert for this domain this cycle:
+  staleness *= config.scoring.off_mission_dampen     -- default 0.2
+
 -- Alert recency dampener (prevents alert-driven domain monopoly)
 cooldown_hours = config.signals.alert_cooldown_hours  -- default 4
 if urgent_signal > 0 AND alert severity is NOT "critical":
