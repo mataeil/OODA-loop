@@ -47,6 +47,8 @@ BALANCE_WEIGHT = 5.0
 
 DRY_DAMPEN = 0.3           # staleness x for a dry WORK domain (strategize/execute)
 DRY_DAMPEN_OBSERVE = 0.6  # milder x for a quiet MONITOR (observe) — still polled
+OFF_MISSION_DAMPEN = 0.2  # x for a near-zero-alignment domain when a mission is set
+OFF_MISSION_THRESHOLD = 0.2
 
 
 def _score(domains, hours, confidence, execs, total_execs, ev, mission_aware,
@@ -76,6 +78,8 @@ def _score(domains, hours, confidence, execs, total_execs, ev, mission_aware,
         balance = max(-BALANCE_WEIGHT * (share - 1.0 / n), -10.0)
         alert = 5.0 if alerting else 0.0
         mission = (MISSION_WEIGHT * d.get("mission_alignment", 0.0)) if mission_aware else 0.0
+        if mission_aware and d.get("mission_alignment", 0.0) < OFF_MISSION_THRESHOLD and not alerting:
+            staleness *= OFF_MISSION_DAMPEN   # off-mission distraction: don't steal cycles
         scores[name] = staleness + conf_term + balance + alert + mission
     return scores
 

@@ -78,3 +78,15 @@ no longer dominating. Alert exempts.
 | A_webapp | 58.3 → **50.0** | 66.7 → **83.3** | 41.7 → **50.0** |
 | B_library | 58.3 (unchanged) | 100.0 | 41.7 |
 | C_greenfield | 25.0 (unchanged) | 57.1 | 41.7 |
+
+## Iteration 4 — Off-mission deprioritization
+
+When a mission is set, domains with mission_alignment < 0.2 get staleness ×0.2
+(`config.scoring.off_mission_dampen`) — distractions stop stealing cycles. Alert
+exempts.
+
+| scenario | futile% | mission% | goal% | loopVal |
+|---|---|---|---|---|
+| A_webapp | 50.0 | 50.0 | 83.3 | 0.10 |
+| B_library | 58→**25** | 42→**75** | 100 | 0.083→**0.15** |
+| C_greenfield | 25→42 | 42→**50** | 57→**71** | 0.35→**0.367** |
