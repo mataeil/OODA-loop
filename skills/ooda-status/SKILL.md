@@ -17,6 +17,8 @@ input:
     - agent/state/evolve/skill_gaps.json
     - agent/state/evolve/CHANGELOG.md
     - agent/state/evolve/reflections.json
+    - agent/state/evolve/outcomes.json
+    - agent/state/evolve/cycle_log.jsonl
     - "agent/state/*/lens.json"
     - "agent/state/*/lens_changelog.json"
   config_keys: []
@@ -191,6 +193,33 @@ debugging whether the learning loop is actually running):
 
 Output focuses on Episodes / Principles / Lens / Chain / Interventions /
 Skill gaps and omits the domain/cost/saturation rows.
+
+### `--scorecard` — is the loop actually WORKING?
+
+```
+/ooda-status --scorecard          (all recorded cycles)
+/ooda-status --scorecard --window 20   (last 20 cycles)
+```
+
+Renders the **Loop Scorecard** — the loop-engineering measurement view that
+answers "is the loop *improving the project*, or just running?". This is the
+deterministic reference `scripts/loop_scorecard.py` rendered verbatim; it reads
+`outcomes.json` (Step 6-C9), `metrics.json` counters, `cost_ledger.json`, and
+`action_queue.json` — no recomputation, no model call. KPIs (the measurement
+canon):
+
+- **Loop Value Score** — mean `quality_multiplier` across scored cycles (0–1).
+  The single headline number: 1.0 = every cycle merged & held; 0.0 = all futile.
+- **Task Completion Rate** — % of cycles that merged and were accepted.
+- **Futile Cycle Rate** — % of cycles that ran but changed nothing.
+- **PR Merge Rate** + **hold rate** (merged that weren't reverted).
+- **Action Queue Resolution** — resolved ÷ added (a value < 100% means the
+  backlog is growing faster than the loop clears it).
+- **Cost per Successful Cycle** — total cost ÷ accepted-value cycles.
+- **Verdict** — working / partial / stalled, from the Loop Value Score.
+
+Graceful degradation: with no `outcomes.json` yet (pre-v1.4.0 state or a fresh
+project), every KPI shows `—` and the verdict reads "no outcomes recorded yet."
 
 ### `--share` — render the latest Cycle Card
 

@@ -288,6 +288,9 @@ class Engine:
         # 6-C6 hygiene sweep [SKILL.md v1.3.0 action lifecycle]
         self._action_hygiene(st, cycle_id, r)
 
+        # 6-C9 Outcome Record [SKILL.md v1.4.0] — deterministic quality signal
+        self._outcome_record(st, cycle_id, now, o)
+
         # Step 6 decision_log append — CANONICAL selected_* keys
         # [SKILL.md Step 6 + working_memory_size cap]
         entry = {"cycle": cycle_id, "timestamp": now,
@@ -405,6 +408,35 @@ class Engine:
         })
         write_json(ep_path, eps)
         r.logs.append(f"[Reflect] Episode {ep_id} generated.")
+
+    def _outcome_record(self, st: dict, cycle_id: int, now: str, o: dict) -> None:
+        """6-C9: append the deterministic quality signal via the shared reference
+        (scripts/score_outcome.py — same source of truth as Tier 0)."""
+        import importlib.util
+        repo = Path(__file__).resolve().parents[3]
+        spec = importlib.util.spec_from_file_location("so", repo / "scripts" / "score_outcome.py")
+        so = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(so)
+        cyc = {"result": o["result"], "pr_number": o.get("pr_number"),
+               "pr_outcome": o.get("pr_outcome"), "had_output": o.get("had_output")}
+        rt, q = so.score(cyc)
+        op = self.ev / "outcomes.json"
+        outc = read_json(op, {"schema_version": "1.0.0", "entries": []})
+        outc["entries"].append({"cycle_id": cycle_id, "timestamp": now,
+                                "domain": o["selected_domain"], "skill": o["selected_skill"],
+                                "result_type": rt, "quality_multiplier": q,
+                                "pr_number": o.get("pr_number"), "verifier_verdict": None})
+        cap = (self.cfg.get("memory") or {}).get("outcomes_buffer_size", 200)
+        outc["entries"] = outc["entries"][-cap:]
+        write_json(op, outc)
+        # cycle_log.jsonl append-only
+        line = json.dumps({"cycle_id": cycle_id, "timestamp": now, "domain": o["selected_domain"],
+                           "skill": o["selected_skill"], "result": o["result"], "result_type": rt,
+                           "quality_multiplier": q, "had_output": o.get("had_output", False)})
+        with open(self.ev / "cycle_log.jsonl", "a") as fh:
+            fh.write(line + "\n")
+        # counters
+        c = read_json(self.ev / "metrics.json", {}).get("counters", {}) if (self.ev / "metrics.json").exists() else {}
 
     def _git_commit(self, cycle_id: int, r: CycleResult) -> None:
         if not (self.p / ".git").exists():

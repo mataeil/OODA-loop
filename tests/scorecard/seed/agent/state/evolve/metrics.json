@@ -1,0 +1,4 @@
+{ "schema_version": "1.0.0", "counters": {
+  "total_cycles": 6, "total_prs_created": 1, "total_prs_merged": 1, "total_prs_rejected": 0,
+  "total_futile_cycles": 1, "actions_added": 4, "actions_resolved": 2 },
+  "cost": { "total_estimated_usd": 0.30 } }

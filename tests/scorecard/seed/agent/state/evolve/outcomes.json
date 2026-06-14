@@ -1,0 +1,8 @@
+{ "schema_version": "1.0.0", "entries": [
+  {"cycle_id": 1, "result_type": "observe", "quality_multiplier": 0.1, "pr_number": null},
+  {"cycle_id": 2, "result_type": "action_extracted", "quality_multiplier": 0.2, "pr_number": null},
+  {"cycle_id": 3, "result_type": "pr_created", "quality_multiplier": 0.5, "pr_number": 41},
+  {"cycle_id": 4, "result_type": "pr_merged", "quality_multiplier": 0.8, "pr_number": 41},
+  {"cycle_id": 5, "result_type": "pr_merged_held", "quality_multiplier": 1.0, "pr_number": 41},
+  {"cycle_id": 6, "result_type": "futile", "quality_multiplier": 0.0, "pr_number": null}
+] }

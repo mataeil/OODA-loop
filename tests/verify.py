@@ -435,6 +435,41 @@ def check_outcome_scoring(r: Runner) -> None:
     )
 
 
+def check_scorecard(r: Runner) -> None:
+    """Loop Scorecard (scripts/loop_scorecard.py): the headline measurement
+    artifact. Verify the canon KPIs compute correctly from a seeded outcome set."""
+    import importlib.util
+
+    sc_path = ROOT.parent / "scripts" / "loop_scorecard.py"
+    spec = importlib.util.spec_from_file_location("sc", sc_path)
+    sc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sc)
+    s = sc.compute(ROOT / "scorecard" / "seed")
+
+    expect = {
+        "loop_value_score": 0.433,            # (0.1+0.2+0.5+0.8+1.0+0.0)/6
+        "task_completion_rate_pct": 33.3,     # 2/6 merged+held
+        "futile_cycle_rate_pct": 16.7,        # 1/6
+        "pr_merge_rate_pct": 100.0,           # 1/1
+        "action_resolution_rate_pct": 50.0,   # 2/4
+        "cost_per_successful_cycle": 0.15,     # 0.30/2
+    }
+    mismatches = [k for k, v in expect.items() if s.get(k) != v]
+    r.check(
+        "scorecard: all canon KPIs compute to the expected values",
+        not mismatches,
+        f"mismatches={[(k, s.get(k), expect[k]) for k in mismatches]}" if mismatches
+        else "loop_value=0.433, TCR=33.3%, futile=16.7%, merge=100%, queue=50%, $/success=0.15",
+    )
+    # graceful degradation: empty project → all None, never crash
+    empty = sc.compute(ROOT / "scorecard")   # dir with no seed/state
+    r.check(
+        "scorecard: empty/missing state degrades to None (never crashes)",
+        empty["loop_value_score"] is None and empty["cycles_scored"] == 0,
+        f"empty loop_value={empty['loop_value_score']}",
+    )
+
+
 def check_longhorizon(r: Runner) -> None:
     """Long-horizon thresholds (saturation / contrarian / decay) fire where the
     spec says — verified against the SHIPPED config.example.json values."""
