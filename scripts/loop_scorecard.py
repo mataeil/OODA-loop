@@ -23,6 +23,7 @@ from pathlib import Path
 DASH = "—"
 SUCCESS_RT = {"pr_merged_held", "pr_merged"}     # cycles that delivered accepted value
 WORKING_RT = SUCCESS_RT | {"pr_created", "action_extracted"}  # produced real output
+DEFAULT_BAR = 0.65   # artifact quality bar when config.quality_rubric omits one (v1.7.0)
 
 
 def _load(p: Path, default=None):
@@ -32,12 +33,26 @@ def _load(p: Path, default=None):
         return default
 
 
+def _resolve_bar(config: dict) -> float:
+    """The artifact quality bar. Top-level config.quality_rubric.bar, else the
+    first domain that declares a per-domain quality_rubric.bar, else default."""
+    top = (config.get("quality_rubric") or {}).get("bar")
+    if isinstance(top, (int, float)):
+        return float(top)
+    for d in (config.get("domains") or {}).values():
+        b = ((d or {}).get("quality_rubric") or {}).get("bar")
+        if isinstance(b, (int, float)):
+            return float(b)
+    return DEFAULT_BAR
+
+
 def _pct(n, d):
     return None if not d else round(100.0 * n / d, 1)
 
 
 def compute(project: Path, window: int | None = None) -> dict:
     ev = Path(project) / "agent" / "state" / "evolve"
+    config = _load(Path(project) / "config.json", {}) or {}
     outcomes = (_load(ev / "outcomes.json", {}) or {}).get("entries", []) or []
     metrics = _load(ev / "metrics.json", {}) or {}
     counters = metrics.get("counters", {}) or {}
@@ -61,6 +76,13 @@ def compute(project: Path, window: int | None = None) -> dict:
     producing = [e for e in scope if e.get("quality_multiplier", 0) > 0]
     on_mission_n = sum(1 for e in producing if e.get("on_mission"))
     mission_hit_pct = _pct(on_mission_n, len(producing))
+
+    # ARTIFACT QUALITY (v1.7.0, headline KPI) — the axis the F1 dogfood proved was
+    # missing. Mean of the independent critic's artifact_score (Step 5-G) over the
+    # scored cycles that actually produced an artifact. None ⇒ artifact axis off.
+    bar = _resolve_bar(config)
+    art_scores = [e.get("artifact_score") for e in scope if e.get("artifact_score") is not None]
+    artifact_quality = round(sum(art_scores) / len(art_scores), 3) if art_scores else None
 
     prs_created = counters.get("total_prs_created", 0)
     prs_merged = counters.get("total_prs_merged", 0)
@@ -86,6 +108,10 @@ def compute(project: Path, window: int | None = None) -> dict:
     return {
         "window": window or "all",
         "cycles_scored": n,
+        # ARTIFACT QUALITY — the new headline: is the thing the loop builds GOOD?
+        "artifact_quality": artifact_quality,
+        "artifact_bar": bar,
+        "artifact_cycles": len(art_scores),
         # headline single number: mean quality across scored cycles (0..1)
         "loop_value_score": round(qsum / n, 3) if n else None,
         # canon metrics
@@ -111,19 +137,66 @@ def compute(project: Path, window: int | None = None) -> dict:
     }
 
 
+def _letter(composite: float) -> str:
+    return ("A" if composite >= 0.8 else "B" if composite >= 0.65
+            else "C" if composite >= 0.5 else "D" if composite >= 0.35 else "F")
+
+
+def goodhart_guard(s: dict) -> dict:
+    """The 'measurement is lying' detector (v1.7.0). The F1 dogfood graded A while
+    the artifact was broken because NO term measured the artifact. This guard is
+    ARTIFACT-ONLY: it does not care whether process metrics are green (a loop
+    could keep one metric amber to dodge an AND-gate — gaming-resistance finding).
+    If artifact quality is below bar, the headline grade is capped, graduated by
+    HOW far below — so a 0.40 artifact against a 0.65 bar reads D, not C."""
+    a = s.get("artifact_quality")
+    bar = s.get("artifact_bar") or DEFAULT_BAR
+    if a is None or a >= bar:
+        return {"lying": False, "cap": None, "message": ""}
+    if a >= 0.75 * bar:
+        cap = "C"
+    elif a >= 0.50 * bar:
+        cap = "D"
+    else:
+        cap = "F"
+    return {
+        "lying": True,
+        "cap": cap,
+        "message": ("MEASUREMENT WARNING: artifact_quality %.2f < bar %.2f — "
+                    "the scoreboard was lying; grade capped at %s. LEAP, don't add features."
+                    % (a, bar, cap)),
+    }
+
+
 def grade(s: dict) -> tuple[str, float]:
-    """A single loop-engineering letter grade from the whole picture: are goals
-    progressing, is the loop efficient (low futile), is it delivering value?
-    Composite in [0,1] → letter. Returns (letter, composite). DASH if no data."""
+    """A single loop-engineering letter grade. v1.7.0: artifact quality is the
+    dominant term and a self-declared goal is discounted by artifact reality, so a
+    feature-checklist loop over a broken artifact can no longer score an A.
+    Returns (letter, composite). DASH if no data."""
     lv = s.get("loop_value_score")
     if lv is None:
         return DASH, None
     goal = (s.get("goal_progress_pct") or 0) / 100.0
     futile = (s.get("futile_cycle_rate_pct") or 0) / 100.0
-    composite = 0.5 * goal + 0.3 * (1 - futile) + 0.2 * min(lv / 0.5, 1.0)
+    a = s.get("artifact_quality")
+    bar = s.get("artifact_bar") or DEFAULT_BAR
+
+    if a is not None:
+        # Evidence-weight the self-declared goal by the artifact reality: a 100%
+        # checklist over a 0.40 artifact (bar 0.65) only counts 0.40/0.65 ≈ 0.62
+        # of its weight. This is what kills D1 even before the cap fires.
+        goal_ev = goal * (1.0 if a >= bar else a / bar)
+        composite = 0.45 * a + 0.25 * goal_ev + 0.20 * (1 - futile) + 0.10 * min(lv / 0.5, 1.0)
+    else:
+        # Back-compat: no artifact axis configured → original process-only formula.
+        composite = 0.5 * goal + 0.3 * (1 - futile) + 0.2 * min(lv / 0.5, 1.0)
     composite = round(composite, 3)
-    letter = ("A" if composite >= 0.8 else "B" if composite >= 0.65
-              else "C" if composite >= 0.5 else "D" if composite >= 0.35 else "F")
+    letter = _letter(composite)
+
+    # Apply the artifact-only Goodhart cap: letter may not be BETTER than the cap.
+    g = goodhart_guard(s)
+    if g["cap"] and "FEDCBA".index(letter) > "FEDCBA".index(g["cap"]):
+        letter = g["cap"]
     return letter, composite
 
 
@@ -142,16 +215,26 @@ def _verdict(s: dict) -> str:
     return "stalled — mostly futile cycles; check domains, goals, or HALT"
 
 
+def _meter(v):
+    if v is None:
+        return DASH * 10
+    filled = round(v * 10)
+    return "█" * filled + "░" * (10 - filled)
+
+
 def render(project: Path, window: int | None = None) -> str:
     s = compute(project, window)
     lv = s["loop_value_score"]
-    bar = ""
-    if lv is not None:
-        filled = round(lv * 10)
-        bar = "█" * filled + "░" * (10 - filled)
+    bar = _meter(lv) if lv is not None else ""
+    aq = s.get("artifact_quality")
+    aqbar = s.get("artifact_bar") or DEFAULT_BAR
+    g = goodhart_guard(s)
     _grade_letter, _grade_score = grade(s)
+    aq_label = (DASH if aq is None
+                else f"{aq} {'✓≥bar' if aq >= aqbar else '✗<bar %.2f' % aqbar}")
     lines = [
         f"┌─ OODA-loop Scorecard ── {s['cycles_scored']} cycles ({s['window']}) ──────────────┐",
+        f"│  ★ Artifact Quality {_fmt(aq_label):<13} {_meter(aq)}  │   ← is the thing GOOD?",
         f"│  Loop Value Score   {_fmt(lv):<5} {bar}   │",
         f"│  Task Completion    {_fmt(s['task_completion_rate_pct'],'%'):<6}  (merged & accepted)        │",
         f"│  Futile Cycle Rate  {_fmt(s['futile_cycle_rate_pct'],'%'):<6}  (ran, changed nothing)     │",
@@ -167,6 +250,8 @@ def render(project: Path, window: int | None = None) -> str:
         f"│  Loop grade: {_grade_letter} ({_fmt(_grade_score)})  ·  {_verdict(s)[:30]:<30} │",
         f"└──────────────────────────────────────────────────────┘",
     ]
+    if g["lying"]:
+        lines.append(f"⚠  {g['message']}")
     return "\n".join(lines)
 
 

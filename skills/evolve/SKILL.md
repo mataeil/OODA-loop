@@ -614,6 +614,25 @@ for each goal in goals.json where status == "active":
   if progress >= 1.0: mark status "completed"
 ```
 
+**Evidence gate for artifact-dependent goals (v1.7.0).** The F1 dogfood declared
+its goal 99% complete by counting *features it wrote for itself* while the game
+was broken. A goal whose domain declares a `quality_rubric` may NOT be credited
+on a self-authored checklist alone — and a single lucky critic spike must not
+permanently unlock it either:
+
+```
+if goal.domain has config.domains[d].quality_rubric:
+  -- rolling artifact mean over the last N build cycles (N = rubric.plateau_window)
+  roll = mean(artifact_score of last N artifact-scored outcomes for this domain)
+  above = count of trailing cycles with artifact_score >= rubric.bar
+  -- cap the self-declared progress by the rolling artifact reality, and only let
+  -- it reach "completed" when quality has HELD above bar for N consecutive cycles.
+  goal.progress = min(goal.progress, roll / rubric.bar)
+  goal.evidence = { rolling_artifact_mean: roll, consecutive_above_bar: above }
+  if goal.progress >= 1.0 AND above < N:
+    goal.progress = 0.99   -- "feature-complete but quality not yet held" — not done
+```
+
 ### 2-D: Memo Adjustments
 
 Read memos.json. The canonical format (v1.1.0, bumped in v1.2.0) is:
@@ -690,9 +709,93 @@ A reflection whose `verdict` was `miss` and whose lesson was applied and then
 held (no repeat miss) is the clearest signal the verbal loop is working — surface
 it in the Cycle Card LEARN line (Step 7) when no higher-priority delta exists.
 
+### 2-G: Plateau Detection (the leap trigger — v1.7.0)
+
+The fix for **D3**: detect when the loop is *running but not improving the
+artifact*, so Decide (3-K) can force a quantum-leap cycle instead of bolting on
+yet another feature. Runs **after 2-B4** (so it reads outcomes.json with this
+cycle's back-annotations applied) and only for domains that declare a rubric.
+
+```
+for the implementation/build domain that declares config.domains[d].quality_rubric:
+  p = rubric_score.detect_plateau(outcomes.entries, rubric)   -- pure, deterministic
+  -- p.plateau is true when artifact quality is BELOW bar AND either:
+  --   (a) artifact_score is flat (max−first < plateau_eps) over the last
+  --       plateau_window artifact-scored cycles, OR
+  --   (b) the same weakest_dimension has stayed weakest for plateau_window cycles.
+  -- Anti-circularity (the loop generates the scores it is judged on): a plateau
+  -- requires below-bar — slow upward drift that never reaches bar still counts as
+  -- stuck, and "already good" (>= bar) is never a plateau.
+  if p.plateau:
+    -- THRASHING GUARD: if a leap on this weakest_dimension has already failed to
+    -- clear config.leap.min_dimension_delta `config.leap.max_attempts_per_dimension`
+    -- times (default 2) — counted from outcomes[].leap_attempts — do NOT leap
+    -- again. Escalate to a halt for human help:
+    fails = count(e in outcomes where cycle_mode=="leap"
+                  AND weakest_dimension == p.weakest_dimension
+                  AND e.leap_delta < config.leap.min_dimension_delta)
+    if fails >= config.leap.max_attempts_per_dimension:
+      record skill_gap { name: "leap_stuck_{p.weakest_dimension}", type:"quality_gap",
+        detail:"Leap on {dim} failed {fails}× without clearing min delta" }
+      Create HALT: "Leap on '{p.weakest_dimension}' failed {fails}× — human review
+                    needed; the loop cannot self-fix this dimension."
+      set plateau_leap_blocked = true
+    else:
+      set orient.plateau = { active:true, weakest_dimension:p.weakest_dimension,
+                             artifact_score:p.latest, reason:p.reason }
+      Print "[Orient] 📉 PLATEAU on '{p.weakest_dimension}' ({p.reason}). Next cycle should LEAP, not add a feature."
+  else:
+    set orient.plateau = { active:false }
+```
+
+`orient.plateau` is consumed by Step 3-K. A plateau cleared by a successful leap
+(artifact_score rose, or weakest_dimension changed) resets automatically — it is
+derived from outcomes.json each cycle, not a persisted counter.
+
 ---
 
 ## Step 3: Decide
+
+### 3-K: Leap-Mode Gate (apply BEFORE 3-G — v1.7.0)
+
+The fix for **D3**: RICE (`Reach×Impact×Confidence/Effort`) structurally scores
+overhauls low (high effort, uncertain confidence), so the loop could only ever
+take small safe steps — 22 feature modules, never a re-founding of the broken
+core. This gate lets a plateau force a **quantum leap**. It is a *cycle-mode*
+decision, not a new scorer: it sets a flag and reuses existing machinery
+(memo_adjustment + a context var), so it adds no parallel scoring branch.
+
+```
+cycle_mode = "feature"                       -- default
+if orient.plateau.active AND not plateau_leap_blocked AND not dry_run:
+  -- cost guard: a leap (bigger diff + 2× artifact critique) is pricier. Defer
+  -- (not HALT) if it would breach the daily cap.
+  if cost_ledger.total_estimated_usd + config.leap.cost_limit_usd > config.cost.daily_limit_usd:
+    Print "[Decide] Plateau detected but a leap would breach the daily cost cap — deferring leap to next cycle."
+  else if leaps_today >= config.leap.max_per_day (default 2):
+    Print "[Decide] Plateau detected but daily leap cap reached — deferring."
+  else:
+    cycle_mode = "leap"
+    targeted_dimension = orient.plateau.weakest_dimension
+    -- Pull the weakest-dimension's owning build domain UP via the EXISTING
+    -- memo_adjustment term (consumed in 3-A) so the normal scorer selects it —
+    -- no new term in the 3-A formula:
+    gap = config.domains[build_domain].quality_rubric.bar - orient.plateau.artifact_score
+    memo_adjustment[build_domain] += config.leap.gap_weight * (gap / bar)   -- gap-to-bar bonus
+    -- protected-path pre-check at trigger time (not just at PR time): if the core
+    -- this leap must touch is protected, force human review.
+    if `git diff`/target files would touch config.safety.protected_paths:
+      force risk_tier = 3 (no auto-merge, regardless of enable_auto_merge)
+    Print "[Decide] 🚀 LEAP MODE: overhaul '{targeted_dimension}' (artifact {orient.plateau.artifact_score} < bar). RICE bypassed for this cycle."
+```
+
+When `cycle_mode == "leap"`, Step 4-B passes `leap_mode=true`,
+`targeted_dimension`, and `config.leap.max_lines` (a larger size budget than
+`max_lines_per_pr`) to the build skill (dev-cycle), instructing it to make a
+**step-change on the targeted dimension** (overhaul / rebuild / refactor-for-
+cohesion) rather than pick the top-RICE *feature*. Steps 3-G (complexity level)
+and 3-F (confidence) STILL apply — a leap is not exempt from safety gates. The
+leap's verification is the 5-G artifact gate (4-C2), not only the unit test.
 
 ### 3-G: Progressive Complexity Filter (apply FIRST)
 
@@ -1255,7 +1358,12 @@ if config.safety.enable_rollback OR config.safety.enable_auto_merge:
     state_snapshot: {
       confidence: copy of confidence.json,
       action_queue: copy of action_queue.json pending items
-    }
+    },
+    -- v1.7.0: for a LEAP cycle, anchor the pre-change artifact scores here so the
+    -- post-leap 5-G critique is compared against a fixed baseline, never against a
+    -- drifting outcomes.json entry. Captured by running 5-G at 3-K trigger time.
+    leap_baseline_scores: { <dimension>: <score>, ... } or null,
+    rubric_hash: sha256(config.domains[d].quality_rubric)   -- integrity (5-G)
   }
 
   -- Read or create checkpoints.json
@@ -1297,6 +1405,33 @@ if PR was auto-merged AND health check fails:
   -- Create HALT file — ALWAYS, even if the push failed (especially then)
   Create HALT: "Auto-rollback: PR #{n} merged but health check failed. Reverted to {checkpoint.commit_sha}.{' PUSH FAILED — remote still has the bad merge.' if push failed}"
   Print "[Rollback] Reverted PR #{n}. HALT created. Human review required."
+```
+
+**LEAP artifact-regression gate (v1.7.0).** A LEAP overhauls the untestable core,
+so the unit-test gate is the WRONG arbiter: a restructured module can legitimately
+break a smoke test that mocked the old shape, and a leap that passes smoke tests
+can still have made the artifact worse. For `cycle_mode == "leap"` the revert
+decision is the **artifact**, not the unit test:
+
+```
+if cycle_mode == "leap":
+  -- Re-run 5-G on the post-leap artifact (pre-PR, on the branch — this is the
+  -- PRIMARY stop, before any merge).
+  post = rubric_score.aggregate(5-G_recritique.dimension_scores, rubric)
+  baseline = checkpoints[-1].leap_baseline_scores
+  delta = post.dimension_scores[targeted_dimension] - baseline[targeted_dimension]
+  if delta < config.leap.min_dimension_delta (default 0.05):
+    Print "[Leap] '{targeted_dimension}' did not improve (Δ {delta} < {min_delta}). Reverting leap."
+    git checkout -- .   (or revert the branch commit); do NOT open the PR
+    record outcome: leap_regressed (quality 0.0), append leap_attempts entry
+       { dimension: targeted_dimension, attempt_number: fails+1, delta_score: delta }
+    -- the 2-G thrashing guard reads these; after max_attempts it HALTs.
+  else:
+    Print "[Leap] 🚀 '{targeted_dimension}' {baseline[..]}→{post[..]} (Δ +{delta}). Quantum jump confirmed."
+    proceed to PR/commit as normal.
+  -- The unit test still RUNS (it is information, recorded in the PR body) but a
+  -- unit-test failure alone does NOT auto-revert a leap — only a failed artifact
+  -- improvement does.
 ```
 
 **Manual rollback** via `/ooda-config rollback {cycle}` — `ooda-config/SKILL.md`
@@ -1641,6 +1776,80 @@ Print "[Reflect] Self-critique recorded ({verdict}): {lesson}"
 
 Honesty rule: this is verbal self-reflection (text the model re-reads), not
 learned parameters. Frame it that way in any user-facing surface.
+
+### 5-G: Artifact Critique (independent, evidence-grounded — v1.7.0)
+
+The fix for **D2/D4**: a real critic that looks at the *artifact* and scores it
+against a **rubric**, instead of the loop only checking that a commit happened or
+that a unit test (which can only reach testable peripheral modules) passed. The
+F1 dogfood polished a glassmorphism HUD over a broken cyan track precisely because
+the only gate was `node tests/smoke.mjs` — untestable-but-vital work (visuals,
+feel) was never measured, so the loop systematically avoided it.
+
+This uses a **separate model context** (the same independence principle as 7-B,
+but a *different* prompt and schema — they are not shared code: 7-B asks "did you
+achieve the declared goal?", 5-G asks "is the artifact good?"). Run it ONLY when
+the winning domain declares a rubric and the cycle produced/changed an artifact.
+
+```
+rubric = config.domains[selected_domain].quality_rubric    -- per-domain (evolve is domain-agnostic)
+if rubric is null OR this cycle produced no artifact (observe/futile/error/skip):
+  artifact_score = null; weakest_dimension = null; dimension_scores = null
+  skip the rest of 5-G.
+
+-- INTEGRITY (gaming-resistance): the rubric is HUMAN-AUTHORED and read-only to
+-- the loop. The loop must NEVER write config.*.quality_rubric. Verify it is
+-- unchanged before grading: if checkpoints.rubric_hash exists and
+-- sha256(rubric) != checkpoints.rubric_hash → HALT ("quality_rubric mutated —
+-- the loop may not author its own grading standard"). On first run, record the
+-- hash. (config.*.quality_rubric SHOULD be listed in config.safety.protected_paths.)
+
+-- CAPTURE the actual artifact via rubric.capture_method:
+--   "screenshot"  → serve + Playwright screenshot to a temp PNG (web UIs)
+--   "api_call"    → run rubric.capture_command, capture stdout/response
+--   "benchmark"   → run rubric.capture_command, capture metrics
+capture = run rubric.capture_command (or the screenshot path)
+
+-- INDEPENDENT critique. Separate model context (config.eval.model or default).
+-- Give it ONLY: the rubric axes+descriptions, the captured artifact (image/output),
+-- and the mission. NOT the build cycle's own reasoning (that would let the maker
+-- grade itself).
+verdict = critic(
+  system: "You are an independent product critic. You did NOT build this. Score
+           the ACTUAL artifact against each rubric axis 0..1 from what you observe.
+           Cite concrete evidence per axis. Be harsh; default low when unsure.
+           A good HUD cannot compensate for a broken core. Output
+           {dimension_scores:{axis:score}, weakest_dimension, critique(<=30 words)}.",
+  input:  { mission, rubric.dimensions, artifact: capture }
+) -> { dimension_scores, weakest_dimension, critique }
+
+-- AGGREGATE deterministically (scripts/rubric_score.py — pure, no model):
+agg = rubric_score.aggregate(verdict.dimension_scores, rubric)
+artifact_score   = agg.artifact_score          -- weighted mean
+weakest_dimension = agg.weakest_dimension       -- prefer the critic's, else agg's
+dimension_scores = verdict.dimension_scores
+if agg.missing is non-empty:
+  -- the critic skipped an axis → re-prompt for those axes; an un-scored axis is a
+  -- critic failure, never a free pass.
+Print "[Reflect] Artifact critique: {artifact_score} (weakest: {weakest_dimension}) — {critique}"
+```
+
+These three values flow into **6-C9** (folded into `quality_multiplier`, and they
+make `on_mission` a real signal) and seed **2-G** plateau detection next cycle.
+
+**Weakest-dimension weighting (non-leap cycles).** To stop the loop from farming
+easy-to-score peripheral wins (D4 reborn at the critic level), in FEATURE cycles
+the rubric's `weakest_dimension` carries extra weight in the aggregate
+(`rubric_score` applies the rubric weights as authored; the critic prompt is told
+the current weakest dimension so a cycle that ignores the real bottleneck scores
+low). The action that actually moves the weakest dimension is what earns a high
+artifact_score.
+
+**LEAP gate.** When `cycle_mode == "leap"` (Step 3-K), 5-G runs **twice**: once at
+trigger time on the *pre-change* artifact to anchor `leap_baseline_scores`
+(stored in checkpoints.json, Step 4-C2), and again after the build to verify the
+targeted dimension rose by at least `config.leap.min_dimension_delta`. If it did
+not, the leap is reverted (4-C2) and recorded `leap_regressed` (quality 0.0).
 
 ---
 
@@ -2111,9 +2320,14 @@ It is fully **deterministic** (no model call): it scores the cycle from facts
 already recorded this cycle. The richer separate-model verdict is layered on top
 in Step 7-B (opt-in), never replacing this.
 
-Compute `quality_multiplier` (0.0–1.0) from the cycle's actual `result_type`:
+`quality_multiplier` (0.0–1.0) is the product of **two axes** (v1.7.0):
 
-| result_type | quality_multiplier | meaning |
+> `quality_multiplier = process_factor × artifact_factor`
+
+**Axis 1 — PROCESS** (`process_factor`, from `result_type`): did the PR/commit
+machinery advance? This is `scripts/score_outcome.py`'s deterministic table:
+
+| result_type | process_factor | meaning |
 |---|---|---|
 | `pr_merged_held` | 1.0 | a prior cycle's PR merged and survived (no revert) — confirmed value |
 | `pr_merged` | 0.8 | PR merged this cycle (hold not yet confirmed) |
@@ -2123,10 +2337,25 @@ Compute `quality_multiplier` (0.0–1.0) from the cycle's actual `result_type`:
 | `futile` | 0.0 | `had_output == false` — ran, changed nothing |
 | `error` | 0.0 | skill errored |
 | `pr_rejected` | 0.0 | a prior cycle's PR was closed unmerged — negative outcome |
+| `leap_regressed` | 0.0 | a LEAP cycle that lowered its targeted dimension and was reverted (v1.7.0) |
+
+**Axis 2 — ARTIFACT** (`artifact_factor`): is the thing the cycle produced
+actually *good*? This is the axis the F1-game dogfood proved was missing — 22
+cycles all scored 0.5 while the game was broken, because nothing measured the
+artifact. `artifact_factor = artifact_score` (0..1) written by the independent
+critic in **Step 5-G**, or **1.0** when there is no rubric / the cycle built no
+artifact (observe/futile) — so process-only loops are unchanged (back-compat).
+A `pr_created` (0.5) whose artifact scores 0.4 now records **0.2**, not 0.5.
+
+This is the fix for **D2**. It DOES let an independent, evidence-grounded signal
+move the score — which the old 7-B honesty rule forbade. That rule was right that
+*the maker must not grade itself*; it was wrong to throw out artifact evaluation
+entirely. 5-G is independent and must cite evidence, so it satisfies the
+principle while finally measuring quality.
 
 ```
 -- Append to agent/state/evolve/outcomes.json (create if missing:
---   { "schema_version": "1.0.0", "entries": [] }):
+--   { "schema_version": "1.1.0", "entries": [] }):
 outcomes.entries.append({
   cycle_id: cycle_count,
   timestamp: now (ISO 8601),
@@ -2135,16 +2364,31 @@ outcomes.entries.append({
   declared_goal: (active goals.json goal id this cycle advanced)
                  OR (action_queue item id acted on) OR null,
   result_type: <one of the table above>,
-  quality_multiplier: <from the table>,
-  on_mission: (config.mission set AND
-               config.domains[selected_domain].mission_alignment >= 0.5),  -- Iter 8
+  artifact_score: <0..1 from Step 5-G, or null if no rubric / no artifact>,
+  weakest_dimension: <from Step 5-G, or null>,
+  dimension_scores: <{axis: score} from Step 5-G, or null>,
+  quality_multiplier: <process_factor × (artifact_score if not null else 1.0)>,
+  on_mission: (
+     -- v1.7.0: for a BUILD cycle that produced an artifact, on_mission is a REAL
+     -- signal — did the artifact clear its bar? — not a static config echo (the
+     -- F1 run read 100% only because mission_alignment was hardcoded 1.0).
+     artifact_score >= config.domains[selected_domain].quality_rubric.bar
+        if artifact_score is not null
+     else (config.mission set AND
+           config.domains[selected_domain].mission_alignment >= 0.5)),  -- observe fallback
+  cycle_mode: <"feature" | "leap"  from Step 3-K>,
+  leap_attempts: <[{dimension, attempt_number, delta_score}] appended if this was a leap, else omit>,
   pr_number: pr_number or null,
   verifier_verdict: null   -- filled by Step 7-B if eval.enabled
 })
 -- Cap entries at config.memory.outcomes_buffer_size (default 200); drop oldest.
 Write outcomes.json.
-Print "[Reflect] Outcome: {result_type} (quality {quality_multiplier})."
+Print "[Reflect] Outcome: {result_type} · artifact {artifact_score or '—'} → quality {quality_multiplier}."
 ```
+
+The deterministic arithmetic (`process × artifact`, the bar check, plateau) lives
+in `scripts/score_outcome.py` and `scripts/rubric_score.py` so the engine, the
+scorecard, and the tests all agree on one definition.
 
 Also append ONE machine-readable line to `agent/state/evolve/cycle_log.jsonl`
 (append-only; never rewritten — this is the queryable substrate for every trend
@@ -2321,8 +2565,18 @@ Loop-engineering canon: **the writer must not grade its own work.** OODA-loop's
 deterministic Outcome Record (6-C9) is always on and unbiased because it scores
 from facts, not opinion. This step adds the *maker/checker* layer — a SEPARATE
 model reads what the cycle actually did and judges whether it achieved the
-declared goal. It runs ONLY when `config.eval.enabled == true` (default
-**false** — the deterministic signal stands alone at zero extra cost).
+declared **goal** (goal-conformance). It runs ONLY when `config.eval.enabled ==
+true` (default **false** — the deterministic signal stands alone at zero extra
+cost).
+
+> **7-B vs 5-G (v1.7.0).** These are different questions answered by independent
+> model contexts — *not* shared code. 7-B asks **"did it achieve the declared
+> goal?"** (input: declared_goal + diff; output: `{achieved, reason, confidence}`;
+> never moves the score — a second opinion). 5-G asks **"is the artifact good?"**
+> (input: the rendered/run artifact + rubric; output: `{dimension_scores,
+> weakest_dimension, critique}`; DOES move the score, because it is independent and
+> evidence-grounded). 5-G is the axis the F1 dogfood proved was missing; 7-B
+> remains a goal-conformance cross-check.
 
 ```
 if not config.eval.enabled: skip Step 7-B.

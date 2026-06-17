@@ -93,6 +93,26 @@ schedule). When in doubt, treat as manual invocation and allow execution.
 
 ## Step 1: Select Action from Queue
 
+**LEAP mode (v1.7.0).** If evolve invoked this cycle with `leap_mode=true` (Step
+3-K, fired by an artifact-quality plateau), do NOT pick the top-RICE *feature*.
+Instead:
+- Make a **step-change on `targeted_dimension`** (the rubric axis that has stayed
+  weakest / below bar) — overhaul, rebuild, or refactor-for-cohesion of the core
+  responsible for that dimension. RICE is bypassed on purpose: the whole point is
+  to do the high-effort overhaul that RICE structurally suppresses.
+- Use `config.leap.max_lines` (default 1500) as the size budget for Step 3,
+  instead of `config.safety.max_lines_per_pr` — a re-founding of the core is
+  legitimately larger than a feature.
+- The verification gate for a leap is the **artifact critique** (evolve 5-G /
+  4-C2): the targeted dimension must rise by `config.leap.min_dimension_delta` or
+  the change is reverted. The unit test still runs (information) but a unit-test
+  failure alone does not block a leap (a restructured module may legitimately
+  break a smoke test that mocked its old shape).
+- Title the branch/PR `leap: overhaul {targeted_dimension}` so it is legible as a
+  step-change, not a feature.
+Then skip the RICE selection below and go straight to Step 2 with this overhaul as
+the selected action. FEATURE cycles (the default) proceed with RICE selection:
+
 Read `agent/state/evolve/action_queue.json`.
 
 Find the top pending item by highest `effective_rice` (after decay adjustment):
