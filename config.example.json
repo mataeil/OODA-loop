@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.3.0",
+  "schema_version": "1.4.0",
   "project": {
     "name": "my-app",
     "locale": "en",
@@ -270,16 +270,27 @@
     "plateau_window": 4,
     "plateau_eps": 0.05,
     "locked": true,
-    "dimensions": []
+    "__dimensions_doc__": "v1.8.0: each dimension may override capture_method so the critic gets the evidence it actually needs. 'screenshot' axes share one capture; EXPERIENTIAL axes (feel/fun/responsiveness) a screenshot cannot judge use 'gameplay_metrics' — a HUMAN-AUTHORED harness that exercises the artifact and emits metrics JSON. The harness MUST be in safety.protected_paths AND match gameplay_metrics_hash (independence gate, same invariant as the rubric hash); else the dimension scores null (capture_failure) rather than faking a score. Without per-dimension capture, experiential axes freeze at their initial score and silently cap artifact_quality.",
+    "dimensions": [],
+    "__example_dimension__": {
+      "name": "driving_feel",
+      "weight": 0.25,
+      "capture_method": "gameplay_metrics",
+      "gameplay_metrics_command": "node tools/feel_harness.mjs",
+      "gameplay_metrics_hash": "<sha256 of the harness file>",
+      "metrics_fields": ["input_lag_ms", "physics_response_ms", "completion_rate"],
+      "description": "Responsive steering, weight transfer, distinct braking — judge against: input_lag_ms<40, physics_response_ms stable, completion_rate>0.7."
+    }
   },
   "leap": {
-    "__doc__": "Quantum-leap cycles (evolve Steps 2-G/3-K, v1.7.0) — the fix for monotonic incrementalism (RICE structurally forbids overhauls). When the artifact plateaus BELOW bar, the next cycle is forced into LEAP mode: it overhauls the weakest dimension (step-change, not a new feature), bypassing pure RICE via a gap-to-bar bonus, with a larger size budget and an ARTIFACT-improvement gate instead of the unit-test gate. Safety: min_dimension_delta must be cleared or the leap is reverted; max_attempts_per_dimension failures escalate to HALT; cost/day caps bound spend.",
+    "__doc__": "Quantum-leap cycles (evolve Steps 2-G/3-K, v1.7.0) — the fix for monotonic incrementalism (RICE structurally forbids overhauls). When the artifact plateaus BELOW bar, the next cycle is forced into LEAP mode: it overhauls the weakest dimension (step-change, not a new feature), bypassing pure RICE via a gap-to-bar bonus, with a larger size budget and an ARTIFACT-improvement gate instead of the unit-test gate. Safety: min_dimension_delta must be cleared or the leap is reverted; max_attempts_per_dimension failures escalate to HALT; cost/day caps bound spend. v1.8.0: lock_until_bar keeps leaping the SAME dimension until it clears bar (drive-to-good, not detect-and-nudge).",
     "max_lines": 1500,
     "min_dimension_delta": 0.05,
     "max_attempts_per_dimension": 2,
     "max_per_day": 2,
     "gap_weight": 30.0,
-    "cost_limit_usd": 0.5
+    "cost_limit_usd": 0.5,
+    "lock_until_bar": true
   },
   "goal_completion_idle": true
 }

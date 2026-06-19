@@ -683,6 +683,42 @@ def check_artifact_axis(r: Runner) -> None:
         f"weighted-gap target={target} (lowest raw was {lowest_raw})",
     )
 
+    # 9) v1.8.0 thrashing-guard bug fix: failed_leaps counts leap_attempts[].delta_score
+    # on the leap_target. The v1.7.x engine read a nonexistent `leap_delta` → always 0.
+    oc_fail = [
+        {"cycle_mode": "leap", "leap_attempts": [{"dimension": "fun_challenge", "delta_score": 0.01}]},
+        {"cycle_mode": "feature", "leap_attempts": []},
+        {"cycle_mode": "leap", "leap_attempts": [{"dimension": "fun_challenge", "delta_score": 0.02}]},
+        {"cycle_mode": "leap", "leap_attempts": [{"dimension": "visual_fidelity", "delta_score": 0.18}]},
+    ]
+    fails = R.failed_leaps(oc_fail, "fun_challenge", 0.05)
+    nofake = R.failed_leaps(oc_fail, "visual_fidelity", 0.05)  # 0.18 cleared → 0 fails
+    r.check(
+        "artifact-axis: thrashing guard counts real leap_attempts deltas (v1.8.0 bug fix)",
+        fails == 2 and nofake == 0,
+        f"fun_challenge fails={fails} (want 2), visual fails={nofake} (want 0)",
+    )
+
+    # 10) v1.8.0 dimension lock: stay on a below-bar target after a successful leap;
+    # release once at/near bar (tolerance band) so critic variance can't lock forever.
+    rubL = R.rubric_of({"quality_rubric": {"bar": 0.65, "plateau_eps": 0.05,
+        "dimensions": [{"name": "visual_fidelity", "weight": 1}]}})
+    below = [{"cycle_mode": "leap", "result_type": "pr_created",
+              "dimension_scores": {"visual_fidelity": 0.45}}]
+    nearbar = [{"cycle_mode": "leap", "result_type": "pr_created",
+                "dimension_scores": {"visual_fidelity": 0.62}}]   # within eps of 0.65 → release
+    regressed = [{"cycle_mode": "leap", "result_type": "leap_regressed",
+                  "dimension_scores": {"visual_fidelity": 0.45}}]
+    r.check(
+        "artifact-axis: dimension lock holds below-bar, releases near bar / on regress (v1.8.0)",
+        R.lock_target(below, rubL, "visual_fidelity") == "visual_fidelity"
+        and R.lock_target(nearbar, rubL, "visual_fidelity") is None
+        and R.lock_target(regressed, rubL, "visual_fidelity") is None,
+        f"below={R.lock_target(below, rubL, 'visual_fidelity')}, "
+        f"nearbar={R.lock_target(nearbar, rubL, 'visual_fidelity')}, "
+        f"regressed={R.lock_target(regressed, rubL, 'visual_fidelity')}",
+    )
+
 
 def main() -> int:
     r = Runner()

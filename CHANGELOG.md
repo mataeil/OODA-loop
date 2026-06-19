@@ -8,6 +8,42 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
+## [v1.8.0] — 2026-06-19
+
+### Changed — drive quality to "good", not "passable" (config schema 1.4.0)
+
+The F1 probe stayed crap after **three** v1.7.0 leaps (artifact 0.394 → 0.447 →
+0.472 → 0.522, never reaching the 0.65 bar). A 13-agent adversarially-verified
+diagnosis (`.claude/ooda-evolution-v1.8.0.md`) found the loop **detects** a
+quality gap but isn't built to **close** it. Four fixes, ranked by leverage:
+
+- **Thrashing-guard bug fix (prerequisite).** evolve 2-G counted a nonexistent
+  `leap_delta` field on `weakest_dimension`, so the guard's `fails` count was
+  ALWAYS 0 and the HALT safety valve **never fired** — the loop could thrash a
+  dimension forever. Now counts `leap_attempts[].delta_score` on the actual
+  `leap_target` (`rubric_score.failed_leaps()`).
+- **Per-dimension `capture_method` (5-G).** The critic scored every axis from one
+  screenshot, so `driving_feel` + `fun_challenge` (**45% of the rubric's weight**)
+  were frozen across all 25 cycles. Each axis now declares its capture;
+  experiential axes use `gameplay_metrics` — a human-authored, hash-verified,
+  protected harness (same independence invariant as the rubric hash). Missing/
+  unverified → score `null` + skill_gap, never a faked or silent-screenshot score.
+- **Dimension lock until bar (2-G).** A successful leap that left its target below
+  `bar − eps` now keeps the plateau active on the SAME target (drive-to-bar, not
+  detect-and-nudge + rotate). `rubric_score.lock_target()`; toggle with
+  `config.leap.lock_until_bar`. Tolerance band + the now-working max-attempts HALT
+  prevent infinite lock.
+- **Auto-queue remainder (5-G).** A leap that passes its delta gate but leaves the
+  dimension below bar queues a high-RICE remainder, triggered by the *independent
+  critic's* score (not the maker's self-report), so dropped/partial scope can't be
+  silently orphaned (as leap 3's materials/lighting was).
+
+**Rejected** (kept the loop honest): raising the bar to 0.80 before feel/fun are
+measurable; an inner multi-pass refine loop; an LLM-component-coverage gate
+(gameable); `multi_probe` still-sequences. `tests/verify.py` 59 → **61**.
+
+---
+
 ## [v1.7.0] — 2026-06-17
 
 ### Added — artifact-grounded evaluation + quantum-leap cycles (config schema 1.3.0)

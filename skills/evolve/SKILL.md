@@ -727,18 +727,27 @@ for the implementation/build domain that declares config.domains[d].quality_rubr
   -- requires below-bar — slow upward drift that never reaches bar still counts as
   -- stuck, and "already good" (>= bar) is never a plateau.
   if p.plateau:
-    -- THRASHING GUARD: if a leap on this weakest_dimension has already failed to
-    -- clear config.leap.min_dimension_delta `config.leap.max_attempts_per_dimension`
-    -- times (default 2) — counted from outcomes[].leap_attempts — do NOT leap
-    -- again. Escalate to a halt for human help:
-    fails = count(e in outcomes where cycle_mode=="leap"
-                  AND weakest_dimension == p.weakest_dimension
-                  AND e.leap_delta < config.leap.min_dimension_delta)
+    -- THRASHING GUARD (v1.8.0 fix): if leaps on the TARGET dimension have already
+    -- failed to clear config.leap.min_dimension_delta
+    -- `config.leap.max_attempts_per_dimension` times (default 2), do NOT leap
+    -- again — escalate to a HALT for human help.
+    -- BUG FIX: the v1.7.x guard read a nonexistent field `e.leap_delta` and
+    -- matched `weakest_dimension`, so `fails` was ALWAYS 0 and the guard NEVER
+    -- fired — the loop could thrash forever on an unmeasurable dimension. The
+    -- real ledger field is `leap_attempts[].delta_score`, and the dimension that
+    -- was actually leapt is `leap_target` (the weighted-gap winner from 3-K),
+    -- which can differ from the raw `weakest_dimension`.
+    fails = count(e in outcomes where e.cycle_mode == "leap"
+                  for a in (e.leap_attempts or [])
+                  if a.dimension == p.leap_target
+                     AND a.delta_score < config.leap.min_dimension_delta)
     if fails >= config.leap.max_attempts_per_dimension:
-      record skill_gap { name: "leap_stuck_{p.weakest_dimension}", type:"quality_gap",
-        detail:"Leap on {dim} failed {fails}× without clearing min delta" }
-      Create HALT: "Leap on '{p.weakest_dimension}' failed {fails}× — human review
-                    needed; the loop cannot self-fix this dimension."
+      record skill_gap { name: "leap_stuck_{p.leap_target}", type:"quality_gap",
+        detail:"Leap on {p.leap_target} failed {fails}× without clearing min delta —
+                likely UNMEASURABLE by the current capture_method (see 5-G)." }
+      Create HALT: "Leap on '{p.leap_target}' failed {fails}× — human review needed:
+                    supply a richer capture_method/metrics harness for this
+                    dimension, or reweight the rubric. The loop cannot self-fix it."
       set plateau_leap_blocked = true
     else:
       set orient.plateau = { active:true, leap_target:p.leap_target,
@@ -746,12 +755,37 @@ for the implementation/build domain that declares config.domains[d].quality_rubr
                              artifact_score:p.latest, reason:p.reason }
       Print "[Orient] 📉 PLATEAU. Leap target '{p.leap_target}' ({p.reason}). Next cycle should LEAP, not add a feature."
   else:
-    set orient.plateau = { active:false }
+    -- DIMENSION LOCK until bar (v1.8.0): the v1.7.x loop cleared the plateau the
+    -- instant a leap produced any improvement (+min_delta), then coasted through
+    -- ~plateau_window−1 feature cycles before re-detecting — and re-targeted via a
+    -- recomputed weighted gap, so a partially-fixed dimension could LOSE its slot
+    -- before reaching bar. Result: the loop "detected and nudged" instead of
+    -- "detected and CLOSED" (the F1 probe: visual_fidelity took 0.22→0.41→0.59
+    -- across non-consecutive leaps and never reached bar). Fix: if the last cycle
+    -- was a SUCCESSFUL leap whose target is still below bar, keep the plateau
+    -- active on the SAME target so 3-K leaps it again next cycle — drive it to bar.
+    last = outcomes.entries[-1] if outcomes.entries else null
+    bar = config.domains[d].quality_rubric.bar
+    if (config.leap.lock_until_bar (default true)
+        AND last is not null AND last.cycle_mode == "leap"
+        AND last.result_type != "leap_regressed"
+        AND p.leap_target is not null
+        AND last.dimension_scores[p.leap_target] < bar - rubric.plateau_eps):
+        -- tolerance band: within plateau_eps of bar counts as cleared, so critic
+        -- variance near threshold can't lock the loop forever (max_attempts HALT
+        -- is the backstop if it genuinely can't clear).
+      set orient.plateau = { active:true, leap_target:p.leap_target,
+                             weakest_dimension:p.weakest_dimension,
+                             artifact_score:p.latest,
+                             reason:"'{p.leap_target}' improved to {last.dimension_scores[p.leap_target]} but still < bar {bar} — keep leaping" }
+      Print "[Orient] 🔒 LEAP succeeded but '{p.leap_target}' still below bar. Locking target — leap again, don't coast."
+    else:
+      set orient.plateau = { active:false }
 ```
 
-`orient.plateau` is consumed by Step 3-K. A plateau cleared by a successful leap
-(artifact_score rose, or weakest_dimension changed) resets automatically — it is
-derived from outcomes.json each cycle, not a persisted counter.
+`orient.plateau` is consumed by Step 3-K. With **lock_until_bar** the loop drives
+one dimension to its bar before moving on (constraint *exploitation*, not
+rotation); set `config.leap.lock_until_bar=false` to restore v1.7.x rotation.
 
 ---
 
@@ -1810,23 +1844,51 @@ if rubric is null OR this cycle produced no artifact (observe/futile/error/skip)
 -- the loop may not author its own grading standard"). On first run, record the
 -- hash. (config.*.quality_rubric SHOULD be listed in config.safety.protected_paths.)
 
--- CAPTURE the actual artifact via rubric.capture_method:
---   "screenshot"  → serve + Playwright screenshot to a temp PNG (web UIs)
---   "api_call"    → run rubric.capture_command, capture stdout/response
---   "benchmark"   → run rubric.capture_command, capture metrics
-capture = run rubric.capture_command (or the screenshot path)
+-- CAPTURE per-DIMENSION (v1.8.0): the v1.7.x critic took ONE screenshot for every
+-- axis, so experiential dimensions (driving_feel, fun_challenge — 45% of the F1
+-- rubric's weight) were unmeasurable from a still and FROZEN across every cycle —
+-- the single biggest reason quality stalled (the loop was optimizing 55% of its
+-- own rubric). Each dimension now declares how to capture the evidence it needs:
+--   "screenshot"       → serve + Playwright screenshot (visual axes; one shot reused for all)
+--   "api_call"         → run capture_command, capture stdout/response (library/API axes)
+--   "benchmark"        → run capture_command, capture metrics
+--   "gameplay_metrics" → run a HUMAN-AUTHORED harness that exercises the artifact
+--                        (e.g. drive 10s, log input_lag_ms / physics_response_ms /
+--                        completion_rate) so feel/fun become measurable.
+for dim in rubric.dimensions:
+  method = dim.capture_method or rubric.capture_method or "screenshot"
+  if method == "gameplay_metrics":
+    -- INDEPENDENCE GATE (same invariant as rubric_hash): the harness must be
+    -- human-authored and out of the loop's reach, or its score is worthless.
+    --   (1) dim.gameplay_metrics_command path MUST be in config.safety.protected_paths
+    --   (2) sha256(harness file) MUST equal dim.gameplay_metrics_hash
+    -- If either fails: dim_artifact[dim] = CAPTURE_FAILURE; record
+    --   skill_gap("gameplay_metrics_not_independent_{dim}"); do NOT fall back to a
+    --   screenshot silently (that would re-freeze the dimension). The dimension
+    --   scores null and the 2-G thrashing guard will eventually HALT for a human.
+    if not independent: dim_artifact[dim] = null (capture_failure); continue
+    dim_artifact[dim] = run_protected_harness(dim.gameplay_metrics_command)  -- metrics JSON
+  else if method == "screenshot":
+    dim_artifact[dim] = the shared screenshot (captured once)
+  else:
+    dim_artifact[dim] = run dim.capture_command (or rubric.capture_command)
+-- If a dimension's harness is MISSING entirely, score it null (capture_failure) +
+-- skill_gap("gameplay_metrics_harness_missing_{dim}") — degrade gracefully, never
+-- fake a score. The loop keeps improving the dimensions it CAN see.
 
 -- INDEPENDENT critique. Separate model context (config.eval.model or default).
--- Give it ONLY: the rubric axes+descriptions, the captured artifact (image/output),
+-- Give it ONLY: the rubric axes+descriptions, each dimension's captured evidence,
 -- and the mission. NOT the build cycle's own reasoning (that would let the maker
--- grade itself).
+-- grade itself). Dimensions whose capture failed are passed as null → scored null.
 verdict = critic(
   system: "You are an independent product critic. You did NOT build this. Score
-           the ACTUAL artifact against each rubric axis 0..1 from what you observe.
-           Cite concrete evidence per axis. Be harsh; default low when unsure.
-           A good HUD cannot compensate for a broken core. Output
-           {dimension_scores:{axis:score}, weakest_dimension, critique(<=30 words)}.",
-  input:  { mission, rubric.dimensions, artifact: capture }
+           each rubric axis 0..1 from ITS captured evidence (image, metrics JSON,
+           or api output). Cite concrete evidence per axis. Be harsh; default low
+           when unsure. A good HUD cannot compensate for a broken core. For a
+           metrics axis, judge against the axis description's targets, not vibes.
+           Score null only if the evidence is null. Output
+           {dimension_scores:{axis:score|null}, weakest_dimension, critique(<=30 words)}.",
+  input:  { mission, rubric.dimensions, evidence: dim_artifact }
 ) -> { dimension_scores, weakest_dimension, critique }
 
 -- AGGREGATE deterministically (scripts/rubric_score.py — pure, no model):
@@ -1856,6 +1918,30 @@ trigger time on the *pre-change* artifact to anchor `leap_baseline_scores`
 (stored in checkpoints.json, Step 4-C2), and again after the build to verify the
 targeted dimension rose by at least `config.leap.min_dimension_delta`. If it did
 not, the leap is reverted (4-C2) and recorded `leap_regressed` (quality 0.0).
+
+**Remainder auto-queue (v1.8.0).** A leap can PASS the gate (delta ≥ min_delta)
+yet leave its dimension still below bar — and a multi-component plan can ship only
+part of itself (the F1 probe: leap 3 shipped car/cockpit but the designed
+materials/lighting/shadows — the #1 recurring critic complaint — silently
+vanished). After the post-leap critique, if the targeted dimension is still below
+bar, record it and queue the remainder so it is never orphaned:
+```
+if cycle_mode == "leap":
+  post = dimension_scores[orient.plateau.leap_target]
+  bar  = config.domains[d].quality_rubric.bar
+  outcomes.entries[-1].leap_dim_still_below_bar = (post < bar)   -- crisp 2-G signal
+  if post < bar:
+    action_queue.pending.append({
+      id: next, title: "quality remainder: '{leap_target}' at {post} still < bar {bar}",
+      source_domain: build_domain, rice_score: 90, status: "pending",
+      origin: "leap_remainder_auto" })
+    Print "[5-G] Remainder queued: '{leap_target}' needs +{bar−post} more."
+```
+The trigger is the *independent critic's* score, not the build cycle's
+self-reported "plan complete" — so the maker cannot suppress it (the
+LLM-component-coverage gate was rejected as gameable). With **dimension lock**
+(2-G) active this is usually redundant for consecutive leaps, but it is the
+backstop when the lock releases near bar or `lock_until_bar=false`.
 
 ---
 
