@@ -8,6 +8,30 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
+## [v1.8.1] — 2026-06-19
+
+### Validated + guidance — the gameplay_metrics path works end-to-end
+
+The f1 probe exercised v1.8.0's per-dimension capture: it authored a
+`gameplay_metrics` harness (drives the real pure physics headlessly) for the two
+**frozen** experiential axes (`driving_feel`, `fun_challenge` = 45% of the rubric
+a screenshot can't judge).
+
+- **Honest measurement first dropped artifact_quality 0.533 → 0.490** — the
+  screenshot had been *over*-scoring feel/fun (0.51/0.38 → measured 0.41/0.29).
+  Confirms the v1.8.0 thesis: measurement was the bottleneck *and* inflating.
+- Two leaps the unlock enabled: `fun_challenge` 0.29 → **0.81** (distinct AI
+  racing lines + tamed DRS slingshot) and `driving_feel` 0.41 → **0.78** (steering
+  inertia + power oversteer + weight transfer). **artifact_quality crossed the bar
+  for the first time (0.687 ≥ 0.65) → an HONEST grade A** (the loop's original A
+  was a lie; this one is earned).
+- **Guidance (config doc):** a `gameplay_metrics` harness must MEASURE BEHAVIOUR
+  (drive the artifact, read the numbers), never assert an implementation fact — the
+  probe's first harness hardcoded a feature flag and couldn't credit the fix,
+  which would trigger a spurious thrashing-HALT. Rewritten to measure behaviour.
+
+---
+
 ## [v1.8.0] — 2026-06-19
 
 ### Changed — drive quality to "good", not "passable" (config schema 1.4.0)
