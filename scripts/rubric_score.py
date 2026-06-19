@@ -214,6 +214,43 @@ def detect_plateau(outcomes: list, rubric: dict) -> dict:
     }
 
 
+def failed_leaps(outcomes: list, dimension: str, min_delta: float) -> int:
+    """v1.8.0 thrashing-guard count (deterministic ground truth for evolve 2-G).
+    Counts leap cycles whose `leap_attempts` on `dimension` failed to clear
+    `min_delta`. The v1.7.x engine read a nonexistent field `leap_delta` and
+    matched the raw weakest_dimension, so this was ALWAYS 0 and the guard never
+    fired — the loop could thrash forever. The real ledger field is
+    `leap_attempts[].delta_score`, keyed on the dimension actually leapt."""
+    n = 0
+    for e in outcomes:
+        if e.get("cycle_mode") != "leap":
+            continue
+        for a in (e.get("leap_attempts") or []):
+            if a.get("dimension") == dimension and a.get("delta_score", 1.0) < min_delta:
+                n += 1
+    return n
+
+
+def lock_target(outcomes: list, rubric: dict, leap_target: str | None) -> str | None:
+    """v1.8.0 dimension-lock: after a SUCCESSFUL leap whose target is still below
+    (bar − eps), return that target so evolve 2-G keeps the plateau active on it
+    (drive-to-bar) instead of coasting through feature cycles and re-rotating.
+    Returns None when nothing should be locked (no leap last, regressed, or the
+    target is at/near bar — the tolerance band stops critic variance from locking
+    the loop forever; the max_attempts HALT is the genuine-stuck backstop)."""
+    if not leap_target or not outcomes:
+        return None
+    last = outcomes[-1]
+    if last.get("cycle_mode") != "leap" or last.get("result_type") == "leap_regressed":
+        return None
+    bar = rubric.get("bar", DEFAULT_BAR)
+    eps = float(rubric.get("plateau_eps", DEFAULT_PLATEAU_EPS))
+    score = (last.get("dimension_scores") or {}).get(leap_target)
+    if score is None:
+        return None
+    return leap_target if score < bar - eps else None
+
+
 def compute(project: Path) -> dict:
     ev = Path(project) / "agent" / "state" / "evolve"
     config = _load(Path(project) / "config.json", {}) or {}
