@@ -8,6 +8,52 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
+## [v1.7.0] — 2026-06-17
+
+### Added — artifact-grounded evaluation + quantum-leap cycles (config schema 1.3.0)
+
+The F1-racing dogfood (22 cycles, every cycle graded **A** / futile 0% /
+mission-hit 100%) produced a *처참* (dismal) game: a Z-fighting cyan blob for a
+track, no recognizable car, polished HUD bolted over a broken core. The metrics
+were perfect; the artifact proved them a lie — a **Goodhart collapse**. Root
+cause: the loop measured **process** (did a PR/commit advance?) and was blind to
+the **artifact** (is the thing good?), and its action selection (RICE + "one
+focused feature") could only ever take small steps. Diagnosis + design:
+`.claude/ooda-evolution-v1.7.0.md`.
+
+- **Artifact axis in scoring (fixes D2).** `quality_multiplier = process_factor ×
+  artifact_factor` (`scripts/score_outcome.py`). A `pr_created` (0.5) whose
+  artifact scores 0.4 now records **0.2**, not 0.5. `artifact_score` is a
+  first-class field in `outcomes.json` (Step 6-C9). No rubric → factor 1.0
+  (process-only loops unchanged).
+- **Step 5-G: Artifact Critique.** An *independent*, evidence-grounded critic
+  (separate model context) captures the real artifact (screenshot / API call /
+  benchmark per `quality_rubric.capture_method`) and scores it against a
+  HUMAN-AUTHORED, integrity-checked rubric — the loop may never author its own
+  grading standard.
+- **Honest scorecard (fixes D1).** `scripts/loop_scorecard.py`: `★ Artifact
+  Quality` is the new headline KPI; the self-declared goal term is **evidence-
+  weighted** by artifact reality; an **artifact-only Goodhart Guard** caps the
+  grade (graduated C/D/F) and prints a measurement warning when artifact < bar.
+  The F1 run re-grades **A (0.995) → D (0.567)**.
+- **Quantum-leap cycles (fixes D3).** Step 2-G plateau detector + Step 3-K
+  Leap-Mode Gate: when artifact quality plateaus *below bar*, the next cycle is
+  forced to **overhaul the weakest dimension** (step-change, RICE bypassed via a
+  gap-to-bar bonus, larger size budget) instead of adding another feature.
+- **Leap safety.** Pre-PR artifact gate with a checkpoint baseline; revert on
+  `min_dimension_delta` miss (→ `leap_regressed`, quality 0.0); thrashing
+  escalates to HALT after `max_attempts_per_dimension`; per-leap cost cap +
+  `max_per_day`; protected-path diff-time check. Hardened by a 5-agent adversarial
+  red-team (gaming-resistance / autonomous-safety / implementability).
+- **`on_mission` is now a real signal** for build cycles (`artifact_score >= bar`)
+  instead of a static config echo.
+- **Config:** new `quality_rubric` (per-domain, canonical) + `leap` blocks in
+  `config.example.json`. **Tests:** new `scripts/rubric_score.py` (pure) + 8 new
+  `tests/verify.py` checks (now 58 passing; the previously-unregistered
+  `scorecard` suite is wired back in).
+
+---
+
 ## [v1.6.1] — 2026-06-14
 
 ### Added / clarified — plugin namespacing + cloud routine recipe

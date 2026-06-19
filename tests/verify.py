@@ -574,6 +574,116 @@ def check_longhorizon(r: Runner) -> None:
     )
 
 
+def check_artifact_axis(r: Runner) -> None:
+    """v1.7.0: the artifact-quality axis, Goodhart Guard, and plateau detector —
+    the fix for the F1 dogfood collapse (22 cycles all 0.5 / grade A while the
+    game was broken). Pure-function checks, no fixtures."""
+    import importlib.util
+
+    def _mod(name, fn):
+        p = ROOT.parent / "scripts" / fn
+        spec = importlib.util.spec_from_file_location(name, p)
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        return m
+
+    S = _mod("so", "score_outcome.py")
+    L = _mod("lsc", "loop_scorecard.py")
+    R = _mod("rs", "rubric_score.py")
+
+    # 1) quality_multiplier = process × artifact (fixes D2)
+    folds = {
+        S.score({"result": "success", "pr_number": 1, "artifact_score": 0.4})[1]: 0.2,
+        S.score({"result": "success", "pr_number": 1, "artifact_score": 0.9})[1]: 0.45,
+        S.score({"result": "success", "pr_number": 1})[1]: 0.5,   # no rubric → back-compat
+        S.score({"leap_regressed": True})[1]: 0.0,
+    }
+    r.check(
+        "artifact-axis: quality_multiplier = process × artifact (D2)",
+        all(k == v for k, v in folds.items()),
+        f"pr_created×0.4=0.2, ×0.9=0.45, no-rubric=0.5, leap_regressed=0.0 → {sorted(folds)}",
+    )
+
+    # 2) back-compat — the 8 original result_types are unchanged with no artifact
+    ladder = [S.score({"result": "success", "pr_number": 1, "pr_outcome": o})[1]
+              for o in ("merged_held", "merged")]
+    r.check(
+        "artifact-axis: process-only scoring unchanged when no rubric (back-compat)",
+        ladder == [1.0, 0.8] and S.PROCESS["pr_created"] == 0.5,
+        f"merged_held=1.0, merged=0.8 → {ladder}",
+    )
+
+    # 3) the honest re-grade: F1-like (artifact 0.40 < bar 0.65) drops A→D, guard fires
+    f1 = {"loop_value_score": 0.20, "goal_progress_pct": 99.0,
+          "futile_cycle_rate_pct": 0.0, "artifact_quality": 0.40, "artifact_bar": 0.65}
+    g_letter, _ = L.grade(f1)
+    guard = L.goodhart_guard(f1)
+    r.check(
+        "artifact-axis: F1-like self-checklist over broken artifact → D, guard fires (kills D1)",
+        g_letter == "D" and guard["lying"] and guard["cap"] == "D",
+        f"grade={g_letter} guard.cap={guard['cap']} lying={guard['lying']}",
+    )
+
+    # 4) a genuinely good loop (artifact ≥ bar) still earns an A, no guard
+    good = {"loop_value_score": 0.7, "goal_progress_pct": 80.0,
+            "futile_cycle_rate_pct": 5.0, "artifact_quality": 0.80, "artifact_bar": 0.65}
+    r.check(
+        "artifact-axis: good artifact (≥ bar) still grades A, guard silent",
+        L.grade(good)[0] == "A" and not L.goodhart_guard(good)["lying"],
+        f"grade={L.grade(good)[0]} guard_lying={L.goodhart_guard(good)['lying']}",
+    )
+
+    # 5) graduated cap: far-below-bar artifact is capped harder (D vs F)
+    far = {"loop_value_score": 0.2, "goal_progress_pct": 99.0,
+           "futile_cycle_rate_pct": 0.0, "artifact_quality": 0.30, "artifact_bar": 0.65}
+    r.check(
+        "artifact-axis: graduated Goodhart cap (0.30 « bar → F, 0.40 < bar → D)",
+        L.goodhart_guard(far)["cap"] == "F" and L.grade(far)[0] == "F",
+        f"0.30→cap {L.goodhart_guard(far)['cap']}, grade {L.grade(far)[0]}",
+    )
+
+    # 6) rubric aggregation: weighted mean + weakest dimension + missing reported
+    rub = R.rubric_of({"quality_rubric": {"bar": 0.65, "dimensions": [
+        {"name": "visual", "weight": 0.5}, {"name": "feel", "weight": 0.5}]}})
+    agg = R.aggregate({"visual": 0.2, "feel": 0.6}, rub)
+    agg_missing = R.aggregate({"visual": 0.2}, rub)
+    r.check(
+        "artifact-axis: rubric aggregate = weighted mean, names weakest, flags missing",
+        agg["artifact_score"] == 0.4 and agg["weakest_dimension"] == "visual"
+        and agg_missing["missing"] == ["feel"],
+        f"agg={agg['artifact_score']} weakest={agg['weakest_dimension']} missing={agg_missing['missing']}",
+    )
+
+    # 7) plateau detector: flat + below-bar + weakest-stuck → leap; already-good → no leap
+    flat = [{"artifact_score": 0.22, "weakest_dimension": "visual"},
+            {"artifact_score": 0.23, "weakest_dimension": "visual"},
+            {"artifact_score": 0.24, "weakest_dimension": "visual"},
+            {"artifact_score": 0.24, "weakest_dimension": "visual"}]
+    rub2 = R.rubric_of({"quality_rubric": {"bar": 0.65, "plateau_window": 4,
+                                           "plateau_eps": 0.05, "dimensions": [{"name": "visual", "weight": 1}]}})
+    p_stuck = R.detect_plateau(flat, rub2)
+    good_series = [{"artifact_score": 0.7, "weakest_dimension": "visual"}] * 4
+    p_good = R.detect_plateau(good_series, rub2)
+    r.check(
+        "artifact-axis: plateau fires when stuck below bar, never when already ≥ bar (D3 trigger)",
+        p_stuck["plateau"] and not p_good["plateau"],
+        f"stuck.plateau={p_stuck['plateau']} ({p_stuck['reason']}); good.plateau={p_good['plateau']}",
+    )
+
+    # 8) v1.7.1 weighted-gap targeting: the leap targets the largest weight×gap,
+    # NOT the lowest raw score (F1 dogfood: visual outranks lower-scoring fun).
+    rub3 = R.rubric_of({"quality_rubric": {"bar": 0.65, "dimensions": [
+        {"name": "visual_fidelity", "weight": 0.28}, {"name": "fun_challenge", "weight": 0.20}]}})
+    ds = {"visual_fidelity": 0.41, "fun_challenge": 0.38}
+    target = R.aggregate(ds, rub3)["leap_target"]
+    lowest_raw = min(ds, key=ds.get)
+    r.check(
+        "artifact-axis: leap targets largest WEIGHTED gap, not lowest raw score (v1.7.1)",
+        target == "visual_fidelity" and lowest_raw == "fun_challenge",
+        f"weighted-gap target={target} (lowest raw was {lowest_raw})",
+    )
+
+
 def main() -> int:
     r = Runner()
     r.section("principles-extraction", lambda: check_principles_extraction(r))
@@ -587,6 +697,8 @@ def main() -> int:
     r.section("cycle-card-render", lambda: check_cycle_card_render(r))
     r.section("auto-merge-gating", lambda: check_auto_merge_gating(r))
     r.section("outcome-scoring", lambda: check_outcome_scoring(r))
+    r.section("scorecard", lambda: check_scorecard(r))
+    r.section("artifact-axis", lambda: check_artifact_axis(r))
     r.section("halt-hook", lambda: check_halt_hook(r))
     r.section("eval-config", lambda: check_eval_config(r))
     r.section("long-horizon", lambda: check_longhorizon(r))
