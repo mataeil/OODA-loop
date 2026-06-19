@@ -95,6 +95,26 @@ driven, and gaming-resistant. `tests/verify.py` 59 → **61**.
 
 ## Validation (leap 4 under the upgraded loop)
 
-<!-- run a leap with the new loop; show visual_fidelity driven toward the bar in a
-     sustained push (dimension lock) and the previously-dropped materials/lighting
-     actually shipped -->
+Ran a real leap under v1.8.0, targeting `visual_fidelity` (dimension lock kept it
+as the target). It shipped exactly the materials/lighting that leap 3 dropped —
+ACES filmic tone mapping, soft directional shadows (cars/buildings/kerbs cast,
+road/ground receive), and baked contact shadows under every car.
+
+- Independent re-critique: **visual_fidelity 0.59 → 0.63** (Δ +0.04). Building
+  shadows and tonal range are now visible; objects are grounded.
+- Artifact trajectory across all leaps: **0.394 → 0.447 → 0.472 → 0.522 → 0.533**.
+
+**The decisive finding (the whole point — f1 is the probe):** +0.04 is *at the
+gate boundary*, and the critic still under-credits the change — because
+`visual_fidelity` has hit the **ceiling of what a still screenshot can measure
+(~0.63)**. The loop's next weighted-gap target is `fun_challenge` (0.38), which a
+screenshot *cannot* judge at all. So the upgraded loop's correct next move is
+exactly what v1.8.0 built: with the **fixed** thrashing guard, two failed leaps on
+`fun_challenge` → **HALT requesting a human-authored `gameplay_metrics` harness**,
+instead of thrashing forever (the v1.7.x bug) or faking a score.
+
+The bottleneck has *moved*: from "the loop can't close gaps" (v1.7.0) to "the loop
+can't **perceive** the experiential half of quality" (now). v1.8.0's per-dimension
+`capture_method` is the mechanism to close it — but it requires a human to author
+the measurement harness, because the loop is forbidden (by design) from grading
+its own standard. **That hand-off is the next experiment.**
