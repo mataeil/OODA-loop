@@ -8,6 +8,43 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
+## [v1.9.0] — 2026-06-19
+
+### Added — "Ambition": let the loop make RADICAL jumps, not prototype plateaus (config schema 1.5.0)
+
+The f1 probe still looked like a 1980s game after all the v1.7/v1.8 work — an
+independent re-grade **against real racing games scored it 0.09 (F+)**, vs the
+internal rubric's 0.687 "A". A 6-agent diagnosis found the loop's quality ceiling
+is `min(standard, medium, leap-scope)` and all three were pinned to "prototype":
+
+- **Dual thresholds (`bar_leap` + `bar_coast`).** The single `bar` made the loop
+  COAST the instant it cleared a prototype number. Now: below `bar_leap` → always
+  leap; only above `bar_coast` (set high, ~0.85, anchored to a real product) may
+  it coast; the forcing zone between keeps leaping on stagnation. Back-compat: a
+  lone `bar` sets both equal (old behaviour). `rubric_score` + `loop_scorecard`
+  grade against `bar_coast`.
+- **Benchmark anchors (critic recalibration).** Each rubric dimension carries
+  `reference` anchors (`score_0.10..0.90`) naming what each level looks like in
+  REAL products; the 5-G critic scores against those, NOT relative to the
+  artifact's own past — so a flat-shaded prototype reads ~0.10, not 0.6. A
+  `prototype_ceiling` triggers an ANCHOR WARNING when the critic may be grading on
+  a curve.
+- **Technique menu.** Each dimension lists the modern `techniques` + pre-approved
+  `technique_cdns` (EffectComposer, PMREM/IBL, particles, Sky shader…). A leap is
+  told to pick ONE and implement it completely — the fix for "the loop reached for
+  more BoxGeometry instead of post-processing".
+- **Mega-leap mode.** A human-approved, multi-cycle RE-PLATFORM (bigger budget, no
+  per-cycle revert, atomic final-gate rollback) for radical rewrites a bounded
+  leap can't make. `requires_human_plan_approval` keeps the loop from
+  self-authorising it.
+- **Asset ceilings.** Each dimension declares `ceiling_without_assets`; when a
+  code-only leap reaches it, the loop records a `human_required` skill_gap instead
+  of thrashing — honest about what needs authored models/textures/audio.
+
+`tests/verify.py` 61 → **62**. plugin 1.8.1→1.9.0.
+
+---
+
 ## [v1.8.1] — 2026-06-19
 
 ### Validated + guidance — the gameplay_metrics path works end-to-end

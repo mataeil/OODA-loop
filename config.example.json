@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.4.0",
+  "schema_version": "1.5.0",
   "project": {
     "name": "my-app",
     "locale": "en",
@@ -265,21 +265,47 @@
   "quality_rubric": {
     "__doc__": "ARTIFACT-quality axis (evolve Step 5-G, v1.7.0) — the fix for the dogfood failure where every cycle scored 0.5 / graded A while the built thing was broken, because nothing measured the artifact. CANONICAL placement is PER-DOMAIN: config.domains[<build domain>].quality_rubric (evolve is domain-agnostic). This top-level block is the single-domain fallback. Each cycle that produces an artifact, an INDEPENDENT critic (separate model context) captures the real artifact via capture_method and scores each dimension 0..1; rubric_score.py aggregates to artifact_score, which MULTIPLIES the process score in 6-C9 and drives the Goodhart Guard + LEAP trigger. The rubric is HUMAN-AUTHORED and read-only to the loop — add 'quality_rubric' / the config path to safety.protected_paths so the loop can never write its own grading standard (gaming-resistance). Empty dimensions = artifact axis OFF (process-only scoring, back-compat).",
     "bar": 0.65,
+    "__bars_doc__": "v1.9.0 'Ambition' — DUAL thresholds break the prototype plateau. bar_leap: below it, ALWAYS leap. bar_coast: only above it may the loop coast (stop leaping). The forcing zone (bar_leap..bar_coast) keeps leaping on stagnation so the loop cannot declare victory at prototype quality. Set bar_coast HIGH (~0.85) anchored to a REAL product, not a demo. Legacy single `bar` → bar_leap==bar_coast==bar (old behaviour).",
+    "bar_leap": 0.65,
+    "bar_coast": 0.85,
+    "prototype_ceiling": 0.20,
     "capture_method": "screenshot",
     "capture_command": "<serve + screenshot for web UIs | run + capture stdout for api_call | run benchmark>",
     "plateau_window": 4,
     "plateau_eps": 0.05,
     "locked": true,
+    "__anchors_doc__": "v1.9.0 — each dimension SHOULD carry `reference` anchors naming what score_0.10/0.40/0.70/0.90 look like in REAL products, and `ceiling_without_assets`. The 5-G critic scores against these named anchors, not relative to the artifact's own past — without them a critic silently grades a flat-shaded prototype as 0.6 ('it works') instead of 0.1 ('vs Gran Turismo'). When artifact_score >= a dimension's ceiling_without_assets, the loop records a `human_required` skill_gap (authored model/track/audio assets needed) instead of leaping fruitlessly. Reference anchors + ceilings are human-authored + protected.",
     "__dimensions_doc__": "v1.8.0: each dimension may override capture_method so the critic gets the evidence it actually needs. 'screenshot' axes share one capture; EXPERIENTIAL axes (feel/fun/responsiveness) a screenshot cannot judge use 'gameplay_metrics' — a HUMAN-AUTHORED harness that exercises the artifact and emits metrics JSON. The harness MUST be in safety.protected_paths AND match gameplay_metrics_hash (independence gate, same invariant as the rubric hash); else the dimension scores null (capture_failure) rather than faking a score. Without per-dimension capture, experiential axes freeze at their initial score and silently cap artifact_quality. v1.8.1 rule (validated by the f1 probe): the harness must MEASURE BEHAVIOUR (e.g. drive the real physics and read the resulting numbers), NOT assert an implementation fact — a hardcoded flag like {feature: false} cannot credit a real fix, so it would trigger a spurious thrashing-HALT. Drive the artifact and report what it actually does.",
     "dimensions": [],
     "__example_dimension__": {
-      "name": "driving_feel",
+      "name": "visual_fidelity",
       "weight": 0.25,
-      "capture_method": "gameplay_metrics",
-      "gameplay_metrics_command": "node tools/feel_harness.mjs",
-      "gameplay_metrics_hash": "<sha256 of the harness file>",
-      "metrics_fields": ["input_lag_ms", "physics_response_ms", "completion_rate"],
-      "description": "Responsive steering, weight transfer, distinct braking — judge against: input_lag_ms<40, physics_response_ms stable, completion_rate>0.7."
+      "capture_method": "screenshot",
+      "description": "3D visual quality vs SHIPPED games. Score against the reference anchors, not the artifact's past.",
+      "reference": {
+        "score_0.10": "flat-shaded primitive meshes, solid-colour sky, no shadows/post-processing (a 1990s look)",
+        "score_0.40": "textured surfaces, basic shadows, simple post (PS2-era)",
+        "score_0.70": "PBR materials + image-based lighting, bloom + tone mapping, particle FX, real skybox",
+        "score_0.90": "authored models, motion blur, SSAO, weather, near-photoreal"
+      },
+      "ceiling_without_assets": 0.35,
+      "ceiling_note": "Procedural geometry + CDN Three.js addons (post-processing, PBR/IBL, particles, Sky shader) top out ~0.35. Above that needs authored glTF models / textures / HDRIs — the loop should record a human_required skill_gap, not keep leaping.",
+      "techniques": [
+        "EffectComposer: RenderPass + UnrealBloomPass + OutputPass (ACES tone map)",
+        "PMREMGenerator from RoomEnvironment or Sky → scene.environment (IBL)",
+        "MeshStandardMaterial roughness/metalness + envMapIntensity (PBR paint)",
+        "three/addons Sky shader (atmospheric scattering) replacing solid clear colour",
+        "Points/BufferGeometry particle systems (tyre smoke, sparks)",
+        "procedural normalMap (canvas noise) on the road/track material"
+      ],
+      "technique_cdns": ["three/addons/postprocessing/*", "three/addons/environments/RoomEnvironment.js", "three/addons/objects/Sky.js"],
+      "__experiential_example__": {
+        "name": "driving_feel", "weight": 0.25, "capture_method": "gameplay_metrics",
+        "gameplay_metrics_command": "node tools/feel_harness.mjs",
+        "gameplay_metrics_hash": "<sha256 of the harness file>",
+        "metrics_fields": ["steer_response_rad_s", "has_oversteer", "has_weight_transfer"],
+        "description": "Responsive, believable handling — judge metrics vs targets, not vibes."
+      }
     }
   },
   "leap": {
@@ -290,7 +316,16 @@
     "max_per_day": 2,
     "gap_weight": 30.0,
     "cost_limit_usd": 0.5,
-    "lock_until_bar": true
+    "lock_until_bar": true,
+    "mega_leap": {
+      "__doc__": "v1.9.0 — a multi-cycle RE-PLATFORM for radical jumps a normal leap can't make (replace the whole rendering pipeline, swap a subsystem). Unlocked only by a human-authored, approved mega_leap_plan.json after a leap exhausts max_attempts_per_dimension. Bigger budget, no per-cycle revert; the whole sequence reverts if the cumulative artifact delta misses min_artifact_delta_at_completion.",
+      "enabled": false,
+      "max_lines": 5000,
+      "max_cycles": 4,
+      "min_artifact_delta_at_completion": 0.15,
+      "requires_human_plan_approval": true,
+      "plan_file": "agent/state/evolve/mega_leap_plan.json"
+    }
   },
   "goal_completion_idle": true
 }
