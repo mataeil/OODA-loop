@@ -34,15 +34,23 @@ def _load(p: Path, default=None):
 
 
 def _resolve_bar(config: dict) -> float:
-    """The artifact quality bar. Top-level config.quality_rubric.bar, else the
-    first domain that declares a per-domain quality_rubric.bar, else default."""
-    top = (config.get("quality_rubric") or {}).get("bar")
-    if isinstance(top, (int, float)):
-        return float(top)
+    """The "genuinely good" bar the scorecard grades against. v1.9.0: prefer
+    `bar_coast` (the real-quality ceiling) over `bar`/`bar_leap`, so the headline
+    grade reflects distance to a good product, not a cleared prototype bar.
+    Top-level quality_rubric first, then the first domain that declares one."""
+    def pick(r):
+        for key in ("bar_coast", "bar"):
+            v = (r or {}).get(key)
+            if isinstance(v, (int, float)):
+                return float(v)
+        return None
+    top = pick(config.get("quality_rubric"))
+    if top is not None:
+        return top
     for d in (config.get("domains") or {}).values():
-        b = ((d or {}).get("quality_rubric") or {}).get("bar")
-        if isinstance(b, (int, float)):
-            return float(b)
+        b = pick((d or {}).get("quality_rubric"))
+        if b is not None:
+            return b
     return DEFAULT_BAR
 
 

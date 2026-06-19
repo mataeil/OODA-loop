@@ -32,6 +32,13 @@ from pathlib import Path
 DEFAULT_BAR = 0.70
 DEFAULT_PLATEAU_WINDOW = 4      # build cycles to look back over
 DEFAULT_PLATEAU_EPS = 0.05      # min artifact_score gain over the window to count as progress
+# v1.9.0 "Ambition": dual thresholds. The single `bar` made the loop COAST the
+# instant it cleared a prototype-level number, so it never pushed toward a real
+# product. bar_leap = below this, ALWAYS leap; bar_coast = until this, never coast
+# (the forcing zone in between alternates leap/feature). Set bar_coast high
+# (~0.85) so "it exists and works" can't masquerade as "it's genuinely good".
+DEFAULT_BAR_COAST = 0.85
+DEFAULT_PROTOTYPE_CEILING = 0.20  # below this, the critic is likely grading vs a prototype, not best-in-class
 
 
 def _load(p: Path, default=None):
@@ -63,9 +70,16 @@ def rubric_of(config: dict, domain: str | None = None) -> dict:
     if not r:
         r = config.get("quality_rubric") or {}
     dims = r.get("dimensions") or r.get("axes") or []
+    bar = r.get("bar", DEFAULT_BAR)
     return {
         "dimensions": dims,
-        "bar": r.get("bar", DEFAULT_BAR),
+        "bar": bar,
+        # v1.9.0 dual thresholds. Back-compat: a project with only `bar` set gets
+        # bar_leap == bar_coast == bar (old single-bar behaviour). To open the
+        # forcing zone, the project sets bar_coast (e.g. 0.85) above bar_leap.
+        "bar_leap": r.get("bar_leap", bar),
+        "bar_coast": r.get("bar_coast", bar),
+        "prototype_ceiling": r.get("prototype_ceiling", DEFAULT_PROTOTYPE_CEILING),
         "plateau_window": r.get("plateau_window", DEFAULT_PLATEAU_WINDOW),
         "plateau_eps": r.get("plateau_eps", DEFAULT_PLATEAU_EPS),
         "enabled": bool(dims),     # no dimensions defined → artifact axis is off (back-compat)
@@ -123,8 +137,10 @@ def aggregate(dimension_scores: dict, rubric: dict) -> dict:
 
 def _weighted_gap_target(dimension_scores: dict, dims: list, rubric: dict) -> str | None:
     """Pick the dimension with the largest weight × max(0, bar − score). Ties
-    break to the lower raw score (the more broken one)."""
-    bar = rubric.get("bar", DEFAULT_BAR)
+    break to the lower raw score (the more broken one). v1.9.0: gap is measured to
+    the COAST bar (distance to "good"), not the leap bar, so targeting reflects
+    distance to the real goal."""
+    bar = rubric.get("bar_coast", rubric.get("bar", DEFAULT_BAR))
     best, best_key = None, None
     for d in dims:
         name = d.get("name")
@@ -140,23 +156,31 @@ def _weighted_gap_target(dimension_scores: dict, dims: list, rubric: dict) -> st
 
 
 def meets_bar(artifact_score, rubric: dict) -> bool:
+    """'Good enough to stop leaping' = cleared the COAST bar (v1.9.0). Back-compat:
+    when bar_coast defaults to bar, this is the old behaviour."""
     if artifact_score is None:
         return True   # no artifact axis configured → don't block (back-compat)
-    return artifact_score >= rubric.get("bar", DEFAULT_BAR)
+    return artifact_score >= rubric.get("bar_coast", rubric.get("bar", DEFAULT_BAR))
 
 
 def goodhart_flag(process_green: bool, artifact_score, rubric: dict) -> dict:
     """The 'measurement is lying' detector. process_green := futile≈0 and goal high.
     If the process scoreboard is green but the artifact is below bar, the headline
     grade must be capped and the operator warned."""
+    coast = rubric.get("bar_coast", rubric.get("bar", DEFAULT_BAR))
     lying = bool(process_green) and artifact_score is not None and not meets_bar(artifact_score, rubric)
-    return {
-        "lying": lying,
-        "message": (
-            "MEASUREMENT WARNING: process green but artifact %.2f < bar %.2f — "
-            "the scoreboard is lying; cap grade and LEAP." % (artifact_score, rubric.get("bar", DEFAULT_BAR))
-        ) if lying else "",
-    }
+    # v1.9.0 anchor warning: a very low artifact_score suggests the critic is
+    # grading vs a prototype, not best-in-class (re-anchor the rubric references).
+    ceil = rubric.get("prototype_ceiling", DEFAULT_PROTOTYPE_CEILING)
+    anchor_warn = artifact_score is not None and artifact_score < ceil
+    msg = ""
+    if lying:
+        msg = ("MEASUREMENT WARNING: process green but artifact %.2f < coast bar %.2f — "
+               "the scoreboard is lying; cap grade and LEAP." % (artifact_score, coast))
+    elif anchor_warn:
+        msg = ("ANCHOR WARNING: artifact %.2f below prototype_ceiling %.2f — this is "
+               "prototype-level vs best-in-class; keep leaping (don't trust a high process grade)." % (artifact_score, ceil))
+    return {"lying": lying, "anchor_warn": bool(anchor_warn), "message": msg}
 
 
 def artifact_series(outcomes: list) -> list:
@@ -190,15 +214,25 @@ def detect_plateau(outcomes: list, rubric: dict) -> dict:
         tail = weak_dims[-window:]
         weak_stuck = len(set(tail)) == 1 and tail[0] is not None
 
-    # A plateau only matters if we are not already good enough.
-    plateau = (stagnant or weak_stuck) and below_bar
+    # v1.9.0 dual-bar plateau: leap if (stagnant OR weak-stuck OR below bar_leap),
+    # as long as we are not yet at bar_coast. Below bar_leap ALWAYS leaps (don't
+    # wait for a full stagnation window when quality is still prototype-level);
+    # the forcing zone (bar_leap..bar_coast) leaps on stagnation. This is the fix
+    # for "the loop coasted the instant it cleared a prototype bar".
+    bar_leap = rubric.get("bar_leap", rubric.get("bar", DEFAULT_BAR))
+    bar_coast = rubric.get("bar_coast", rubric.get("bar", DEFAULT_BAR))
+    below_coast = latest is not None and latest < bar_coast
+    below_leap = latest is not None and latest < bar_leap
+    plateau = (stagnant or weak_stuck or below_leap) and below_coast
     reasons = []
+    if below_leap:
+        reasons.append("artifact %.2f below leap bar %.2f (always leap)" % (latest, bar_leap))
     if stagnant:
-        reasons.append("artifact_score flat over last %d cycles (<%.2f gain)" % (window, eps))
+        reasons.append("artifact_score flat over last %d cycles (<=%.2f gain)" % (window, eps))
     if weak_stuck:
         reasons.append("'%s' weakest for %d cycles running" % (weak_dims[-1], window))
-    if below_bar and not (stagnant or weak_stuck):
-        reasons.append("artifact %.2f below bar %.2f" % (latest, rubric.get("bar", DEFAULT_BAR)))
+    if below_coast and not (stagnant or weak_stuck or below_leap):
+        reasons.append("artifact %.2f in forcing zone (< coast %.2f)" % (latest, bar_coast))
     # v1.7.1: the LEAP target is the largest weighted gap on the latest critique,
     # not just the running weakest_dimension (impact on the headline metric).
     latest_dims = (scored[-1].get("dimension_scores") if scored else None) or {}
@@ -243,7 +277,7 @@ def lock_target(outcomes: list, rubric: dict, leap_target: str | None) -> str | 
     last = outcomes[-1]
     if last.get("cycle_mode") != "leap" or last.get("result_type") == "leap_regressed":
         return None
-    bar = rubric.get("bar", DEFAULT_BAR)
+    bar = rubric.get("bar_coast", rubric.get("bar", DEFAULT_BAR))  # v1.9.0: lock until COAST (good), not prototype bar
     eps = float(rubric.get("plateau_eps", DEFAULT_PLATEAU_EPS))
     score = (last.get("dimension_scores") or {}).get(leap_target)
     if score is None:

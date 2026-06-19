@@ -719,6 +719,23 @@ def check_artifact_axis(r: Runner) -> None:
         f"regressed={R.lock_target(regressed, rubL, 'visual_fidelity')}",
     )
 
+    # 11) v1.9.0 dual-bar: the loop keeps leaping in the forcing zone (above bar_leap,
+    # below bar_coast) and only coasts once genuinely good — back-compat when only
+    # `bar` is set (bar_leap == bar_coast == bar).
+    rub19 = R.rubric_of({"quality_rubric": {"bar_leap": 0.65, "bar_coast": 0.85,
+        "plateau_window": 3, "plateau_eps": 0.05, "dimensions": [{"name": "v", "weight": 1}]}})
+    zone = [{"artifact_score": 0.70, "weakest_dimension": "v", "dimension_scores": {"v": 0.70}}] * 3
+    good = [{"artifact_score": 0.88, "weakest_dimension": "v", "dimension_scores": {"v": 0.88}}] * 3
+    legacy = R.rubric_of({"quality_rubric": {"bar": 0.65, "dimensions": [{"name": "v", "weight": 1}]}})
+    r.check(
+        "artifact-axis: dual-bar keeps leaping in the forcing zone, coasts only when good (v1.9.0)",
+        R.detect_plateau(zone, rub19)["plateau"] is True
+        and R.detect_plateau(good, rub19)["plateau"] is False
+        and legacy["bar_leap"] == 0.65 and legacy["bar_coast"] == 0.65,
+        f"zone(0.70)→leap={R.detect_plateau(zone, rub19)['plateau']}, "
+        f"good(0.88)→leap={R.detect_plateau(good, rub19)['plateau']}, legacy bars={legacy['bar_leap']}/{legacy['bar_coast']}",
+    )
+
 
 def main() -> int:
     r = Runner()
