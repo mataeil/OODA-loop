@@ -670,6 +670,19 @@ def check_artifact_axis(r: Runner) -> None:
         f"stuck.plateau={p_stuck['plateau']} ({p_stuck['reason']}); good.plateau={p_good['plateau']}",
     )
 
+    # 8) v1.7.1 weighted-gap targeting: the leap targets the largest weight×gap,
+    # NOT the lowest raw score (F1 dogfood: visual outranks lower-scoring fun).
+    rub3 = R.rubric_of({"quality_rubric": {"bar": 0.65, "dimensions": [
+        {"name": "visual_fidelity", "weight": 0.28}, {"name": "fun_challenge", "weight": 0.20}]}})
+    ds = {"visual_fidelity": 0.41, "fun_challenge": 0.38}
+    target = R.aggregate(ds, rub3)["leap_target"]
+    lowest_raw = min(ds, key=ds.get)
+    r.check(
+        "artifact-axis: leap targets largest WEIGHTED gap, not lowest raw score (v1.7.1)",
+        target == "visual_fidelity" and lowest_raw == "fun_challenge",
+        f"weighted-gap target={target} (lowest raw was {lowest_raw})",
+    )
+
 
 def main() -> int:
     r = Runner()

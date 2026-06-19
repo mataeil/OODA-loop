@@ -741,9 +741,10 @@ for the implementation/build domain that declares config.domains[d].quality_rubr
                     needed; the loop cannot self-fix this dimension."
       set plateau_leap_blocked = true
     else:
-      set orient.plateau = { active:true, weakest_dimension:p.weakest_dimension,
+      set orient.plateau = { active:true, leap_target:p.leap_target,
+                             weakest_dimension:p.weakest_dimension,
                              artifact_score:p.latest, reason:p.reason }
-      Print "[Orient] 📉 PLATEAU on '{p.weakest_dimension}' ({p.reason}). Next cycle should LEAP, not add a feature."
+      Print "[Orient] 📉 PLATEAU. Leap target '{p.leap_target}' ({p.reason}). Next cycle should LEAP, not add a feature."
   else:
     set orient.plateau = { active:false }
 ```
@@ -776,7 +777,12 @@ if orient.plateau.active AND not plateau_leap_blocked AND not dry_run:
     Print "[Decide] Plateau detected but daily leap cap reached — deferring."
   else:
     cycle_mode = "leap"
-    targeted_dimension = orient.plateau.weakest_dimension
+    -- v1.7.1: target the largest WEIGHTED gap (weight × (bar − score)), i.e. the
+    -- dimension whose fix most raises the headline artifact_quality — not just the
+    -- lowest raw score. (rubric_score.detect_plateau.leap_target. F1 dogfood:
+    -- visual_fidelity outranked a lower-scoring fun_challenge and matched what a
+    -- player perceived as "crap".) Falls back to weakest_dimension.
+    targeted_dimension = orient.plateau.leap_target or orient.plateau.weakest_dimension
     -- Pull the weakest-dimension's owning build domain UP via the EXISTING
     -- memo_adjustment term (consumed in 3-A) so the normal scorer selects it —
     -- no new term in the 3-A formula:

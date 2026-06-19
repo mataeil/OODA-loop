@@ -109,9 +109,34 @@ def aggregate(dimension_scores: dict, rubric: dict) -> dict:
         "artifact_score": artifact_score,
         "weakest_dimension": weakest,
         "weakest_score": None if weakest_score > 1.5 else round(weakest_score, 3),
+        # v1.7.1: the dimension a LEAP should target — the one whose improvement
+        # most raises the OVERALL (weighted-mean) artifact_score, i.e. largest
+        # weight × gap-to-bar, NOT merely the lowest raw score. Surfaced by the F1
+        # dogfood: visual_fidelity (gap .24 × weight .28) outranks fun_challenge
+        # (gap .27 × weight .20) — fixing it moves the headline more and matches
+        # what a player perceives as "crap". Falls back to the lowest raw score.
+        "leap_target": _weighted_gap_target(dimension_scores or {}, dims, rubric),
         "covered": covered,
         "missing": missing,
     }
+
+
+def _weighted_gap_target(dimension_scores: dict, dims: list, rubric: dict) -> str | None:
+    """Pick the dimension with the largest weight × max(0, bar − score). Ties
+    break to the lower raw score (the more broken one)."""
+    bar = rubric.get("bar", DEFAULT_BAR)
+    best, best_key = None, None
+    for d in dims:
+        name = d.get("name")
+        if name not in dimension_scores:
+            continue
+        s = float(dimension_scores[name])
+        w = float(d.get("weight", 1.0))
+        impact = w * max(0.0, bar - s)
+        key = (round(impact, 6), -s)   # max impact, then lowest score
+        if best is None or key > best:
+            best, best_key = key, name
+    return best_key
 
 
 def meets_bar(artifact_score, rubric: dict) -> bool:
@@ -174,11 +199,17 @@ def detect_plateau(outcomes: list, rubric: dict) -> dict:
         reasons.append("'%s' weakest for %d cycles running" % (weak_dims[-1], window))
     if below_bar and not (stagnant or weak_stuck):
         reasons.append("artifact %.2f below bar %.2f" % (latest, rubric.get("bar", DEFAULT_BAR)))
+    # v1.7.1: the LEAP target is the largest weighted gap on the latest critique,
+    # not just the running weakest_dimension (impact on the headline metric).
+    latest_dims = (scored[-1].get("dimension_scores") if scored else None) or {}
+    leap_target = (_weighted_gap_target(latest_dims, rubric.get("dimensions") or [], rubric)
+                   or (weak_dims[-1] if weak_dims else None))
     return {
         "plateau": bool(plateau),
         "below_bar": bool(below_bar),
         "latest": latest,
         "weakest_dimension": weak_dims[-1] if weak_dims else None,
+        "leap_target": leap_target,
         "reason": "; ".join(reasons) if reasons else "improving",
     }
 
