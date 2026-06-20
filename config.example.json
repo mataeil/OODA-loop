@@ -289,7 +289,9 @@
         "score_0.90": "authored models, motion blur, SSAO, weather, near-photoreal"
       },
       "ceiling_without_assets": 0.35,
-      "ceiling_note": "Procedural geometry + CDN Three.js addons (post-processing, PBR/IBL, particles, Sky shader) top out ~0.35. Above that needs authored glTF models / textures / HDRIs — the loop should record a human_required skill_gap, not keep leaping.",
+      "ceiling_note": "Procedural geometry + CDN Three.js addons (post-processing, PBR/IBL, particles, Sky shader) top out ~0.35. Above that needs authored glTF models / textures / HDRIs — the loop records a human_required skill_gap, not keep leaping.",
+      "__asset_sources_doc__": "v1.10.0 hand-off — the OPERATOR supplies authored assets here (CDN URLs or repo paths to glTF models, textures, HDRIs, audio) once the code-only ceiling is hit. Non-empty asset_sources LIFTS ceiling_without_assets (rubric_score.asset_ceiling → None): the human_required gap resolves and the loop resumes leaping toward bar_coast, now integrating the assets. The f1 probe drove this: the loop flagged the box-car ceiling at ~0.21; a real glTF car + an HDRI were supplied here and leaping resumed.",
+      "asset_sources": [],
       "techniques": [
         "EffectComposer: RenderPass + UnrealBloomPass + OutputPass (ACES tone map)",
         "PMREMGenerator from RoomEnvironment or Sky → scene.environment (IBL)",

@@ -8,6 +8,32 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
+## [v1.10.0] — 2026-06-20
+
+### Added — asset hand-off; restored v1.9.0 engine prose (probe-found gap)
+
+The f1 probe ran option (a): supply the authored assets v1.9.0 flagged as
+`human_required`. Two findings → fixes:
+
+- **Asset hand-off (`asset_sources`).** A dimension's `ceiling_without_assets`
+  caps CODE-ONLY work; once the operator lists `asset_sources` (CDN/repo paths to
+  glTF models, textures, HDRIs, audio), `rubric_score.asset_ceiling()` returns
+  None — the ceiling lifts, the `human_required` skill_gap resolves, and the loop
+  resumes leaping the dimension toward `bar_coast` integrating the assets.
+  Demonstrated: the f1 box-car ceiling (~0.21) was broken by supplying a real
+  glTF car + an HDRI. New `asset_ceiling()`/`asset_ceiling_hit()` (deterministic),
+  config `asset_sources`, evolve 5-G/2-G rule. verify.py 62 → 63.
+- **Restored lost v1.9.0 SKILL.md prose (probe-found bug).** The v1.9.0 commit
+  staged scripts/config/tests but NOT `skills/evolve/SKILL.md`, then a hard-reset
+  discarded the engine-prose edits — so the 5-G benchmark-anchoring critic prompt,
+  the 3-K technique-menu injection, the mega-leap step, and the asset-ceiling rule
+  were missing from `main` even though their scripts/config shipped. Re-applied
+  here (the dual-bar/anchor/technique/mega-leap behaviour is now actually in the
+  engine spec, matching the v1.9.0 scripts). Lesson: stage the engine spec with
+  its scripts.
+
+plugin 1.9.0→1.10.0.
+
 ## [v1.9.0] — 2026-06-19
 
 ### Added — "Ambition": let the loop make RADICAL jumps, not prototype plateaus (config schema 1.5.0)
