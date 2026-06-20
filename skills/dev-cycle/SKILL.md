@@ -259,6 +259,24 @@ in_progress.
 
 ## Step 4: Verify
 
+> **Gate integrity (v1.10.1 — earned by the f1 probe).** A static check is
+> necessary but NOT sufficient, and a sub-agent's *self-reported* gate result is
+> not trustworthy — the orchestrator must verify from facts. Two real misses the
+> f1 overnight run surfaced, BOTH caught only by loading the artifact in its real
+> runtime, never by the unit gate:
+> 1. `node --check` exits 0 on a same-scope `const` REDECLARATION that the browser
+>    ES-module parser rejects — the game wouldn't boot, yet the cycle's
+>    `node --check + smoke` gate "passed". For an ES-module/browser artifact, also
+>    do a **module-load check** (import the changed modules in their module system,
+>    e.g. `node --input-type=module -e 'import("./src/x.js")'`, or load the page)
+>    — that catches what `node --check` cannot.
+> 2. A cumulative **visual regression** (over-exposed-to-white frame) passed every
+>    unit gate; only a **rendered critique** caught it.
+> Rule: for rich-runtime artifacts (browser/UI/graphics/game), the verification
+> MUST load the artifact the way its runtime does (module-load + render/screenshot
+> critique, i.e. evolve Step 5-G), and evolve re-checks the gate from recorded
+> facts — it does NOT take the build skill's word for "tests passed".
+
 **If `config.test_command` is not configured or is empty:**
 ```
 Print "No test_command configured. Skipping tests."

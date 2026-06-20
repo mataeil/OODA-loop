@@ -8,6 +8,28 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
+## [v1.10.1] — 2026-06-20
+
+### Fixed/clarified — gate integrity (f1 probe, overnight)
+
+The overnight f1 campaign surfaced that the per-cycle gate (`node --check` + smoke)
+is necessary but NOT sufficient, and a sub-agent's self-reported "gate passed" is
+not trustworthy — both misses were caught only by loading the artifact in its
+runtime (the orchestrator's render-verify):
+
+- **`node --check` misses ES-module redeclarations.** A duplicate same-scope
+  `const` (two cycles each declaring `speedN`) exits 0 under `node --check` but the
+  browser ES-module parser rejects it — the game wouldn't boot, yet the cycle
+  reported PASS. dev-cycle Step 4 now requires a **module-load check** (import the
+  changed modules in their module system) for ES-module/browser artifacts.
+- **Visual regressions pass every unit gate.** A cumulative over-exposed-to-white
+  frame passed `node --check` + smoke; only a rendered critique (evolve 5-G)
+  caught it. Rule added: for rich-runtime artifacts, verification MUST load the
+  artifact the way its runtime does (module-load + render/screenshot), and evolve
+  re-checks the gate from recorded facts — it does not take the build skill's word.
+
+plugin 1.10.0→1.10.1. (Docs/spec only; verify.py unchanged at 63.)
+
 ## [v1.10.0] — 2026-06-20
 
 ### Added — asset hand-off; restored v1.9.0 engine prose (probe-found gap)
