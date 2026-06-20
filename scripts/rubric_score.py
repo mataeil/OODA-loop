@@ -265,6 +265,28 @@ def failed_leaps(outcomes: list, dimension: str, min_delta: float) -> int:
     return n
 
 
+def asset_ceiling(dimension: dict):
+    """v1.10.0 asset hand-off: the score above which CODE-ONLY work can't climb.
+    Returns None (no ceiling) once the OPERATOR has supplied `asset_sources` for the
+    dimension — the v1.9.0 `human_required` hand-off is fulfilled, so the loop may
+    keep leaping toward bar_coast with the authored assets (models/textures/HDRIs/
+    audio). Otherwise returns `ceiling_without_assets` (or None if unset). This is
+    what closes the v1.9.0 ceiling concept: the loop stops at the code-only limit,
+    flags human_required, and — once assets arrive — resumes."""
+    if dimension.get("asset_sources"):
+        return None
+    c = dimension.get("ceiling_without_assets")
+    return float(c) if isinstance(c, (int, float)) else None
+
+
+def asset_ceiling_hit(dimension: dict, score) -> bool:
+    """True iff a code-only leap has topped out: at/above the ceiling AND no assets
+    supplied yet. evolve 2-G records a `human_required` skill_gap instead of leaping
+    again; supplying `asset_sources` clears it and re-opens leaping."""
+    ceil = asset_ceiling(dimension)
+    return ceil is not None and score is not None and score >= ceil
+
+
 def lock_target(outcomes: list, rubric: dict, leap_target: str | None) -> str | None:
     """v1.8.0 dimension-lock: after a SUCCESSFUL leap whose target is still below
     (bar − eps), return that target so evolve 2-G keeps the plateau active on it

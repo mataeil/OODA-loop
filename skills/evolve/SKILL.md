@@ -830,12 +830,26 @@ if orient.plateau.active AND not plateau_leap_blocked AND not dry_run:
 ```
 
 When `cycle_mode == "leap"`, Step 4-B passes `leap_mode=true`,
-`targeted_dimension`, and `config.leap.max_lines` (a larger size budget than
-`max_lines_per_pr`) to the build skill (dev-cycle), instructing it to make a
-**step-change on the targeted dimension** (overhaul / rebuild / refactor-for-
-cohesion) rather than pick the top-RICE *feature*. Steps 3-G (complexity level)
-and 3-F (confidence) STILL apply — a leap is not exempt from safety gates. The
-leap's verification is the 5-G artifact gate (4-C2), not only the unit test.
+`targeted_dimension`, `config.leap.max_lines` (a larger size budget than
+`max_lines_per_pr`), AND — **v1.9.0** — the targeted dimension's `techniques` +
+`technique_cdns` menu + any `asset_sources`, to the build skill (dev-cycle),
+instructing it to make a **step-change on the targeted dimension** (overhaul /
+rebuild / refactor-for-cohesion) rather than pick the top-RICE *feature*. The
+technique menu is the fix for "the loop reached for more BoxGeometry instead of
+EffectComposer": the leap instruction is *"pick the ONE technique from this menu
+(or integrate the supplied asset_sources) most likely to move the score toward
+bar_coast and implement it completely; do not add game features."* Steps 3-G
+(complexity level) and 3-F (confidence) STILL apply. The leap's verification is the
+5-G artifact gate (4-C2), not only the unit test.
+
+**Mega-leap (v1.9.0, optional).** When a dimension can't be moved by a normal leap
+(the 2-G thrashing guard would HALT), an operator may author `config.leap.mega_leap`
++ an approved `mega_leap_plan.json` to unlock a multi-cycle RE-PLATFORM: a much
+larger budget (`mega_leap.max_lines`) across up to `max_cycles`, NO per-cycle
+revert, only a final-cycle gate (revert ALL cycles if cumulative artifact delta <
+`min_artifact_delta_at_completion`). `requires_human_plan_approval` keeps the loop
+from self-authorising a rewrite — this is how the loop makes a genuinely RADICAL
+jump (replace a whole pipeline) instead of only incremental overhauls.
 
 ### 3-G: Progressive Complexity Filter (apply FIRST)
 
@@ -1886,10 +1900,31 @@ verdict = critic(
            or api output). Cite concrete evidence per axis. Be harsh; default low
            when unsure. A good HUD cannot compensate for a broken core. For a
            metrics axis, judge against the axis description's targets, not vibes.
+           --- BENCHMARK ANCHORING (v1.9.0, critical): if the axis has `reference`
+           anchors, score ONLY against those named real-product levels — NOT
+           relative to this artifact's past or to other prototype work. Name the
+           anchor the artifact most resembles before the number. A flat/primitive/
+           'it exists and works' result is ~0.10 (score_0.10), NOT 0.5+. Worse than
+           score_0.10 → below 0.10. Do not grade on a curve where 'a decent
+           prototype' = good. ---
            Score null only if the evidence is null. Output
            {dimension_scores:{axis:score|null}, weakest_dimension, critique(<=30 words)}.",
-  input:  { mission, rubric.dimensions, evidence: dim_artifact }
+  input:  { mission, rubric.dimensions (with reference anchors), evidence: dim_artifact }
 ) -> { dimension_scores, weakest_dimension, critique }
+
+-- ASSET CEILING + HAND-OFF (v1.9.0 → v1.10.0). For the targeted dimension, after
+-- the leap is scored: if rubric_score.asset_ceiling_hit(dimension, score) — i.e.
+-- a CODE-ONLY leap reached `ceiling_without_assets` AND no `asset_sources` are
+-- supplied — record a skill_gap { type:"human_required", name:"asset_ceiling_{dim}",
+-- detail: dimension.ceiling_note } and STOP leaping that dimension (further gain
+-- needs authored models/textures/audio the loop can't make). When the operator
+-- adds `dimension.asset_sources` (CDN/local authored assets), asset_ceiling()
+-- returns None → the ceiling lifts, the human_required gap is resolved, and the
+-- loop resumes leaping the dimension toward bar_coast WITH the assets. (The f1
+-- probe drove this: the loop flagged the box-car ceiling; a real glTF car +
+-- HDRI were supplied as asset_sources; leaping resumed.) NOTE: assets often load
+-- async — integrate with a "rebuild on asset-ready" step so a cycle isn't scored
+-- before the asset is in the frame.
 
 -- AGGREGATE deterministically (scripts/rubric_score.py — pure, no model):
 agg = rubric_score.aggregate(verdict.dimension_scores, rubric)

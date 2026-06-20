@@ -736,6 +736,22 @@ def check_artifact_axis(r: Runner) -> None:
         f"good(0.88)→leap={R.detect_plateau(good, rub19)['plateau']}, legacy bars={legacy['bar_leap']}/{legacy['bar_coast']}",
     )
 
+    # 12) v1.10.0 asset hand-off: a code-only dimension is ceiling-capped until the
+    # operator supplies asset_sources, after which the ceiling lifts (the
+    # human_required hand-off the f1 probe drove — supply a glTF model → keep leaping).
+    code_only = {"name": "visual_fidelity", "ceiling_without_assets": 0.35}
+    with_assets = {"name": "visual_fidelity", "ceiling_without_assets": 0.35,
+                   "asset_sources": ["cdn://ferrari.glb", "cdn://venice.hdr"]}
+    r.check(
+        "artifact-axis: asset ceiling caps code-only work, lifts once assets supplied (v1.10.0)",
+        R.asset_ceiling(code_only) == 0.35
+        and R.asset_ceiling_hit(code_only, 0.36) is True
+        and R.asset_ceiling(with_assets) is None
+        and R.asset_ceiling_hit(with_assets, 0.36) is False,
+        f"code-only ceiling={R.asset_ceiling(code_only)} hit@0.36={R.asset_ceiling_hit(code_only,0.36)}; "
+        f"with-assets ceiling={R.asset_ceiling(with_assets)} hit@0.36={R.asset_ceiling_hit(with_assets,0.36)}",
+    )
+
 
 def main() -> int:
     r = Runner()
