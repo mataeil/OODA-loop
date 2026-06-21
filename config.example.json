@@ -281,6 +281,8 @@
       "name": "visual_fidelity",
       "weight": 0.25,
       "capture_method": "screenshot",
+      "__capture_states_doc__": "v1.12.0 (feedback fidelity) — a dimension is only gradeable in the state(s) where it MANIFESTS; a single default frame under-credits + misdirects the loop. List the states to drive the artifact into before capturing; the critic gets ALL frames. The f1 probe earned this: a chase camera / HDRI sky / speed blur / slip-angle physics were all added but every capture was one low-speed cockpit frame, so the work was invisible and the grade stalled. A state that can't be reached = capture_failure (null), not a low score.",
+      "capture_states": ["chase view, car stationary on a straight", "chase view at ~80% top speed", "camera pitched up to show the sky/horizon"],
       "description": "3D visual quality vs SHIPPED games. Score against the reference anchors, not the artifact's past.",
       "reference": {
         "score_0.10": "flat-shaded primitive meshes, solid-colour sky, no shadows/post-processing (a 1990s look)",

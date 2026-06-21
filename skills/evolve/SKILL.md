@@ -1908,7 +1908,25 @@ for dim in rubric.dimensions:
     if not independent: dim_artifact[dim] = null (capture_failure); continue
     dim_artifact[dim] = run_protected_harness(dim.gameplay_metrics_command)  -- metrics JSON
   else if method == "screenshot":
-    dim_artifact[dim] = the shared screenshot (captured once)
+    -- CAPTURE COVERAGE (v1.12.0 — feedback fidelity). A SINGLE default frame
+    -- under-credits and MISDIRECTS: a dimension is only gradeable in the state(s)
+    -- where it MANIFESTS. The f1 probe proved this — 10 grounded rounds added a
+    -- chase camera (where the clearcoat hero car + HDRI reflections live), real
+    -- HDRI sky, speed motion-blur/FOV, and slip-angle physics, but every capture
+    -- was one LOW-SPEED COCKPIT frame facing a wall, so NONE of that work was
+    -- visible to the critic → the still-grade stalled (~0.41) while the true
+    -- quality (~0.58) was far higher, and the critic kept steering effort toward
+    -- only-what-was-in-that-frame. Rule: capture each dimension in the state(s)
+    -- where it shows. dim.capture_states (list) enumerates them, e.g.
+    --   visual_paint:  ["chase_view at speed 0", "chase_view at speed 0.8"]
+    --   sense_of_speed:["cockpit at speed 0.9 on a straight"]
+    --   sky/lighting:  ["camera pitched up to the horizon"]
+    -- Drive the artifact INTO each state (set the view/speed/scenario) before the
+    -- frame; pass the critic ALL of a dimension's frames. A dimension whose state
+    -- can't be reached is a CAPTURE_FAILURE (null), NOT a low score — never grade
+    -- a dimension from a frame that structurally cannot show it.
+    states = dim.capture_states or rubric.capture_states or ["default"]
+    dim_artifact[dim] = [ capture_in(state) for state in states ]  -- 1+ frames
   else:
     dim_artifact[dim] = run dim.capture_command (or rubric.capture_command)
 -- If a dimension's harness is MISSING entirely, score it null (capture_failure) +
