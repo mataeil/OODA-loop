@@ -752,6 +752,24 @@ def check_artifact_axis(r: Runner) -> None:
         f"with-assets ceiling={R.asset_ceiling(with_assets)} hit@0.36={R.asset_ceiling_hit(with_assets,0.36)}",
     )
 
+    # 13) v1.11.0 stall→REWRITE: when the artifact is plateaued AND the incremental
+    # LEAPS themselves keep failing, escalate from patch to rewrite (the anti-maze
+    # fix — the f1 'iterate without improving' loop). Plateaued-but-leaps-working
+    # stays on incremental (leap, don't rewrite).
+    rubRW = R.rubric_of({"quality_rubric": {"bar": 0.65, "plateau_window": 3,
+        "plateau_eps": 0.05, "dimensions": [{"name": "v", "weight": 1}]}})
+    stalled = [{"artifact_score": 0.50, "weakest_dimension": "v", "dimension_scores": {"v": 0.50},
+                "cycle_mode": "leap", "leap_attempts": [{"dimension": "v", "delta_score": 0.01}]}] * 3
+    viable = [{"artifact_score": 0.50, "weakest_dimension": "v", "dimension_scores": {"v": 0.50},
+               "cycle_mode": "leap", "leap_attempts": [{"dimension": "v", "delta_score": 0.10}]}] * 3
+    rw_s = R.recommend_rewrite(stalled, "v", rubRW)
+    rw_v = R.recommend_rewrite(viable, "v", rubRW)
+    r.check(
+        "artifact-axis: stalled incremental leaps escalate to REWRITE; working leaps stay incremental (v1.11.0)",
+        rw_s["rewrite"] is True and rw_s["failed_leaps"] >= 2 and rw_v["rewrite"] is False,
+        f"stalled→{rw_s}; viable→{rw_v}",
+    )
+
 
 def main() -> int:
     r = Runner()

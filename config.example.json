@@ -310,8 +310,21 @@
       }
     }
   },
+  "references": {
+    "__doc__": "v1.11.0 (anti-maze) — REFERENCE TARGETS that ground the loop in external ground truth instead of model priors. dev-cycle Step 3-PRE resolves the reference for a technique, WebFetches the concrete block, derives acceptance criteria, THEN generates (AlphaCodium pattern). The 5-G critic scores AGAINST these (not the artifact's own past). Permanent: also mirror into agent/state/evolve/principles.json so they survive episode rollover. Populate per project with named real-product levels and reference-implementation URLs.",
+    "visual": "https://threejs.org/examples/webgl_materials_car.html",
+    "physics": "https://github.com/spacejack/carphysics2d/blob/master/public/js/Car.js",
+    "camera": "https://github.com/mrdoob/Starter-Kit-Racing/blob/main/js/Camera.js",
+    "quality_floor": 0.7
+  },
+  "research": {
+    "__doc__": "v1.11.0 — a researched, CITED knowledge base the loop reads before leaping (the missing external-knowledge input that breaks the 'iterate without improving' maze). Built by a heavy web-research pass (graphics/physics/art/methodology) distilled into an actionable, sourced playbook. dev-cycle Step 3-PRE prefers a concrete playbook move (technique + parameters + source URL) over the model's first idea.",
+    "playbook_path": "agent/state/research/playbook.md",
+    "refresh_when_stalled": true
+  },
   "leap": {
-    "__doc__": "Quantum-leap cycles (evolve Steps 2-G/3-K, v1.7.0) — the fix for monotonic incrementalism (RICE structurally forbids overhauls). When the artifact plateaus BELOW bar, the next cycle is forced into LEAP mode: it overhauls the weakest dimension (step-change, not a new feature), bypassing pure RICE via a gap-to-bar bonus, with a larger size budget and an ARTIFACT-improvement gate instead of the unit-test gate. Safety: min_dimension_delta must be cleared or the leap is reverted; max_attempts_per_dimension failures escalate to HALT; cost/day caps bound spend. v1.8.0: lock_until_bar keeps leaping the SAME dimension until it clears bar (drive-to-good, not detect-and-nudge).",
+    "__doc__": "Quantum-leap cycles (evolve Steps 2-G/3-K, v1.7.0) — the fix for monotonic incrementalism (RICE structurally forbids overhauls). When the artifact plateaus BELOW bar, the next cycle is forced into LEAP mode: it overhauls the weakest dimension (step-change, not a new feature), bypassing pure RICE via a gap-to-bar bonus, with a larger size budget and an ARTIFACT-improvement gate instead of the unit-test gate. Safety: min_dimension_delta must be cleared or the leap is reverted; max_attempts_per_dimension failures escalate to HALT; cost/day caps bound spend. v1.8.0: lock_until_bar keeps leaping the SAME dimension until it clears bar (drive-to-good, not detect-and-nudge). v1.11.0: rewrite_on_stall — when recommend_rewrite() fires (incremental leaps THEMSELVES stalled), escalate from patch to a from-scratch REWRITE carrying a Reflexion negative-example memo, instead of thrashing to HALT.",
+    "rewrite_on_stall": true,
     "max_lines": 1500,
     "min_dimension_delta": 0.05,
     "max_attempts_per_dimension": 2,

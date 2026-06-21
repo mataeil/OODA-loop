@@ -287,6 +287,35 @@ def asset_ceiling_hit(dimension: dict, score) -> bool:
     return ceil is not None and score is not None and score >= ceil
 
 
+def recommend_rewrite(outcomes: list, dimension: str, rubric: dict, min_failed: int = 2) -> dict:
+    """v1.11.0 stall → REWRITE escalation (the anti-maze fix).
+
+    `detect_plateau` says "the artifact stalled → do a LEAP". This says something
+    sharper: "the incremental LEAPS THEMSELVES have stalled — stop patching the
+    same approach, start over." True when the dimension is plateaued AND
+    >= `min_failed` incremental leaps on it already failed to clear the plateau
+    epsilon. The Reflect step then queues a from-scratch REWRITE (not another
+    same-architecture patch) carrying a negative-example memo of the stalled
+    approach — Reflexion (arXiv:2303.11366) verbal episodic memory so the next
+    attempt explicitly avoids what stalled. This is the fix for the
+    `sky.visible=false` class: a symptom patched cycle after cycle while the root
+    cause (wrong IBL source) is preserved — exactly the f1 'iterate without
+    improving' maze."""
+    pl = detect_plateau(outcomes, rubric)
+    if not pl.get("plateau"):
+        return {"rewrite": False, "failed_leaps": 0, "reason": "not plateaued"}
+    eps = rubric.get("plateau_eps", DEFAULT_PLATEAU_EPS)
+    fails = failed_leaps(outcomes, dimension, eps)
+    do = fails >= min_failed
+    return {
+        "rewrite": do,
+        "failed_leaps": fails,
+        "reason": (f"{fails} incremental leaps stalled on '{dimension}' (>= {min_failed}) "
+                   f"→ rewrite, don't patch") if do
+                  else f"incremental still viable ({fails} failed < {min_failed})",
+    }
+
+
 def lock_target(outcomes: list, rubric: dict, leap_target: str | None) -> str | None:
     """v1.8.0 dimension-lock: after a SUCCESSFUL leap whose target is still below
     (bar − eps), return that target so evolve 2-G keeps the plateau active on it

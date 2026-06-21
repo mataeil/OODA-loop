@@ -8,6 +8,38 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
+## [v1.11.0] — 2026-06-21
+
+### Added — Research-Grounded OODA (the anti-maze methodology)
+
+The f1 probe hit the classic failure: it **iterated without improving** (a
+local-optimum "maze") because generation was anchored to model priors, not
+external ground truth. A heavy external-research pass (graphics/physics/art +
+the methodology literature) produced a cited playbook AND this 5-part fix, each
+grounded in published work:
+
+- **Pre-generation research grounding (dev-cycle Step 3-PRE).** Before any
+  quality leap, resolve a reference (config.references / a researched playbook),
+  WebFetch the concrete block, derive acceptance criteria, THEN generate — and
+  record `grounded_in`. (AlphaCodium arXiv:2401.08500: a structured pre-stage
+  raised pass@5 19%→44%. AutoCodeRover; "concrete examples beat abstract specs".)
+- **Reference targets (config.references + config.research).** Named real-product
+  levels + reference-implementation URLs + a research playbook path; mirror into
+  principles.json as permanent memory.
+- **Reference comparison in the 5-G critic.** The critic names the ONE concrete
+  attribute of the reference the artifact lacks per axis (`per_axis_gap`) — an
+  actionable Observe signal, not "looks worse".
+- **Stall → REWRITE escalation (evolve 2-G + `recommend_rewrite()`).** When the
+  incremental LEAPS themselves stall (not just the artifact), escalate from patch
+  to a from-scratch REWRITE carrying a Reflexion (arXiv:2303.11366) negative-
+  example memo, BEFORE giving up to a HALT — the fix for the `sky.visible=false`
+  class (symptom patched on a wrong architecture).
+- **Diagnose/fix isolation on regression** (MASAI arXiv:2406.11638) noted for the
+  regression path.
+
+New deterministic helper `rubric_score.recommend_rewrite()` + test. verify.py
+63 → 64. plugin 1.10.1→1.11.0.
+
 ## [v1.10.1] — 2026-06-20
 
 ### Fixed/clarified — gate integrity (f1 probe, overnight)
