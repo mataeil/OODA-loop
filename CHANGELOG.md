@@ -8,6 +8,29 @@ independently. Bump there signals migration work for downstream projects.
 
 ---
 
+## [v1.12.0] — 2026-06-21
+
+### Added — capture fidelity (the feedback-coverage fix)
+
+Dogfooding v1.11.0 on the f1 game (10 research-grounded grade→ground→regrade
+rounds, honest re-grade 0.31 → ~0.41 stills / ~0.58 true) surfaced the next maze
+variant: **measurable improvement is bounded by FEEDBACK FIDELITY.** The 5-G
+critic captured ONE low-speed first-person cockpit frame (the car kept stopping at
+the start gantry), so a chase camera (where the clearcoat hero car + HDRI
+reflections live), the HDRI sky, speed motion-blur/FOV, and slip-angle physics —
+all real, gated, merged — were INVISIBLE to the grader. The grade stalled and the
+critic kept steering effort toward only-what-was-in-that-one-frame.
+
+- **`capture_states` (evolve 5-G + config).** A dimension is only gradeable in the
+  state(s) where it MANIFESTS; capture each dimension by driving the artifact INTO
+  those states (chase view for paint, high-speed for sense-of-speed, pitched-up for
+  sky) and pass the critic ALL frames. A state that can't be reached is a
+  capture_failure (null), never a low score — don't grade a dimension from a frame
+  that structurally can't show it.
+
+Spec/config only (verify.py unchanged at 64). plugin 1.11.0→1.12.0.
+Builds on v1.8.0 per-dimension `capture_method` + v1.11.0 reference grounding.
+
 ## [v1.11.0] — 2026-06-21
 
 ### Added — Research-Grounded OODA (the anti-maze methodology)
