@@ -742,13 +742,38 @@ for the implementation/build domain that declares config.domains[d].quality_rubr
                   if a.dimension == p.leap_target
                      AND a.delta_score < config.leap.min_dimension_delta)
     if fails >= config.leap.max_attempts_per_dimension:
-      record skill_gap { name: "leap_stuck_{p.leap_target}", type:"quality_gap",
-        detail:"Leap on {p.leap_target} failed {fails}× without clearing min delta —
-                likely UNMEASURABLE by the current capture_method (see 5-G)." }
-      Create HALT: "Leap on '{p.leap_target}' failed {fails}× — human review needed:
-                    supply a richer capture_method/metrics harness for this
-                    dimension, or reweight the rubric. The loop cannot self-fix it."
-      set plateau_leap_blocked = true
+      -- STALL → REWRITE escalation (v1.11.0, the anti-maze fix). Before giving up
+      -- to a HALT, try ONE from-scratch REWRITE: repeated incremental leaps that
+      -- stall are the signature of the maze (a symptom patched on a wrong
+      -- architecture — the f1 `sky.visible=false` class). A patch can't escape;
+      -- a rewrite can. rubric_score.recommend_rewrite() confirms the stall.
+      rw = rubric_score.recommend_rewrite(outcomes.entries, p.leap_target, rubric,
+             min_failed = config.leap.max_attempts_per_dimension)
+      already_rewrote = any(e.cycle_mode == "rewrite" AND e.leap_target == p.leap_target
+                            for e in last config.leap.max_attempts_per_dimension outcomes)
+      if config.leap.rewrite_on_stall AND rw.rewrite AND not already_rewrote:
+        -- Reflexion (arXiv:2303.11366): carry a NEGATIVE-EXAMPLE memo so the
+        -- rewrite explicitly avoids the stalled approach, and re-ground it
+        -- (dev-cycle Step 3-PRE) in config.references / the research playbook —
+        -- the rewrite must implement a CITED reference technique, not re-guess.
+        write memo { type:"stall_detected", dimension:p.leap_target,
+          stalled_approach: summary of the last {fails} leaps' diffs,
+          instruction:"Start from scratch on {p.leap_target}. The incremental
+            approach stalled. Do NOT reuse it. Ground the rewrite in
+            config.references[{domain}] / the research playbook (Step 3-PRE)." }
+        set orient.plateau = { active:true, leap_target:p.leap_target, mode:"rewrite",
+          weakest_dimension:p.weakest_dimension, artifact_score:p.latest,
+          reason:"incremental stalled → grounded REWRITE" }
+        Print "[Orient] ♻️ STALL→REWRITE: incremental leaps on '{p.leap_target}' stalled {fails}×. Next cycle REWRITES from a cited reference (not another patch)."
+      else:
+        record skill_gap { name: "leap_stuck_{p.leap_target}", type:"quality_gap",
+          detail:"Leap+rewrite on {p.leap_target} failed without clearing min delta —
+                  likely UNMEASURABLE by the current capture_method (see 5-G)." }
+        Create HALT: "Leap+rewrite on '{p.leap_target}' stalled — human review needed:
+                      supply a richer capture_method/metrics harness or authored
+                      assets (asset_sources) for this dimension, or reweight the
+                      rubric. The loop cannot self-fix it."
+        set plateau_leap_blocked = true
     else:
       set orient.plateau = { active:true, leap_target:p.leap_target,
                              weakest_dimension:p.weakest_dimension,
@@ -1907,9 +1932,17 @@ verdict = critic(
            'it exists and works' result is ~0.10 (score_0.10), NOT 0.5+. Worse than
            score_0.10 → below 0.10. Do not grade on a curve where 'a decent
            prototype' = good. ---
-           Score null only if the evidence is null. Output
-           {dimension_scores:{axis:score|null}, weakest_dimension, critique(<=30 words)}.",
-  input:  { mission, rubric.dimensions (with reference anchors), evidence: dim_artifact }
+           --- REFERENCE COMPARISON (v1.11.0): you are also given `references` (the
+           reference target for this domain — a named real product and/or a
+           reference-implementation screenshot/spec). For each axis state the ONE
+           concrete attribute of the reference the artifact most lacks (name a
+           specific technique/parameter, e.g. 'no clearcoat on paint', 'camera has
+           no speed lead', 'tyres show no slip'). That gap-naming is the primary
+           Observe signal that drives the next leap — vague 'looks worse' is not
+           actionable; 'lacks X that reference has' is. ---
+           Score null only if the evidence is null. Output {dimension_scores:{axis:
+           score|null}, weakest_dimension, per_axis_gap:{axis:'lacks X'}, critique(<=30 words)}.",
+  input:  { mission, rubric.dimensions (with reference anchors), config.references, evidence: dim_artifact }
 ) -> { dimension_scores, weakest_dimension, critique }
 
 -- ASSET CEILING + HAND-OFF (v1.9.0 → v1.10.0). For the targeted dimension, after

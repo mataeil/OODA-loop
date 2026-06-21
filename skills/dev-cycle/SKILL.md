@@ -196,8 +196,40 @@ Read context files before writing any code:
 3. Read `selected.source_domain` report (if referenced) to understand the
    motivation behind this action.
 
-Analyze what needs to change based on the action title and source report, then
-implement the changes (write and/or edit files).
+### Step 3-PRE: Research grounding (v1.11.0 — the anti-maze step)
+
+> **Why this exists.** The f1 dogfood proved the loop can "iterate without
+> improving" — a maze/local-optimum — when generation is anchored to the model's
+> own priors instead of to external ground truth. The fix (AlphaCodium
+> arXiv:2401.08500, which raised pass@5 19%→44% with a structured pre-generation
+> stage; AutoCodeRover; Simon Willison's "concrete examples beat abstract
+> requirements"): **ground every non-trivial change in an external reference
+> BEFORE writing code.** This is Boyd's Observe extended to the world's knowledge,
+> not just local state.
+
+For any leap / quality-improving / "make it better" action (skip for a trivial
+mechanical edit), BEFORE writing code:
+
+1. **Resolve a reference.** Read `config.references` (and `agent/state/research/*`
+   if present — a researched, cited playbook). Pick the reference target for this
+   technique/domain (e.g. a named real-product level, a reference implementation
+   URL, or a specific playbook move with its concrete API/parameters).
+2. **Fetch the concrete block.** WebFetch / curl the *specific* reference snippet
+   (the 30–50 lines that matter — the exact API calls, parameter values, order of
+   operations), not the whole repo. If a research playbook already contains the
+   cited concrete spec, use that.
+3. **Derive acceptance criteria** from the reference: "the implementation MUST
+   (a) call X with params Y, (b) produce effect Z visible at camera/probe C,
+   (c) not break the gate." Record them in the cycle's outcome as
+   `reference_block` + `acceptance_criteria`.
+4. **Only then generate** — implement the cited technique, adapting names to the
+   real code. The PR/outcome records WHICH reference grounded it (`grounded_in`).
+
+A leap with no `grounded_in` reference is a red flag for the maze: prefer
+researching a concrete approach over reaching for the model's first idea.
+
+Analyze what needs to change based on the action title, source report, **and the
+resolved reference block**, then implement the changes (write and/or edit files).
 
 **Protected paths enforcement:**
 
