@@ -34,6 +34,11 @@ agent/safety/HALT
 # Build artifact — regenerate with scripts/gen_demo_gif.py --preview
 docs/demo_preview.png
 
+# Dogfood probe evidence (f1-racing screenshots) — kept on disk, not framework source
+.claude/evidence/
+/round*.png
+/roundA*.png
+
 # Internal launch/blog drafts (not for the public repo)
 .claude/blog-flagship.md
 .claude/tier-b-review.md
