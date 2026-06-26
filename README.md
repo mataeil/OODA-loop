@@ -141,6 +141,26 @@ Every metric is a deterministic function over plain-JSON state — the same refe
 
 ---
 
+## Measuring the artifact, not just the loop
+
+When the loop measures only process, there's a failure mode — and we walked straight into it. We dogfooded OODA-loop on a real build — a Three.js F1 racing game — and the loop graded itself **A every cycle** (Loop Value 0.995, futile 0%, mission-hit 100%) while producing a dismal game: a Z-fighting blob for a track, no recognizable car. The metrics were perfect; the artifact proved them a lie. A textbook **Goodhart collapse** — the loop measured *process* (did a PR advance?) and was blind to the *artifact* (is the thing good?).
+
+So we added an artifact axis. When a domain declares a human-authored `quality_rubric`, every cycle's `quality_multiplier` becomes `process × artifact`: an **independent critic** (separate model context) captures the real output — screenshot, API call, or a behaviour-measuring harness — and scores it against a rubric **the loop may never write for itself**. The same F1 run re-graded **A (0.995) → D (0.567)**. Lower, and honest — which is the point.
+
+Then a chain of probe-driven fixes to make the loop *close* the gap, not just detect it:
+
+- **Leap cycles** — when artifact quality plateaus below bar, the next cycle overhauls the weakest dimension (a step-change) instead of adding another feature.
+- **Capture fidelity** — each dimension is graded in the state where it actually manifests (a chase camera for car paint, high-speed for sense-of-speed); a state that can't be reached is a measurement failure, never a low score.
+- **Ambition** — the critic scores against *named real products* (dual `bar_leap`/`bar_coast` thresholds, benchmark anchors), so a flat-shaded prototype reads ~0.10, not a self-graded ~0.7.
+- **Research-grounding** — before a leap, the loop grounds generation in an external reference (an [AlphaCodium](https://arxiv.org/abs/2401.08500)-style pre-stage) — a structural remedy for the "iterate forever without improving" failure mode.
+- **Honest ceilings** — when code-only work hits its limit, the loop records a `human_required` skill gap (supply assets) instead of thrashing.
+
+The arc, all of it found by *using* the loop rather than reasoning about it: **lying A → honest D → earned A → honest F+ vs real games → honest ceiling.** See the [latest release](https://github.com/mataeil/OODA-loop/releases) and [CHANGELOG.md](CHANGELOG.md) for the full story.
+
+> This applies to **build** domains (you set a `quality_rubric`). Pure ops/observe loops are unchanged — no rubric means `artifact_factor = 1.0`, exactly as before.
+
+---
+
 ## The OODA Loop (and why Orient matters)
 
 A Korean-War F-86 pilot, John Boyd spent the next two decades working out why some pilots won dogfights. His answer — refined through the 1970s–90s, long after the cockpit — wasn't faster planes. It was a decision cycle, run continuously, each outcome updating the next: **Observe, Orient, Decide, Act**.
@@ -283,6 +303,8 @@ Two production deployments continuously feed real-world data back into the frame
 | Lynceus | Parliamentary audit (국정감사) | 119+ | 0 (Level 2 — observe only) |
 
 These projects are **reference data sources, not modified by the framework**. Every improvement they surface lands upstream so the next downstream project gets it for free. The v1.2.0 line distilled 271 production cycles: the Orient layer now actually learns (principles extraction, lens pre-init), cost-ledger integrity gating, and primitives promoted from production (season modes, active context, rotation). See [CHANGELOG.md](CHANGELOG.md).
+
+**A different kind of feedback — a build-quality dogfood probe.** Separate from the live ops deployments above, an internal probe in a private repo — a Three.js F1 game the loop both builds and grades — drove the entire v1.7–v1.12 artifact-evaluation line ([Measuring the artifact](#measuring-the-artifact-not-just-the-loop)). It is a lab test, not a production deployment.
 
 > **On the numbers.** "86% merged" and the sandbox results are author-measured; the production cycle data is from the maintainer's own deployments. Run your own pilot at Level 1–2 for a week — that's the honest test, and we'd love your numbers. See **[TESTING.md](TESTING.md)** for exactly how the engine is verified (and what isn't yet).
 
